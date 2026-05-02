@@ -1,0 +1,1533 @@
+INTEGRITY SOLVE
+AML/CTF Compliance Portal
+Full-Stack Code Implementation Plan  —  Phase by Phase with Diamond Feature Layer
+
+Document Property
+Value
+Version
+2.0 — Production-Ready Build Plan
+Date
+May 2026
+Stack
+Next.js 14 · NestJS · PostgreSQL · Prisma · BullMQ · Stripe · S3
+Delivery Model
+Milestone-based, pay-on-delivery
+Phases
+4 Core Phases + Diamond Feature Layer
+Total Milestones
+10 Milestones across 15–23 Weeks
+
+
+# 📋  Table of Contents
+Part 1 — Architecture & Stack Decision............................................................................  3
+Part 2 — Monorepo Code Structure..................................................................................  4
+Part 3 — Core Data Model (Prisma Schema)...................................................................  5
+Part 4 — Phase 1: Foundation & Auth (M1–M2).............................................................  8
+Part 5 — Phase 2: Program Wizard & Outputs (M3–M5)................................................  12
+Part 6 — Phase 3: Client Onboarding & Workflows (M6–M7)......................................  17
+Part 7 — Phase 4: Provider Integrations & Billing (M8–M9)........................................  23
+Part 8 — Phase 5: Hardening & Production (M10).......................................................  29
+Part 9 — 💎 Diamond Feature Layer (New High-Value Opportunities)..........................  31
+Part 10 — Gap Analysis & Fixes from Source Docs......................................................  38
+Part 11 — Testing Strategy............................................................................................  41
+Part 12 — Environment & DevOps Setup......................................................................  43
+
+
+# Part 1 — Architecture & Stack Decision
+
+## 1.1 Why This Stack
+The chosen stack is optimised for a workflow-heavy, multi-tenant compliance SaaS. Every decision favours auditability, modularity, and the ability to swap provider adapters without touching core business logic.
+
+Layer
+Choice
+Why
+Frontend Framework
+Next.js 14 (App Router)
+Server Components for initial load speed; Client Components for wizard interactivity; file-based routing maps cleanly to portal structure; built-in API routes for BFF patterns.
+UI Component System
+shadcn/ui + Tailwind CSS
+Enterprise-grade accessible components; no vendor lock-in; works perfectly with Radix primitives; easily themed for Integrity Solve brand.
+Frontend State
+Zustand + React Query (TanStack)
+Zustand for wizard/session state; React Query for server state caching, optimistic updates, and background refetch.
+Backend Framework
+NestJS (TypeScript)
+Decorators for RBAC guards; modular services; built-in DI container; excellent for building provider adapters; clear separation of concerns.
+ORM / Database
+Prisma + PostgreSQL 15
+Type-safe queries; migration system; row-level security compatible; JSON columns for flexible form data alongside relational columns for reporting.
+Auth
+Clerk (recommended) or custom JWT
+Clerk handles multi-workspace invitations, MFA, session management out of the box. Custom JWT is a fallback if client needs full data sovereignty.
+File Storage
+AWS S3 / Cloudflare R2
+R2 preferred for cost (no egress fees); signed URLs for secure downloads; lifecycle policies for retention compliance.
+Background Jobs
+BullMQ + Redis (Upstash for managed)
+Document generation, provider polling, webhook retry, scheduled reviews, billing sync — all need reliable queues with retry logic.
+Document Generation
+docx (Node) + LibreOffice/PDF conversion
+Server-side DOCX from structured data; convert to PDF for viewing. Deterministic and reproducible from data snapshots.
+Billing
+Stripe
+Subscriptions + metered usage events; Stripe webhooks for billing state sync; test mode for development.
+Email/SMS
+Resend (email) + Twilio (SMS)
+Transactional emails and mobile verification. Resend has excellent Next.js integration.
+Monitoring
+Sentry + Pino structured logs
+Error tracking; job failure alerts; audit trail integrity checks; provider timeout alerts.
+Deployment
+Vercel (frontend) + Railway or Fly.io (API + workers)
+Vercel for zero-config Next.js; Railway for NestJS + BullMQ workers; Managed Postgres on Railway or Neon.io.
+
+
+## 1.2 Multi-Tenant Model
+Every database record is scoped to a workspace_id. A Prisma middleware layer enforces this automatically — no query reaches the database without a workspace filter. This prevents cross-tenant data leakage even if application logic has bugs.
+Architecture Rule: The workspace_id scope check happens at the NestJS guard layer (before controllers) AND at the Prisma middleware layer (before database). Double enforcement is not optional.
+
+
+# Part 2 — Monorepo Code Structure
+
+## 2.1 Repository Layout
+Use a pnpm monorepo (or Turborepo) to share types, schemas, and config between frontend and backend without duplication.
+
+integrity-solve/
+  apps/
+    web/                     # Next.js 14 frontend
+      app/
+        (public)/            # Public marketing pages
+        (auth)/              # Register, verify, login
+        app/                 # Protected portal
+          dashboard-onboarding/
+          setup/[step]/
+          dashboard/
+          program/
+          clients/
+          escalations/
+          reviews/
+          billing/
+          settings/
+      components/
+        ui/                  # shadcn components
+        forms/               # React Hook Form + Zod
+        wizard/              # Step navigation, autosave
+        workflow/            # State badge, timeline
+        tables/              # Data tables with sorting
+        documents/           # Preview, download, version
+        rbac/                # PermissionGate wrapper
+      lib/
+        api.ts               # Typed API client
+        auth.ts              # Clerk/JWT helpers
+        store.ts             # Zustand stores
+        route-guards.ts
+    api/                     # NestJS backend
+      src/
+        modules/
+          auth/              # JWT, sessions, guards
+          users/
+          workspaces/
+          memberships/       # Invites, roles
+          rbac/              # Permission matrix
+          program-forms/     # 6-step wizard data
+          program-versions/  # Snapshot + generation
+          documents/         # DOCX/PDF generation
+          customers/
+          customer-files/    # CDD state machine
+          screening/         # Check requests + results
+          providers/         # Adapter layer
+          billing/           # Stripe integration
+          tasks/
+          notifications/
+          audit/
+          webhooks/          # Provider webhook gateway
+        common/
+          guards/            # RBAC, workspace, billing
+          decorators/        # @CurrentUser, @Workspace
+          interceptors/      # Audit, response transform
+          filters/           # Exception handlers
+  packages/
+    shared/                  # DTOs, Zod schemas, enums
+    database/                # Prisma schema + migrations
+    config/                  # ESLint, TS configs
+  infra/
+    docker-compose.yml       # Local Postgres + Redis
+    deploy/                  # Railway/Fly config
+
+
+# Part 3 — Core Data Model (Prisma Schema)
+
+## 3.1 Complete Entity Reference
+The schema is designed around structured entities. Documents are outputs generated from these entities — never the source of truth. Every entity is workspace-scoped.
+
+
+### 3.1.1 Identity & Workspace Entities
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  mobile            String?
+  passwordHash      String?
+  identityStatus    IdentityStatus @default(PENDING)
+  identityProvider  String?   // facia session ref
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  memberships       WorkspaceMembership[]
+  auditLogs         AuditLog[]
+}
+
+model Workspace {
+  id                    String    @id @default(cuid())
+  legalName             String
+  tradingName           String?
+  abn                   String?
+  acn                   String?
+  registryStatus        RegistryStatus @default(PENDING)
+  industryPathway       IndustryPathway?
+  implementationStatus  ImplementationStatus @default(NOT_STARTED)
+  billingStatus         BillingStatus @default(INACTIVE)
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  currentProgramVersionId String?
+  createdAt             DateTime @default(now())
+  memberships           WorkspaceMembership[]
+  programForms          ProgramForm[]
+  programVersions       ProgramVersion[]
+  customers             Customer[]
+  tasks                 Task[]
+  auditLogs             AuditLog[]
+  providerConnections   ProviderConnection[]
+}
+
+model WorkspaceMembership {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        UserRole
+  status      MembershipStatus @default(PENDING)
+  invitedBy   String?
+  joinedAt    DateTime?
+  user        User      @relation(fields: [userId], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  @@unique([userId, workspaceId])
+}
+
+
+### 3.1.2 Program Entities
+model ProgramForm {
+  id          String    @id @default(cuid())
+  workspaceId String
+  stepCode    ProgramStep
+  status      FormStatus @default(NOT_STARTED)
+  dataJson    Json
+  version     Int       @default(1)
+  completedAt DateTime?
+  submittedBy String?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  @@unique([workspaceId, stepCode])
+}
+
+model ProgramVersion {
+  id                  String    @id @default(cuid())
+  workspaceId         String
+  versionNumber       String    // '1.0', '1.1'
+  riskSnapshotJson    Json      // point-in-time risk data
+  effectiveDate       DateTime
+  generatedBy         String
+  createdFromReviewId String?
+  documents           ProgramDocument[]
+  workspace           Workspace @relation(fields: [workspaceId], references: [id])
+}
+
+model ProgramDocument {
+  id               String    @id @default(cuid())
+  programVersionId String
+  docType          DocumentType // RISK_ASSESSMENT, POLICY, PROCEDURES, GOVERNANCE
+  format           DocFormat  @default(DOCX)
+  filePath         String     // S3/R2 key
+  checksum         String
+  templateVersion  String
+  dataSnapshotJson Json       // what was used to generate
+  generatedAt      DateTime   @default(now())
+  programVersion   ProgramVersion @relation(fields: [programVersionId], references: [id])
+}
+
+
+### 3.1.3 Customer & CDD Entities
+model Customer {
+  id          String    @id @default(cuid())
+  workspaceId String
+  customerType CustomerType
+  legalName   String
+  status      CustomerStatus @default(DRAFT)
+  riskRating  RiskRating?
+  files       CustomerFile[]
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+}
+
+model CustomerFile {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  customerId      String
+  fileReference   String    @unique
+  state           FileState @default(DRAFT)
+  riskRating      RiskRating?
+  nextReviewDue   DateTime?
+  assignedTo      String?
+  forms           CustomerForm[]
+  beneficialOwners BeneficialOwner[]
+  checkRequests   CheckRequest[]
+  escalations     Escalation[]
+  tasks           Task[]
+  stateHistory    FileStateHistory[]
+  customer        Customer  @relation(fields: [customerId], references: [id])
+}
+
+
+### 3.1.4 Checks, Billing & Audit Entities
+model CheckRequest {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  customerFileId     String?
+  subjectType        SubjectType
+  subjectId          String
+  providerCapability ProviderCapability
+  providerName       String
+  status             CheckStatus @default(QUEUED)
+  payloadJson        Json
+  idempotencyKey     String    @unique
+  result             CheckResult?
+  usageEvent         UsageEvent?
+  createdAt          DateTime  @default(now())
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  actorUserId String
+  action      String
+  entityType  String
+  entityId    String
+  oldValue    Json?
+  newValue    Json?
+  reason      String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+  // NOTE: No delete or update permissions on this table
+}
+
+
+### 3.1.5 Key Enums
+Enum Name
+Values
+UserRole
+WORKSPACE_ADMIN · COMPLIANCE_OFFICER · PROGRAM_CONTRIBUTOR · ONBOARDING_USER · REVIEWER · READ_ONLY · PLATFORM_ADMIN · SUPPORT
+ImplementationStatus
+NOT_STARTED · IN_PROGRESS · COMPLETE · REQUIRES_REVISION
+BillingStatus
+INACTIVE · SETUP_PENDING · ACTIVE · PAST_DUE · SUSPENDED · CANCELLED
+ProgramStep
+BUSINESS_PROFILE · DESIGNATED_SERVICES · GOVERNANCE · ROLES_RESPONSIBILITIES · CO_APPOINTMENT · PERSONNEL_SUITABILITY
+FileState
+DRAFT · CDD_IN_PROGRESS · PENDING_CHECKS · CHECKS_RETURNED · ECDD_REQUIRED · UNDER_REVIEW · APPROVED · APPROVED_WITH_CONTROLS · HELD · DECLINED · REVIEW_DUE · CLOSED
+ProviderCapability
+IDENTITY_VERIFICATION · AML_SCREENING · KYB_VERIFICATION · BILLING_AUTHORIZATION · ADVERSE_MEDIA · PEP_SCREENING
+CheckStatus
+QUEUED · PROCESSING · PASSED · FAILED · PARTIAL · ESCALATED · ERROR · MANUAL_OVERRIDE
+DocumentType
+RISK_ASSESSMENT · POLICY · PROCEDURES · GOVERNANCE_SUMMARY · COMPLETION_PACK
+RiskRating
+LOW · MEDIUM · HIGH · CRITICAL
+
+
+# Part 4 — Phase 1: Foundation & Auth  (M1 + M2)
+
+## Milestone 1 — Core Foundation (Weeks 1–2)
+Goal: Working multi-tenant auth system, workspace isolation, RBAC guards, and first-login restricted dashboard shell. Everything built here is permanent infrastructure — invest in it correctly.
+
+
+### M1 — Backend Tasks
+Task
+File / Module
+Detail
+Monorepo bootstrap
+root package.json, turbo.json
+pnpm workspaces; Turborepo pipeline for build/dev/lint; shared tsconfig; shared eslint.
+Database init
+packages/database/schema.prisma
+Full Prisma schema for all entities defined in Part 3. Run initial migration. Seed with test workspace + user.
+NestJS app setup
+apps/api/src/main.ts
+Global validation pipe; Helmet; CORS; request ID middleware; Pino logger with workspace_id and request_id in every log line.
+Auth module
+modules/auth/
+JWT access + refresh token rotation; email/mobile OTP verification; Clerk adapter (or custom); session store.
+Workspace guard
+common/guards/workspace.guard.ts
+Extracts workspace_id from JWT or header; validates user is member; sets req.workspace. Applied globally.
+RBAC guard
+common/guards/rbac.guard.ts
+Decorator-based: @RequireRole(UserRole.COMPLIANCE_OFFICER); checks membership role; rejects 403.
+Workspace isolation middleware
+common/interceptors/workspace-scope.interceptor.ts
+Prisma middleware that appends where: { workspaceId: req.workspace.id } to all queries. Cannot be bypassed.
+Audit interceptor
+common/interceptors/audit.interceptor.ts
+Auto-logs all mutation requests (POST/PUT/PATCH/DELETE) with actor, entity type, entity id, before/after state.
+Users module
+modules/users/
+CRUD, identity status update, role assignment validation.
+Workspaces module
+modules/workspaces/
+Create workspace; get workspace; update status; setup progress calculator.
+Memberships module
+modules/memberships/
+Invite user by email; accept invite; assign/change role; revoke access; support access provisioning.
+
+
+### M1 — Frontend Tasks
+Task
+Route / Component
+Detail
+Next.js app bootstrap
+apps/web/
+App Router; Tailwind + shadcn/ui init; Integrity Solve brand tokens in tailwind.config.ts; custom font (Inter).
+Auth provider
+app/layout.tsx
+Clerk Provider wrapping app; or custom JWT context; session persistence.
+Route guard HOC
+lib/route-guards.ts + middleware.ts
+Next.js middleware checks session on every /app/* route. Redirects to /login if unauthenticated. Redirects to /app/dashboard-onboarding if implementation incomplete.
+Register page
+/register
+Multi-step: account details → email verify → mobile OTP. React Hook Form + Zod validation. Progress indicator.
+Verify identity page
+/verify-identity
+Launch identity provider session (Facia SDK or redirect); poll/webhook for result; show status card with retry option.
+Register business page
+/register-business
+ABN/ACN lookup with live registry API call; prefill fields; authority declaration checkbox; workspace name.
+Restricted dashboard shell
+/app/dashboard-onboarding
+Setup progress card (0–6 steps); locked feature previews with padlock icons and tooltips; billing status card; support CTA.
+Navigation layout
+app/app/layout.tsx
+Sidebar nav with role-aware visibility; workspace switcher (if multi-workspace); notification bell; user avatar + logout.
+PermissionGate component
+components/rbac/PermissionGate.tsx
+Wraps any UI element; hides or disables based on user role. Used throughout entire app.
+API client
+lib/api.ts
+Typed fetch wrapper; auto-attaches auth header and workspace_id; handles 401 refresh and 403 UI feedback.
+
+
+### M1 — Acceptance Criteria
+User can register, verify email, verify identity, register business, and reach restricted dashboard
+Workspace is created and all data is strictly scoped to that workspace
+Direct URL access to /app/clients returns 403 for non-admin roles
+Audit log entry is created for every login, role change, and workspace creation event
+Test user in Workspace A cannot query data belonging to Workspace B even with valid JWT
+
+
+## Milestone 2 — Business Registration & Restricted State (Week 3)
+Goal: Complete the workspace creation funnel. ABN/ACN lookup, billing placeholder, workspace state management, and the restricted-but-meaningful first-login experience.
+
+
+### M2 — Backend Tasks
+Task
+Module
+Detail
+ABN/ACN registry integration
+modules/workspaces/registry.service.ts
+Call ABR or KYB provider for business lookup. Store registry_status. Prefill legal_name, address, registration_details. Flag mismatches for manual review.
+Workspace state machine
+modules/workspaces/workspace-state.service.ts
+Explicit transitions: registered → identity_verified → business_verified → setup_in_progress → setup_complete → active. Each transition logs to audit. Guards prevent skipping states.
+Setup progress API
+GET /workspaces/:id/setup-progress
+Returns completion status of each of the 6 implementation steps plus identity and billing status. Used by frontend to render checklist.
+Billing placeholder setup
+modules/billing/billing-init.service.ts
+Create Stripe customer for workspace on registration. Store stripeCustomerId. Set billingStatus = INACTIVE. Do not require card at this stage.
+Support access provisioning
+modules/memberships/support-access.service.ts
+Platform admin can grant time-limited support access to a workspace. Creates auditable support membership with expiry. Client admin must explicitly approve.
+
+
+### M2 — Frontend Tasks
+Task
+Component
+Detail
+Workspace setup page
+/register-business
+Full business form with ABN/ACN live lookup. Show registry card with matched data. Require user to confirm prefilled data. Authority declaration.
+Billing setup page
+/app/billing/setup
+Show subscription plan options. Add payment method via Stripe Elements. Show clear 'paid checks need billing' messaging. Allow skip (blocks checks only).
+Restricted dashboard widgets
+/app/dashboard-onboarding/
+SetupProgressCard with animated steps; LockedFeaturePreview for each major module; BillingStatusBadge; SupportCard. Each locked module shows what it unlocks.
+Global notification system
+components/notifications/
+Toast notifications; in-app notification bell with count; background polling for new tasks/alerts.
+
+
+### M2 — Acceptance Criteria
+ABN lookup returns and pre-fills business data; manual entry still permitted with admin flag
+Workspace transitions through states in correct order; no skipping
+Restricted dashboard shows meaningful locked previews — not just blank grey boxes
+Billing setup creates Stripe customer; billingStatus updates correctly from Stripe webhook
+Support access is visible in audit log and can be revoked by workspace admin
+
+
+# Part 5 — Phase 2: Program Wizard & Outputs  (M3–M5)
+
+## Milestone 3 — Implementation Wizard (Weeks 4–6)
+Goal: The six-step implementation wizard — the first critical value delivery. A user completing this wizard has built their AML/CTF program foundation and earned access to the full portal.
+
+
+### M3 — The Six Implementation Steps
+Step
+Form Name
+Key Fields to Capture
+Conditional Logic
+Step 1
+Practice / Business Profile Intake
+Industry pathway; business structure; staff count; office locations; jurisdictions; client volume; existing AML systems; reporting obligations
+Industry pathway routes Step 2 options. Jurisdictions flag international risk exposure.
+Step 2
+Designated Services Applicability
+Which designated services apply; volumes; types of customers; geographical exposure; nature of transactions; current controls
+Only show services relevant to industry pathway from Step 1. High volume thresholds trigger enhanced risk flags.
+Step 3
+Governance & AML Program Setup
+Governing body; board-level oversight; compliance reporting cycle; external AML support arrangements; training schedule; internal audit approach
+External support flag affects CO Appointment in Step 5. Reporting cycle sets review task schedule.
+Step 4
+AML Roles & Responsibilities
+Role allocation matrix; who is responsible for each AML function; escalation path; deputy designation; external responsible person
+Escalation path must be complete before Step 5 is unlockable.
+Step 5
+Compliance Officer Appointment
+Appointed CO name; authority scope; qualifications; tenure; support arrangement; contingency plan
+CO name prefills from Step 4 allocation. Must match a registered workspace user or create pending user record.
+Step 6
+Personnel Suitability / Statutory Declaration
+Suitability assessment outcome; conflict of interest flags; fitness and propriety declaration; authorised signatory; declaration date
+Conflicts flag creates compliance task. Declaration triggers document generation job.
+
+
+### M3 — Backend Tasks
+Task
+Module/Endpoint
+Detail
+Program forms CRUD
+modules/program-forms/
+GET /program/forms — returns all 6 steps with status and data; PUT /program/forms/:step — autosave with partial validation; POST /program/forms/:step/submit — final validation and lock.
+Autosave architecture
+program-forms.service.ts
+Debounced PUT endpoint; optimistic frontend saves; server-side last-write-wins; dataJson stores all form fields; key fields extracted to relational columns for reporting.
+Step unlock logic
+program-forms.guard.ts
+Backend validates step N-1 is in status COMPLETED before allowing submit of step N. Frontend mirrors this but is not the authority.
+Conditional field logic
+Shared Zod schemas in packages/shared
+Zod discriminated unions for industry-dependent fields. Same schema used for frontend validation and backend validation — no duplication.
+Step completion tracking
+GET /workspaces/:id/setup-progress
+Returns per-step status, completion percentage, last_saved_at. Called by frontend every 30s and on focus.
+Conflict of interest flag handler
+program-forms.service.ts / tasks module
+When Step 6 conflict_flag = true, auto-create a compliance task assigned to Workspace Admin or CO with due date.
+
+
+### M3 — Frontend Tasks
+Task
+Component
+Detail
+WizardLayout
+components/wizard/WizardLayout.tsx
+Persistent step navigation sidebar; progress bar; current step indicator; Save & Exit button always visible. Never unmounts between steps.
+DynamicFormRenderer
+components/forms/DynamicFormRenderer.tsx
+Renders form fields from JSON schema config. Supports: text, number, select, multi-select, radio, checkbox, date, rich-text, file-upload, conditional sections.
+AutosaveIndicator
+components/wizard/AutosaveIndicator.tsx
+Shows 'Saving...' / 'Saved' / 'Unsaved changes' / 'Save failed'. Triggers PUT every 2s after last change. Shows last saved timestamp.
+StepValidation
+components/wizard/StepValidation.tsx
+Real-time Zod validation; field-level error messages; summary error banner on submit attempt; prevents progression if required fields missing.
+ContextHelpPanel
+components/wizard/ContextHelpPanel.tsx
+Collapsible right panel with step-specific help text, examples, and regulatory references. Client provides content — component is the container.
+ConditionalSection
+components/forms/ConditionalSection.tsx
+Wrapper that shows/hides form sections based on other field values. Animated expand/collapse. Hidden fields are excluded from validation.
+Step 1–6 specific forms
+app/app/setup/[step]/page.tsx
+Each step is a separate page component that uses DynamicFormRenderer with step-specific schema. Shared layout via WizardLayout.
+
+
+### M3 — Acceptance Criteria
+All 6 steps render correctly with appropriate conditional sections
+Autosave works — user can close browser and return to exact state
+Step 4 cannot be submitted before Steps 1–3 are complete (frontend AND backend validation)
+Conflict of interest flag in Step 6 creates a compliance task automatically
+Completing Step 6 changes workspace implementationStatus to COMPLETE
+
+
+## Milestone 4 — Generated Program Outputs (Weeks 6–8)
+Goal: Completing the wizard triggers automatic generation of the Risk Assessment, AML/CTF Policy, and AML/CTF Procedures as versioned DOCX/PDF files. These are the primary tangible product value.
+
+
+### M4 — Document Generation Architecture
+The document generation engine follows a strict pipeline to ensure reproducibility and auditability:
+
+Wizard Completion Event
+  → Create ProgramVersion (snapshot of all form data)
+  → Enqueue 4 generation jobs (one per document type)
+  → Each job: load template → inject variables → render DOCX → convert to PDF
+  → Store in S3/R2 with signed URL → update ProgramDocument record
+  → Calculate checksum → store dataSnapshotJson (point-in-time immutable copy)
+  → Send notification to user
+
+
+### M4 — Backend Tasks
+Task
+Module/Service
+Detail
+Program version creation
+modules/program-versions/
+On Step 6 submission: create ProgramVersion with riskSnapshotJson = aggregation of all 6 form dataJson fields. Immutable after creation — no updates allowed, only supersede.
+Document generation service
+modules/documents/generation.service.ts
+BullMQ job per document type. Load Handlebars/EJS template for doc type. Map form fields to template variables (client provides final template content). Render DOCX using docx-js. Convert to PDF via LibreOffice.
+Template variable mapping
+modules/documents/template-maps/
+Separate mapping file per document type. Maps ProgramVersion.riskSnapshotJson fields to template variables. Easy to update when templates change without touching generation logic.
+Document storage
+modules/documents/storage.service.ts
+Upload to S3/R2 with workspace_id prefix. Generate SHA-256 checksum. Store in ProgramDocument. Signed URL generation with 1-hour expiry for downloads.
+Version supersession
+modules/program-versions/
+When new program version is generated, old ProgramDocuments move to status SUPERSEDED. Frontend shows version history with ability to download any previous version.
+Download endpoint
+GET /documents/:id/download
+Validates user has access to workspace. Generates fresh signed URL. Logs download event to audit.
+
+
+### M4 — Frontend Tasks
+Task
+Component/Route
+Detail
+Generation progress UI
+/app/dashboard-onboarding + completion screen
+Show 'Generating your AML program...' with progress steps. WebSocket or polling for job completion. Reveal documents as each one completes.
+Document viewer
+components/documents/DocumentViewer.tsx
+PDF preview in-browser using PDF.js. Download DOCX and PDF buttons. Version badge. Generated date and program version reference.
+Document versions panel
+/app/program/documents
+List all versions with date, who triggered generation, version number. Each row has download DOCX + PDF. Current version highlighted. Superseded versions clearly labelled.
+Risk assessment summary card
+/app/dashboard + /app/program/risk-assessment
+Visual summary of key risk outputs: industry pathway, designated services, risk rating, key controls, review schedule. Not a document — a live dashboard card from ProgramVersion data.
+
+
+### M4 — Acceptance Criteria
+Completing Step 6 triggers document generation within 60 seconds
+All 4 documents (Risk Assessment, Policy, Procedures, Governance Summary) are generated and downloadable
+DOCX downloads correctly in Word; PDF renders correctly in browser
+Checksum stored; re-downloading the same version returns the same file
+Previous versions remain downloadable after program update regeneration
+
+
+## Milestone 5 — Manage My Program (Week 8–9)
+Goal: Ongoing program maintenance — users can update their program forms, record training, trigger program reviews, and regenerate documents. Version history preserved.
+
+
+### M5 — Backend & Frontend Tasks
+Task
+Detail
+Program update workflow
+User edits any of the 6 implementation forms. Changes are saved but do NOT immediately regenerate documents. A 'Changes pending regeneration' flag appears. User (CO or Admin) must explicitly submit a Program Review/Update Record to trigger new ProgramVersion creation and document regeneration.
+Training record CRUD
+POST/GET/PATCH /program/training-records. Fields: session_title, training_type (INDUCTION/REFRESHER/CO/SYSTEM/OTHER), date, participants, delivery_method, competency_outcome, follow_up_action. List view with filters. Export to CSV.
+Program Review/Update Record
+Form capturing: trigger (SCHEDULED/EVENT/REGULATORY), scope of changes, summary of changes, approver, effective date. On submit: creates new ProgramVersion and queues document regeneration.
+Training dashboard widget
+Shows training compliance status: last training date per role, overdue training alerts, upcoming scheduled training. Links to training record list.
+Program health score
+Calculated from: implementation completeness, training recency, review currency, outstanding tasks, screening currency. Displayed as a score card on main dashboard.
+Audit trail view
+Paginated read-only view of all program-related audit events. Filterable by date, actor, action type. Export to PDF for compliance evidence.
+
+
+### M5 — Acceptance Criteria
+User can update implementation forms and see 'pending' state before regeneration
+Training records can be created, listed, and exported
+Program Review/Update Record submission creates new ProgramVersion and triggers document regeneration
+Audit trail shows every change with actor, timestamp, old value, and new value
+
+
+# Part 6 — Phase 3: Client Onboarding & Workflows  (M6–M7)
+
+## Milestone 6 — Client Onboarding Foundation (Weeks 10–12)
+Goal: The customer file engine — create customer records, progress through the Initial CDD workflow, upload evidence, calculate risk rating, and reach a basic decision state. No live provider calls yet (use mock adapters).
+
+
+### M6 — Customer File State Machine
+Every customer file is an explicit state machine. State transitions are logged. No transition can happen without the correct prior state and the correct role.
+
+State
+Entry Trigger
+Permitted Actors
+Exit Conditions
+Next States
+DRAFT
+User clicks New Client
+ONBOARDING_USER, CO, ADMIN
+Minimum required fields saved
+CDD_IN_PROGRESS
+CDD_IN_PROGRESS
+CDD form started
+ONBOARDING_USER, CO
+All required CDD fields complete; risk rating calculated
+PENDING_CHECKS / ECDD_REQUIRED / HELD
+PENDING_CHECKS
+Check request queued
+System (auto)
+All queued checks returned result
+CHECKS_RETURNED
+CHECKS_RETURNED
+Provider result received
+System (auto)
+User/system reviews results
+UNDER_REVIEW / ECDD_REQUIRED / ESCALATED
+ECDD_REQUIRED
+High-risk trigger or screening hit
+ONBOARDING_USER (trigger), CO/REVIEWER (complete)
+ECDD form submitted with decision
+APPROVED / APPROVED_WITH_CONTROLS / HELD / DECLINED
+UNDER_REVIEW
+Pending reviewer decision
+CO, REVIEWER
+Decision recorded with reason
+APPROVED / APPROVED_WITH_CONTROLS / HELD / DECLINED
+APPROVED
+Clean CDD + clear checks
+CO, REVIEWER, ADMIN
+Relationship established
+REVIEW_DUE / ESCALATED
+APPROVED_WITH_CONTROLS
+Higher risk accepted with conditions
+CO, ADMIN
+Controls recorded
+REVIEW_DUE / ESCALATED
+HELD
+Info missing or unresolved
+CO, REVIEWER
+New information provided or timeout
+UNDER_REVIEW / DECLINED
+DECLINED
+Unacceptable risk or failure
+CO, ADMIN
+Final decision — no reversal
+CLOSED
+REVIEW_DUE
+Scheduled date or event trigger
+System (auto)
+Review completed
+APPROVED / ECDD_REQUIRED / ESCALATED
+
+
+### M6 — Backend Tasks
+Task
+Module/Endpoint
+Detail
+Customer CRUD
+modules/customers/
+Create customer (type, legal name, basic details); list with filters (status, risk_rating, next_review_due); get customer with files.
+Customer file CRUD
+modules/customer-files/
+Create file; get file with all linked data; update state via explicit transition endpoint only; list files with sorting and filtering.
+State transition engine
+POST /customer-files/:id/transition
+Body: { to_state, reason, actor }. Validates: current state allows transition, actor has permission, required linked forms are complete. Logs to audit. Creates task if required.
+CDD form
+PUT /customer-files/:id/forms/INITIAL_CDD
+Form data: customer_type, service pathway, source of relationship, verification method, ID details, risk factors. Extract risk_rating from completed data using rule set.
+Risk rating calculator
+modules/customer-files/risk-calculator.service.ts
+Rule-based scoring from CDD form fields: customer type, industry, jurisdiction, service type, PEP status, ownership complexity. Returns LOW/MEDIUM/HIGH/CRITICAL with factor breakdown.
+Evidence upload
+POST /customer-files/:id/evidence
+Multipart upload to S3/R2; store evidence record with: file_type, label, uploaded_by, uploaded_at, linked_form_type. Signed URL for download. Max file size enforcement.
+Beneficial ownership form
+PUT /customer-files/:id/forms/BENEFICIAL_OWNERSHIP
+Entity structure: owners/controllers with name, ownership_percent, country, verification_status, screening_status. Spawn screening tasks for each person.
+
+
+### M6 — Frontend Tasks
+Task
+Component/Route
+Detail
+Customer list page
+/app/clients
+Table with sort/filter by status, risk_rating, next_review_due. Quick action buttons per row. Bulk actions for review queue. Export to CSV.
+New client wizard
+/app/clients/new
+CustomerTypeSelector → Dynamic CDD form based on type → Check eligibility → Risk result → Decision. Multi-step with progress.
+Customer file detail page
+/app/clients/[id]
+Tabs: Overview (state, risk, timeline) / CDD Forms / Checks / Evidence / Beneficial Owners / Escalations / Audit. FileTimeline showing all state transitions with actor and date.
+FileStateBadge
+components/workflow/FileStateBadge.tsx
+Colour-coded badge per state. Tooltip with state description and permitted next actions. Pulsing animation for PENDING_CHECKS.
+EvidenceUploader
+components/forms/EvidenceUploader.tsx
+Drag-and-drop multi-file upload. File type validation. Progress indicator. Link to form type. Preview thumbnails for images.
+RiskRatingCard
+components/workflow/RiskRatingCard.tsx
+Visual card showing risk_rating with colour coding, factor breakdown (what drove the rating), and suggested next action.
+BeneficialOwnerForm
+components/forms/BeneficialOwnerForm.tsx
+Dynamic add/remove owner rows. Ownership percentage validation (must sum ≤ 100%). Country selector. Screening status per person.
+
+
+### M6 — Acceptance Criteria
+Customer files can be created for Individual, Company, Trust, Partnership types
+CDD form calculates risk rating from form data using defined rules
+State transitions enforce correct sequence and role requirements (backend, not just frontend)
+Evidence uploads store correctly in S3/R2 and can be downloaded via signed URL
+Beneficial ownership form captures and validates ownership structure
+
+
+## Milestone 7 — Escalation & Review Workflows (Weeks 12–14)
+Goal: The high-risk compliance path — ECDD, Source of Funds/Wealth, Escalation, Unusual Activity Review, and Periodic Review. This is where compliance-grade audit requirements are most critical.
+
+
+### M7 — Forms & Workflows
+Form / Workflow
+Trigger
+Required Fields
+Decision Options
+Audit Requirements
+Enhanced CDD (ECDD)
+High risk rating; complexity; jurisdiction; trigger event
+Trigger reason; additional verification obtained; senior approval; revised risk assessment; controls to apply; decision
+PROCEED / PROCEED_WITH_CONTROLS / HOLD / DECLINE
+Full before/after risk comparison; approver identity; timestamp; controls recorded
+Source of Funds (SOF)
+Entity or complex individual; high value service; jurisdiction risk
+Funds source description; evidence obtained; plausibility assessment; gaps and mitigants; conclusion
+SATISFACTORY / FURTHER_INFORMATION / ESCALATE
+Conclusion reason; evidence reference; assessor identity
+Source of Wealth (SOW)
+ECDD trigger; PEP status; high net worth indicators
+Wealth origin; evidence; consistency check; assessment conclusion
+SATISFACTORY / FURTHER_INFORMATION / ESCALATE
+Assessor identity; evidence linked; conclusion reason
+Escalation
+Any file trigger; suspicious activity; unresolved concern
+Escalation category; urgency; summary of concern; supporting evidence refs; reviewer assigned
+PROCEED / PROCEED_WITH_CONTROLS / HOLD / DECLINE / REFER_SUSPICIOUS_MATTER
+Escalation created timestamp; assigned reviewer; decision timestamp; full chain of custody
+Unusual Activity Review
+Staff observation; monitoring alert; system flag
+Activity description; timeline; suspicion basis; internal review outcome; reportability assessment
+NO_FURTHER_ACTION / ENHANCED_MONITORING / ESCALATE / CONSIDER_SMR
+All versions of the review record; who assessed; outcome reasoning
+Periodic Review
+Scheduled date; trigger event (change in ownership, service, jurisdiction)
+Review scope; currency of verification; screening refresh; risk re-assessment; controls adequacy; updated decision
+NO_CHANGE / RISK_UPGRADED / RISK_DOWNGRADED / ECDD_REQUIRED / CLOSE_RELATIONSHIP
+Prior state vs new state; trigger reason; completion date
+
+
+### M7 — Backend Tasks
+Task
+Detail
+ECDD module
+Form CRUD; decision endpoint with mandatory reason capture; role guard (CO or REVIEWER only); triggers state transition on decision.
+SOF/SOW module
+Separate forms linked to customer_file; evidence linking; conclusion states; auditable assessor record.
+Escalation module
+Create escalation; assign reviewer (auto-assign CO if unassigned); transition: open → under_review → action_required → resolved. Email notification on assignment. Escalation list endpoint with filtering.
+Unusual activity module
+Create review from any file; progression states; SMR consideration flag; outcome recording. Link multiple unusual activity reviews to same file.
+Periodic review scheduler
+BullMQ cron job: daily check for customer files where next_review_due ≤ today + 30 days. Create REVIEW_DUE task and transition file to REVIEW_DUE state. Email notification.
+Review completion
+Submit periodic review form; update risk_rating if changed; update next_review_due; transition file back to APPROVED or ECDD_REQUIRED based on outcome.
+Escalation email notifications
+On new escalation: email assigned reviewer. On 48h without action: escalate notification to CO. On resolution: notify originating user.
+Escalation queue API
+GET /escalations?status=open&assigned_to=me — paginated, filterable. GET /reviews?due_within=30 — periodic review queue.
+
+
+### M7 — Frontend Tasks
+Task
+Detail
+Escalation queue page
+/app/escalations — Table: file reference, customer, severity badge, assigned reviewer, days open, last action. Bulk assignment. Quick filters: my escalations, unassigned, by severity.
+Escalation detail panel
+Side panel or modal with: escalation timeline, linked forms, evidence, reviewer decision form with mandatory reason, approve/decline/hold buttons (role-gated).
+Review queue page
+/app/reviews — Table: customer file, review type, due date, days overdue badge (red/amber). One-click open review form. Filter by type and due window.
+ECDD form component
+Multi-section form: trigger section → verification section → risk re-assessment → controls → decision. Decision buttons only visible to CO/REVIEWER role.
+SOF/SOW form component
+Assessment form with evidence linker, conclusion dropdown, notes. Shows linked evidence from file. Read-only after submission.
+Unusual activity form
+Structured form with suspicion category selector, timeline, reviewer notes, SMR consideration flag with extra confirmation step.
+ReviewDecisionModal
+Re-usable modal for all decision types: approval, hold, decline. Mandatory reason field. Role check before showing. Double-confirm for DECLINE decisions.
+
+
+### M7 — Acceptance Criteria
+ECDD form can only be completed/approved by CO or REVIEWER role
+Escalation is automatically assigned to CO if no reviewer specified
+Periodic review scheduler creates tasks 30 days before due date
+Every decision (approve/hold/decline) requires a reason — backend enforces this
+Unusual activity SMR flag creates a confirmation step before final submission
+Audit trail shows complete chain of custody for every escalation
+
+
+# Part 7 — Phase 4: Provider Integrations & Billing  (M8–M9)
+
+## Milestone 8 — Provider API Layer (Weeks 14–17)
+Goal: Real identity verification, AML screening, and KYB checks. Built through capability-based adapters so any provider can be swapped without touching business logic. Start with sandbox/mock adapters.
+
+
+### M8 — Provider Adapter Pattern
+Every external provider is accessed through a common interface. The UI and workflow layer never know which specific provider is being used — they request a capability.
+
+// Provider Capability Contract (TypeScript)
+interface ProviderAdapter {
+  readonly capability: ProviderCapability;
+  readonly providerName: string;
+  createRequest(input: CheckRequestEnvelope): Promise<ProviderStartResult>;
+  pollStatus(providerRequestId: string): Promise<NormalizedCheckResult>;
+  normalizeResponse(raw: unknown): Promise<NormalizedCheckResult>;
+  verifyWebhook(signature: string, body: Buffer): boolean;
+  mapWebhookToRequestId(body: unknown): string;
+}
+
+// Provider Registry — resolves adapter by capability
+class ProviderRegistry {
+  resolve(capability: ProviderCapability): ProviderAdapter {
+    // Looks up active provider config from DB for workspace
+    // Returns correct adapter implementation
+  }
+}
+
+// Check Request Flow
+UI action (e.g., 'Run identity check')
+  → POST /checks { capability, subjectId, workspaceId }
+  → Create CheckRequest record (status: QUEUED, idempotencyKey)
+  → Enqueue BullMQ job
+  → Job: ProviderRegistry.resolve(capability) → adapter.createRequest()
+  → Update CheckRequest (status: PROCESSING, providerRequestId)
+  → Await webhook OR poll on schedule
+  → Webhook/poll: adapter.normalizeResponse() → Create CheckResult
+  → Create UsageEvent (billable)
+  → Update CustomerFile state if required
+  → Create Task if review required
+  → Emit audit log
+
+
+### M8 — Provider Integrations
+Provider Class
+Initial Candidate
+Integration Type
+Key Implementation Notes
+Identity Verification / Liveness
+Facia
+Session-based SDK + webhook
+Create liveness session; embed SDK in frontend; receive webhook on completion; normalize result to identity_status + liveness_status + confidence_score. Store raw payload ref. Support retry with new session.
+AML Screening (Individual)
+AML Watcher or Personr
+Synchronous API + optional webhook
+POST screen request with name, DOB, country. Normalize to sanctions_result + pep_result + adverse_media_result + match_count. Any potential match creates review task. Support re-screen on demand.
+AML Screening (Entity)
+AML Watcher or My Data Boss
+Synchronous API
+Entity name + registration number. Normalize to entity_watchlist_result + media_result. Same task creation on match.
+KYB / Business Registry
+ABR (free) + KYB partner
+REST API
+ABR lookup for Australian entities is free. KYB partner for director/officer data. Prefill onboarding forms. Require user confirmation before save. Trigger individual screening for returned directors.
+Mock / Sandbox Adapter
+Internal
+Configurable
+Mock adapter returns configurable results (always_pass, always_fail, random_match) for each capability. Used in development and UAT testing. Toggled by environment config.
+
+
+### M8 — Backend Tasks
+Task
+Module/Service
+Detail
+Provider connection management
+modules/providers/provider-connection.service.ts
+Store provider config per capability per workspace. Credentials as secret_ref (points to secret manager, never stored in plain DB). Status: active/disabled/error.
+Check orchestrator
+modules/screening/check-orchestrator.service.ts
+Receives check request; resolves provider adapter; creates CheckRequest; enqueues processing job; handles idempotency via idempotencyKey unique constraint.
+BullMQ check processor
+modules/screening/check.processor.ts
+Processes check jobs; handles provider timeouts (retry up to 3 times with backoff); creates pending task on persistent failure; never treats timeout as clear result.
+Webhook gateway
+modules/webhooks/webhook.controller.ts
+Single endpoint per provider: POST /webhooks/:provider. Validates HMAC signature; rejects if invalid. Looks up internal request_id from provider_request_id. Idempotent processing (check processed_at before acting). Creates/updates CheckResult.
+Reconciliation job
+modules/screening/reconciliation.job.ts
+Daily BullMQ cron: find CheckRequests in PROCESSING status older than configured timeout. Poll provider for status. Create alert if still unresolved.
+Normalized result storage
+modules/screening/check-result.service.ts
+Store result_json (normalized), raw_payload_ref (S3 key for full response). Create UsageEvent on successful result. Update CustomerFile state.
+Manual override endpoint
+POST /checks/:id/override
+CO or ADMIN only; requires reason; updates CheckRequest status to MANUAL_OVERRIDE; records who, when, why. Full audit trail.
+
+
+### M8 — Frontend Tasks
+Task
+Detail
+Check trigger UI
+Per-form check buttons (e.g., 'Run Identity Check', 'Run AML Screen'). Visible only when billing is active and checks are available. Disabled (not hidden) when billing inactive — shows tooltip explaining why.
+Check status panel
+In customer file Checks tab: list of all CheckRequests with status badge, provider, timestamp, result summary. Click to expand normalized result. 'View raw evidence' link (opens signed URL).
+Real-time check updates
+WebSocket or Server-Sent Events for check status updates. Status badge updates from QUEUED → PROCESSING → PASSED without page refresh.
+Review task from match
+When AML screening returns potential_match_count > 0: automatically show ReviewMatchTask modal. CO/REVIEWER records outcome: CLEARED / ACCEPTED_WITH_CONTROLS / ESCALATED.
+Provider configuration page
+/app/settings/integrations — List of provider capabilities with connection status. Toggle between sandbox and production. Last check timestamp. Error count in last 24h.
+
+
+### M8 — Acceptance Criteria
+Mock adapter works for all capabilities in sandbox/dev environment
+Real provider (at least one — identity or AML) works end-to-end in staging
+Webhook signature validation rejects tampered payloads
+Duplicate webhook delivery is idempotent — does not create duplicate results or usage events
+Provider timeout creates a pending task, not a false clear result
+Manual override requires reason and is fully logged to audit
+
+
+## Milestone 9 — Billing & Usage (Weeks 17–19)
+Goal: Stripe subscription management, usage-based billing for paid checks, usage dashboard, and billing guards throughout the application.
+
+
+### M9 — Billing Architecture
+Billing Component
+Implementation Detail
+Stripe Customer
+Created at workspace registration. stripeCustomerId stored. Workspace admin is billing contact. Metadata: workspaceId, workspaceName.
+Subscription Plans
+Plan tier determines feature access (not check volume). Stripe Subscription with status webhooks (active, past_due, cancelled). billingStatus updates from webhook.
+Usage Events
+Each finalized CheckResult creates a UsageEvent record: type, quantity=1, provider, workspace, customerFile, cost_category. Stripe Metered Billing reports usage events to Stripe monthly.
+Billing Guards
+NestJS guard: BillingActiveGuard. Applied to all check trigger endpoints. Returns 402 with clear message if billingStatus is not ACTIVE. Never silently fails.
+Payment Method
+Stripe Elements in frontend. Portal stores only stripePaymentMethodId — never raw card data. Payment method status shown in billing page and dashboard.
+Invoice/Usage View
+Billing page: current subscription, next billing date, usage this period (by check type), recent invoices with PDF download. Pull from Stripe API + local UsageEvent table.
+Webhook Handling
+POST /webhooks/stripe — handles: customer.subscription.updated, customer.subscription.deleted, invoice.payment_succeeded, invoice.payment_failed, payment_method.attached. Update billingStatus from these events.
+
+
+### M9 — Acceptance Criteria
+Adding a valid payment method changes billingStatus from INACTIVE to ACTIVE
+Attempting a paid check with inactive billing returns 402 with clear user message (not silent failure)
+Each finalized check creates exactly one UsageEvent (idempotency key prevents duplicates)
+Failed Stripe payment transitions billingStatus to PAST_DUE and shows banner in portal
+Workspace admin can view current period usage broken down by check type
+Cancelling subscription transitions to CANCELLED within 60 seconds of Stripe webhook
+
+
+# Part 8 — Phase 5: Hardening & Production  (M10)
+
+## Milestone 10 — Security, QA & Launch (Weeks 19–23)
+Goal: Production-hardened platform. Security review, audit completeness, performance testing, monitoring setup, documented handover, and go-live.
+
+
+### M10 — Security Checklist
+Area
+Requirement
+Validation Method
+Workspace Isolation
+Every DB query filtered by workspace_id at middleware level. No possibility of cross-tenant data access even with valid JWT.
+Automated test: User A with valid JWT cannot access User B's customer files. Cross-workspace query attempts return 403.
+RBAC Completeness
+All 6 roles tested against all permitted/blocked actions. Backend authorisation is the authority — frontend hiding is secondary.
+Role matrix test suite: 6 roles × all endpoints. Each blocked action returns 403, not 404 or 500.
+Provider Secrets
+All API keys, webhook secrets stored in secret manager (AWS Secrets Manager or Doppler). Never in DB plain text or env files committed to Git.
+Secret scan in CI: no API key patterns in codebase. DB schema audit: no plain secret columns.
+PII Encryption
+Sensitive provider payloads (ID documents, selfies) encrypted at rest in S3. Customer PII fields encrypted at DB level using field-level encryption.
+Verify S3 bucket has server-side encryption. Test that raw_payload_ref contents are not readable without decryption key.
+Audit Log Immutability
+AuditLog table has no UPDATE or DELETE grants. Application service only does INSERT. No soft-delete on audit records.
+DB permission test: attempt UPDATE/DELETE on audit_logs with application user — must fail. Verify no delete cascade from referenced entities.
+Webhook Signature Validation
+All provider webhooks validated via HMAC before processing. Invalid signatures logged and rejected (no data change). Replay protection via processed_at check.
+Test suite: send webhook with invalid signature — must return 401 and create no data changes. Send same webhook twice — second must be no-op.
+Rate Limiting
+API endpoints rate-limited per user and per workspace. Check trigger endpoints have lower limits to prevent accidental billing runaway.
+Load test: 100 rapid check requests from same user — later requests should be rate-limited.
+CSP / Security Headers
+Content-Security-Policy, HSTS, X-Frame-Options, X-Content-Type-Options set on all responses.
+Automated header scanner (e.g., securityheaders.com) on staging URL.
+Input Validation
+All DTOs use class-validator + Zod. No raw user input passed to DB queries. No SQL injection surface.
+OWASP ZAP scan on staging. Automated SQL injection tests on all input fields.
+
+
+### M10 — Performance Targets
+Metric
+Target
+Measurement
+Dashboard initial load
+< 2 seconds (p95)
+Vercel Analytics + synthetic monitoring
+API response time (non-check)
+< 300ms (p95)
+Pino logs + Sentry performance
+Check trigger to status update
+< 5 seconds for sync providers
+E2E test with mock provider
+Document generation
+< 90 seconds per document
+BullMQ job completion time
+Concurrent workspace sessions
+> 50 simultaneous users without degradation
+Load test with k6
+
+
+### M10 — Monitoring Setup
+Sentry: Error tracking for both frontend and backend. Alerts for new error types and spike in error rate.
+Structured logging (Pino): Every log line includes workspace_id, user_id, request_id, action. Searchable in Logtail or Datadog.
+BullMQ monitoring: Failed job alerts. Queue depth monitoring. Retry exhaustion alerts.
+Stripe webhook health: Alert if no webhook received in 24h from expected events.
+Database: Slow query alerts (> 200ms). Connection pool exhaustion monitoring.
+Provider health: Alert if provider error rate > 5% in any 1h window.
+
+
+# Part 9 — 💎 Diamond Feature Layer
+The following features are not in the original specification documents but represent high-value opportunities to differentiate Integrity Solve in the market, increase retention, and create additional revenue streams. Each is a standalone module that can be added after MVP without breaking core architecture.
+
+
+## 💎 Diamond 1 — AI-Powered Risk Narrative Generator
+Market Opportunity: Compliance officers spend significant time writing risk narrative explanations. AI can draft these from structured data, saving hours per client file.
+
+### What it does
+Uses the Anthropic Claude API to generate human-readable risk narratives, escalation summaries, and compliance explanations from structured form data. The user reviews, edits, and approves — AI is a drafting assistant, not a decision-maker.
+
+### Features
+Generate ECDD escalation narrative from structured risk factors
+Draft Source of Funds assessment summary from SOF form data
+Explain risk rating calculation in plain English for client files
+Generate preliminary unusual activity description from flagged factors
+Compliance officer can edit AI draft before finalising — tracked changes
+
+### Implementation
+POST /ai/generate-narrative
+  body: { type: 'ESCALATION_SUMMARY' | 'SOF_ASSESSMENT' | 'RISK_EXPLANATION',
+          sourceData: { customerFileId, formType, riskFactors } }
+  → Calls Anthropic API with structured prompt
+  → Returns draft text in editor
+  → User edits and approves
+  → Saved as form field with ai_assisted: true flag
+  → Audit log records: AI draft generated, human reviewed and approved
+
+### Compliance Safeguards
+AI output is clearly labelled 'AI-drafted — requires compliance officer review'
+AI draft cannot be saved without human review step
+Audit log records that AI was used — full traceability
+Prompt templates are configured by compliance expert, not hardcoded
+
+
+## 💎 Diamond 2 — Smart Ongoing Monitoring Engine
+Market Opportunity: Most compliance tools handle initial onboarding well but struggle with ongoing monitoring. Automated event-driven monitoring is a major differentiator.
+
+### What it does
+Continuous monitoring of active customer files. Automatically detects trigger events and initiates appropriate workflows — without staff having to manually track every client.
+
+### Features
+Automated re-screening schedule: Low risk = annual, Medium = 6-monthly, High = quarterly, Critical = monthly
+Watchlist change detection: If a previously clear screening result would now match (e.g., new sanctions entry), alert immediately
+Ownership change alerts: If KYB data shows changed directors/owners since last check, flag for review
+Dormant file detection: Alert on files with no activity for configurable period
+Jurisdiction risk change: Alert if a customer's country risk changes due to FATF/regulatory updates
+Volume/pattern anomaly detection: Simple rule-based flagging of unusual transaction patterns
+
+### Implementation
+Component
+Detail
+Monitoring rule engine
+JSON-configurable rules per customer type and risk rating. Rules define: trigger condition, check to run, action to take, escalation path. Workspace Admin can configure rule parameters within platform-set bounds.
+Scheduled screening jobs
+BullMQ cron jobs per workspace. Query active files due for re-screen. Enqueue check requests. Update next_review_due on completion.
+Watchlist change detection
+Daily comparison of current screening results against updated provider watchlists. Requires provider that supports delta/change detection.
+Monitoring dashboard widget
+Dashboard widget showing: files due for review (30/7 day windows), active monitoring alerts, screening currency by risk tier. Drill down to individual files.
+
+
+## 💎 Diamond 3 — Compliance Evidence Pack Generator
+Market Opportunity: Businesses need to demonstrate their AML/CTF compliance to regulators. Manual compilation of evidence packs is time-consuming and error-prone.
+
+### What it does
+Generates a comprehensive, timestamped compliance evidence pack for a specific period or a specific customer file. Includes all decisions, documents, training records, and audit trail entries in a single downloadable package.
+
+### Package Contents
+Program Risk Assessment (versioned DOCX/PDF)
+AML/CTF Policy (versioned DOCX/PDF)
+AML/CTF Procedures (versioned DOCX/PDF)
+Training records summary with participant list
+Customer file decision log (anonymisable option)
+Escalation outcomes summary
+Program review and update record
+Audit trail export for specified period
+Provider check evidence references
+
+### Implementation
+POST /compliance/evidence-pack { period_start, period_end, include_customer_files, anonymise_customers }
+BullMQ job assembles package — collects all linked documents, generates summary reports, creates ZIP
+ZIP package with index PDF showing package contents and generation metadata
+Password protection option for sensitive exports
+Audit log records every evidence pack generation (regulatory demonstration)
+
+
+## 💎 Diamond 4 — Multi-Workspace / Group Structure Support
+Market Opportunity: Accounting and legal firms often operate multiple entities or have franchise/group structures. Supporting this natively removes a blocker for larger clients.
+
+### What it does
+Allows a parent workspace to manage a group of related workspaces — shared compliance oversight, consolidated reporting, delegated access, and group-level policy consistency.
+
+### Features
+Group workspace type with child workspace management
+Group-level Compliance Officer can view all child workspace dashboards
+Shared policy templates: group sets base policy, children can extend
+Consolidated escalation queue across all group workspaces
+Group-level training record aggregation
+Billing: group billing account with per-workspace usage breakdown
+
+### Implementation Notes
+Add workspace_group_id FK to Workspace entity
+Group-level RBAC role: GROUP_COMPLIANCE_OFFICER — read access to all child workspaces
+Group dashboard: aggregate stats across all workspaces
+Careful workspace isolation — group access is read-only by default, never write access to child operations
+
+
+## 💎 Diamond 5 — In-Portal Training & Competency Module
+Market Opportunity: AML/CTF training is a regulatory requirement. If Integrity Solve provides training content in the portal, it becomes a stickier product and reduces the client's need for third-party training.
+
+### What it does
+Embeds structured AML/CTF training modules directly in the portal. Staff complete training, pass competency checks, and automatically update the training record — no manual entry required.
+
+### Features
+Course library: induction, refresher, role-specific (CO, onboarding, reviewer) modules
+Lesson player: video or structured content with progress tracking
+Competency assessment: quiz-based with minimum pass score
+Automatic training record entry on completion — no manual data entry
+Training expiry alerts: notify staff and CO when training is approaching expiry
+Training compliance dashboard: shows training status per staff member per course
+
+### Revenue Model
+Course content provided by client (white-label container) — or Integrity Solve licenses AML training content
+Optional: sell training-only plan to businesses not needing full portal
+
+
+## 💎 Diamond 6 — Regulatory Update Feed & Impact Alerts
+Market Opportunity: AML/CTF regulations change frequently. Notifying clients of relevant changes and suggesting program updates is a high-value managed service differentiator.
+
+### What it does
+Curated feed of AML/CTF regulatory updates relevant to each client's industry pathway. Alerts when a regulatory change may require a program update or policy review.
+
+### Features
+Regulatory news feed filtered by industry pathway (accounting, legal, real estate, etc.)
+Change impact assessment: 'This update may affect your Designated Services selection — review recommended'
+One-click program review trigger from regulatory alert
+Alert history log for evidence of regulatory awareness
+Integration with AUSTRAC regulatory update feed (where available via API or scraping)
+
+### Implementation
+Background job to fetch/parse regulatory updates from configured sources
+NLP tagging of updates by industry and impact area (requires AI layer or manual curation)
+Push notification to CO on relevant updates
+Alert acknowledged / dismissed tracking for audit purposes
+
+
+## 💎 Diamond 7 — Client Portal (Customer-Facing CDD Collection)
+Market Opportunity: Currently the portal is used by the reporting entity to collect information about their customers. A client portal flips this — the customer enters their own information directly, reducing staff workload and improving data quality.
+
+### What it does
+A separate, branded customer-facing portal where the reporting entity's clients can submit their own identity documents, beneficial ownership information, and source of funds documentation. The submission flows directly into the CDD workflow.
+
+### Features
+Branded invitation link sent to customer via email
+Customer uploads own identity documents, completes own details form
+Beneficial ownership: entity customers add their own owners/controllers
+Source of funds: customer describes their own funds origin and uploads evidence
+Progress saved — customer can return to complete later
+Submission received notification to onboarding officer
+Data maps directly into CustomerFile CDD forms — no manual re-entry
+
+### Security Considerations
+Customer portal is a separate subdomain with no access to main portal
+Invitation tokens are time-limited and single-use
+Customer can only submit to their own file — no browsing other files
+All uploads encrypted; virus-scanned before storage
+
+
+## 💎 Diamond 8 — Risk Benchmarking & Industry Insights Dashboard
+Market Opportunity: Anonymised aggregate data from all workspaces is a unique asset. Insights about industry risk patterns are genuinely valuable to compliance officers.
+
+### What it does
+An opt-in anonymised benchmarking dashboard showing how a workspace's risk profile and compliance activity compares to peers in the same industry pathway. All data is aggregated and de-identified.
+
+### Features
+Average time to complete CDD by customer type (vs industry average)
+Escalation rate by industry pathway (anonymised)
+Most common CDD red flags by industry
+Training completion rates benchmarked against industry
+Opt-in only — explicit consent required; data never attributable to individual workspace
+
+
+# Part 10 — Gap Analysis & Fixes from Source Documents
+
+## 10.1 Gaps Identified in the Source Documentation
+The following gaps were identified across the 7 source documents and are addressed in this implementation plan:
+
+Gap Area
+Original Documentation
+This Plan's Fix
+Mobile verification flow
+Mentioned as 'mobile verification if required' without detail on OTP provider or retry logic.
+Twilio integration for SMS OTP; 3-attempt limit before lockout; 10-minute expiry; resend cooldown. Specified in M1 auth module.
+Idempotency for checks
+Mentioned as a principle but no field-level spec for how to enforce it.
+idempotencyKey = hash(workspaceId + subjectId + capability + date). Unique DB constraint prevents duplicate requests. Retry of same action returns existing request.
+Document template management
+Acknowledged client must provide templates but no system for managing template versions or updates.
+templateVersion field on ProgramDocument; template_maps/ directory in codebase; when template changes, old versions remain generatable from their snapshot; version comparison tool for admin.
+CO appointment as workspace user
+Step 5 appoints CO but no logic for linking appointment to an actual portal user account.
+CO appointment form must link to an existing workspace_membership OR trigger a pending user invite. Orphan CO appointments (no linked user) block full implementation completion.
+Multi-file beneficial owners
+BO form captures owners but no spec for re-using a person across multiple client files (e.g., director of multiple entities).
+BeneficialOwner records can be linked to a central PersonRecord. Screening results shared across linked files (with re-screen on demand). Reduces duplicate checks.
+Billing before vs after setup
+Open decision: 'should billing be required before setup, or only before paid checks?' — not resolved.
+This plan recommends: billing is NOT required to complete implementation wizard. Billing is required ONLY for paid API checks. Clear UI messaging throughout. Stripe customer created at workspace registration.
+Webhook replay attacks
+Mentioned signature validation but no replay protection spec.
+processed_at field on webhook_events table. Before processing: check if webhook_id already exists. If yes, return 200 (success) but do nothing. Timestamp validation: reject webhooks > 5 minutes old.
+Data retention policy
+Asked as open question but not answered in any document.
+Configurable retention: generated documents = 7 years default; provider raw payloads = 7 years; audit logs = 7 years (regulatory requirement in AML/CTF context); customer forms = 7 years post-relationship end.
+Offline / degraded mode
+No mention of what happens if a critical external dependency (S3, Redis, provider) is unavailable.
+Graceful degradation: forms still saveable if document generation queue is down; check requests queue if provider is down; billing checks fall back to cached status if Stripe is slow; clear user messaging for degraded features.
+Suspicious Matter Report (SMR) workflow
+Referenced in unusual activity matrix as 'consider reportability' but no actual SMR workflow defined.
+Add Diamond-level SMR workflow: structured form for internal decision to report; confidentiality controls (restricted role access); external submission tracking (manual); SMR never visible to onboarding users.
+Workspace suspension / billing past-due
+billingStatus = PAST_DUE / SUSPENDED mentioned but no detail on what the UX looks like.
+Past due: banner warning on all portal pages; 7-day grace period before checks are blocked; 30-day grace before full suspension. Suspended: read-only mode with clear messaging; 90-day before hard close. All states reversible by adding valid payment.
+Provider sandbox vs production config
+No detail on how to manage provider environment config.
+ProviderConnection has environment field (SANDBOX / PRODUCTION). Per-workspace config allows workspace to be in sandbox while another is live. Switching requires explicit admin action + audit log.
+
+
+## 10.2 Open Decisions from PDF — Recommended Answers
+Open Decision
+Recommended Answer
+Which identity, KYB, AML providers?
+Start with Facia (identity), ABR free API (ABN/ACN lookup), AML Watcher (AML screening) as MVP candidates. Build adapters first; swap providers without code change.
+Billing required before setup?
+No. Billing should only be required before paid checks are activated. Setup wizard should be completable without billing.
+AML form questions final?
+Form schemas must be approved by client compliance expert. This plan builds the form engine; the client fills in the content and rule weights.
+Generated documents editable in portal?
+No for MVP. Documents are regenerated from form updates, not directly edited. Add controlled in-portal editing as a future enhancement (Diamond layer).
+Which roles mandatory in MVP?
+All 6 roles are needed but REVIEWER and PROGRAM_CONTRIBUTOR can map to same user in small teams. MVP bundles COMPLIANCE_OFFICER + REVIEWER permissions by default.
+Final UI designs or wireframes?
+Use provided wireframes + clean SaaS design system (shadcn/ui + Tailwind). Do not over-invest in custom design before workflows are validated.
+Live APIs or mocked adapters in M1?
+Mock adapters for M1–M6. Real sandbox APIs from M8. Real production APIs from M10.
+Export formats required?
+DOCX + PDF for documents; CSV for list exports; ZIP bundle for compliance evidence packs. All formats in MVP.
+Evidence and document retention?
+Default 7 years (AML/CTF regulatory standard). Configurable per workspace within platform bounds. Auto-delete job with pre-deletion notification.
+
+
+# Part 11 — Testing Strategy
+
+## 11.1 Test Coverage Requirements
+Test Type
+Coverage Target
+Tools
+Key Test Cases
+Unit tests
+> 80% on critical modules
+Jest + ts-jest
+Permission helpers; risk calculator; state machine transitions; billing event rules; provider normalizers; document variable mapping.
+Integration tests
+All module APIs
+Jest + supertest (NestJS)
+Full registration flow; wizard completion → document generation; customer onboarding → check trigger → result; escalation workflow.
+RBAC tests
+100% of role/action matrix
+Jest + supertest
+Every role tested against every endpoint: permitted roles return 200, blocked roles return 403. Never 404 or 500 for auth failures.
+E2E tests
+Critical user journeys
+Playwright
+Register → verify → business → wizard → download docs; create customer → CDD → checks → escalate → resolve; billing setup → run check → see usage event.
+Provider adapter tests
+All adapters
+Jest with MSW (mock service worker)
+Mock provider responses; webhook signature validation; invalid signature rejection; duplicate webhook idempotency; timeout handling.
+Billing tests
+All Stripe events
+Stripe test mode + Jest
+Subscription created/updated/cancelled; payment failure; usage event creation; billing guard activation/deactivation.
+Security tests
+Cross-tenant and auth
+Custom Jest suite + OWASP ZAP
+User A cannot access User B's data; workspace isolation in all queries; SQL injection attempts; XSS in form fields; CSRF protection.
+Performance tests
+Load and concurrency
+k6
+50 concurrent users; dashboard load time; document generation queue depth; check processing throughput.
+
+
+## 11.2 UAT Scripts
+
+### UAT Script 1 — Low-Risk Individual Onboarding
+Register new account → verify identity → register business → complete all 6 wizard steps
+Create individual customer file → complete CDD → run mock identity check → AML screening returns clear
+Risk rating auto-calculates as LOW → approve file → file moves to APPROVED
+Periodic review task scheduled based on risk rating
+
+
+### UAT Script 2 — High-Risk Entity with Escalation
+Create entity customer file → complete CDD → BO form with 3 owners → run screening → one owner returns potential match
+Review task created → CO reviews match → ECDD triggered → SOF form completed
+Escalation created → Reviewer assigned → decision: APPROVED_WITH_CONTROLS
+Controls recorded → file moves to APPROVED_WITH_CONTROLS → enhanced monitoring schedule set
+
+
+### UAT Script 3 — Billing Inactive Path
+Complete setup wizard → attempt to run identity check on new customer
+System shows clear 402 message: 'Add a payment method to activate checks'
+Navigate to billing → add test card via Stripe Elements
+billingStatus updates to ACTIVE → retry check → check proceeds
+
+
+# Part 12 — Environment & DevOps Setup
+
+## 12.1 Environment Configuration
+Environment
+Purpose
+Provider Config
+Database
+Local (Docker)
+Developer workstation. Full stack with docker-compose.
+Mock adapters only. Stripe test mode with local webhook forwarding (stripe listen).
+Local PostgreSQL via docker-compose. Seed data.
+Development (cloud)
+Shared development branch. Auto-deployed on PR merge.
+Mock adapters. Stripe test mode. Clerk development instance.
+Neon.io dev database. Auto-migrated on deploy.
+Staging
+Pre-production testing. UAT scripts run here. Client demos.
+Sandbox provider APIs (real API calls, test data). Stripe test mode.
+Neon.io staging database. Production-like data volume.
+Production
+Live system. Real provider APIs. Real billing.
+Production provider APIs. Stripe live mode. Clerk production instance.
+Neon.io production with daily backups. Connection pooling via PgBouncer.
+
+
+## 12.2 CI/CD Pipeline
+On PR:
+  1. Lint (ESLint + Prettier check)
+  2. Type check (tsc --noEmit)
+  3. Unit tests (Jest)
+  4. Integration tests (Jest + test DB)
+  5. Secret scan (GitGuardian or truffleHog)
+  6. Build check (Next.js + NestJS)
+
+On merge to main:
+  1. All PR checks
+  2. Deploy to development environment
+  3. Run DB migrations (prisma migrate deploy)
+  4. Smoke tests (5 key endpoints)
+
+On release tag:
+  1. All main checks
+  2. Deploy to staging
+  3. E2E tests (Playwright)
+  4. Manual approval gate
+  5. Deploy to production
+  6. Health check verification
+
+
+## 12.3 Milestone Timeline Summary
+Milestone
+Description
+Weeks
+Deliverable
+M1
+Foundation: repo, auth, RBAC, workspace isolation, restricted dashboard shell
+1–2
+Working multi-tenant auth + first-login restricted portal
+M2
+Business registration, ABN/ACN lookup, workspace state, billing placeholder
+3
+Complete workspace creation funnel + meaningful restricted dashboard
+M3
+Six-step implementation wizard with autosave, validation, conditional logic
+4–6
+Fully working wizard — complete all 6 steps, save/exit/resume
+M4
+Document generation: Risk Assessment, Policy, Procedures, Governance Summary
+6–8
+All 4 documents generated as versioned DOCX + PDF on wizard completion
+M5
+Manage My Program: form updates, training records, program reviews, version history
+8–9
+Program maintenance workflows operational; document regeneration working
+M6
+Customer file engine: CDD, state machine, evidence upload, risk rating, BO form
+10–12
+Full low-risk individual and entity onboarding without live provider calls
+M7
+Escalation, ECDD, SOF/SOW, unusual activity, periodic review workflows
+12–14
+High-risk path fully operational with audit-grade decision recording
+M8
+Provider adapter layer: identity, AML screening, KYB, webhooks, mock + real sandbox
+14–17
+At least one real provider working end-to-end in staging
+M9
+Stripe billing: subscriptions, payment method, usage events, billing guards
+17–19
+Paid checks blocked until billing active; usage events recorded per check
+M10
+Security hardening, QA, monitoring, performance, documentation, production deploy
+19–23
+Production-ready platform with documented handover
+
+Total estimated duration: 19–23 weeks for full MVP. Phase 1 (M1–M5, core value) deliverable in 8–9 weeks. A working, demoable portal foundation can be shown in week 3.
+
+
+Integrity Solve AML/CTF Compliance Portal — Full Code Implementation Plan
+Prepared May 2026 | Version 2.0 | Confidential

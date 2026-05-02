@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "X3ZnaFuCdHeFwwiSQl-Q6"
+uri = "file://MASTER_PLAN.md"
+type = "text"
+title = "INTEGRITY SOLVE — Comprehensive Master Build Plan"

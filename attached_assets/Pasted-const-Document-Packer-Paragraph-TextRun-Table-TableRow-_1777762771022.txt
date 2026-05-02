@@ -1,0 +1,2021 @@
+const {
+  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+  HeadingLevel, AlignmentType, BorderStyle, WidthType, ShadingType,
+  VerticalAlign, PageBreak, LevelFormat, Header, Footer,
+  TabStopType, TabStopPosition
+} = require('docx');
+const fs = require('fs');
+
+// ── Brand Tokens ──
+const NAVY       = "0B1A33";
+const SURFACE    = "0F2447";
+const EMERALD    = "10B981";
+const AMBER      = "F59E0B";
+const RED        = "EF4444";
+const GOLD       = "F4C430";
+const WHITE      = "FFFFFF";
+const SLATE      = "64748B";
+const LIGHT_BG   = "F8FAFC";
+const BORDER_CLR = "CBD5E1";
+const CODE_BG    = "1E293B";
+const CODE_TXT   = "A5F3FC";
+const WARN_BG    = "FEF3C7";
+const WARN_CLR   = "92400E";
+const INFO_BG    = "DBEAFE";
+const INFO_CLR   = "1E40AF";
+const OK_BG      = "DCFCE7";
+const OK_CLR     = "166534";
+const ERR_BG     = "FEE2E2";
+const ERR_CLR    = "991B1B";
+
+const border = { style: BorderStyle.SINGLE, size: 1, color: BORDER_CLR };
+const borders = { top: border, bottom: border, left: border, right: border };
+const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
+
+// ── Helpers ──
+const sp = (before=60, after=60) => ({ before, after });
+
+function h1(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_1,
+    spacing: sp(400, 200),
+    shading: { fill: NAVY, type: ShadingType.CLEAR },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: EMERALD } },
+    indent: { left: 240, right: 240 },
+    children: [new TextRun({ text, bold: true, size: 38, color: WHITE, font: "Arial" })]
+  });
+}
+
+function h2(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    spacing: sp(320, 140),
+    border: { bottom: { style: BorderStyle.SINGLE, size: 3, color: EMERALD, space: 4 } },
+    children: [new TextRun({ text, bold: true, size: 30, color: NAVY, font: "Arial" })]
+  });
+}
+
+function h3(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_3,
+    spacing: sp(220, 80),
+    children: [new TextRun({ text, bold: true, size: 24, color: SURFACE, font: "Arial" })]
+  });
+}
+
+function h4(text) {
+  return new Paragraph({
+    spacing: sp(180, 60),
+    children: [new TextRun({ text, bold: true, size: 22, color: EMERALD, font: "Arial" })]
+  });
+}
+
+function p(text, opts = {}) {
+  return new Paragraph({
+    spacing: sp(60, 60),
+    children: [new TextRun({ text, size: 21, font: "Arial", color: "1E293B", ...opts })]
+  });
+}
+
+function pBold(text) {
+  return p(text, { bold: true });
+}
+
+function bullet(text, level = 0) {
+  return new Paragraph({
+    numbering: { reference: "bullets", level },
+    spacing: sp(40, 40),
+    children: [new TextRun({ text, size: 20, font: "Arial", color: "334155" })]
+  });
+}
+
+function num(text, level = 0) {
+  return new Paragraph({
+    numbering: { reference: "numbers", level },
+    spacing: sp(40, 40),
+    children: [new TextRun({ text, size: 20, font: "Arial", color: "334155" })]
+  });
+}
+
+function code(text) {
+  return new Paragraph({
+    spacing: sp(30, 30),
+    shading: { fill: CODE_BG, type: ShadingType.CLEAR },
+    indent: { left: 360, right: 360 },
+    children: [new TextRun({ text, size: 17, font: "Courier New", color: CODE_TXT })]
+  });
+}
+
+function callout(text, type = "info") {
+  const map = {
+    info:    { fill: INFO_BG, color: INFO_CLR, prefix: "ℹ " },
+    warn:    { fill: WARN_BG, color: WARN_CLR, prefix: "⚠ " },
+    ok:      { fill: OK_BG,   color: OK_CLR,   prefix: "✅ " },
+    danger:  { fill: ERR_BG,  color: ERR_CLR,  prefix: "🚨 " },
+    diamond: { fill: "F5F3FF", color: "6D28D9", prefix: "💎 " },
+    gap:     { fill: "FFF7ED", color: "9A3412", prefix: "🔧 GAP: " },
+  };
+  const { fill, color, prefix } = map[type] || map.info;
+  return new Paragraph({
+    spacing: sp(80, 80),
+    shading: { fill, type: ShadingType.CLEAR },
+    border: { left: { style: BorderStyle.SINGLE, size: 14, color: EMERALD, space: 4 } },
+    indent: { left: 360, right: 240 },
+    children: [new TextRun({ text: prefix + text, size: 20, font: "Arial", color, italics: true })]
+  });
+}
+
+function spacer(n = 1) {
+  return new Paragraph({ spacing: { before: 80 * n, after: 0 }, children: [new TextRun("")] });
+}
+
+function divider() {
+  return new Paragraph({
+    spacing: sp(120, 120),
+    border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: EMERALD } },
+    children: [new TextRun("")]
+  });
+}
+
+function table(headers, rows, colWidths, options = {}) {
+  const totalW = colWidths.reduce((a, b) => a + b, 0);
+  return new Table({
+    width: { size: totalW, type: WidthType.DXA },
+    columnWidths: colWidths,
+    rows: [
+      new TableRow({
+        tableHeader: true,
+        children: headers.map((h, i) => new TableCell({
+          borders,
+          width: { size: colWidths[i], type: WidthType.DXA },
+          shading: { fill: options.headerBg || NAVY, type: ShadingType.CLEAR },
+          margins: { top: 100, bottom: 100, left: 120, right: 120 },
+          verticalAlign: VerticalAlign.CENTER,
+          children: [new Paragraph({
+            spacing: { before: 20, after: 20 },
+            children: [new TextRun({ text: h, bold: true, size: 18, font: "Arial", color: WHITE })]
+          })]
+        }))
+      }),
+      ...rows.map((row, ri) => new TableRow({
+        children: row.map((cell, ci) => {
+          const cellText = String(cell ?? '');
+          return new TableCell({
+            borders,
+            width: { size: colWidths[ci], type: WidthType.DXA },
+            shading: { fill: ri % 2 === 0 ? WHITE : LIGHT_BG, type: ShadingType.CLEAR },
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            verticalAlign: VerticalAlign.TOP,
+            children: [new Paragraph({
+              spacing: { before: 20, after: 20 },
+              children: [new TextRun({ text: cellText, size: 18, font: "Arial", color: "1E293B" })]
+            })]
+          });
+        })
+      }))
+    ]
+  });
+}
+
+function pageBreak() {
+  return new Paragraph({ children: [new PageBreak()] });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DOCUMENT CONTENT
+// ══════════════════════════════════════════════════════════════════════════════
+const C = [];   // children array
+
+// ─── COVER ───
+C.push(
+  new Paragraph({ spacing: { before: 1200, after: 0 }, children: [new TextRun({ text: "INTEGRITY SOLVE", size: 56, bold: true, font: "Arial", color: NAVY })] }),
+  new Paragraph({ spacing: { before: 80, after: 0 }, children: [new TextRun({ text: "AML/CTF Compliance Portal", size: 34, bold: true, font: "Arial", color: EMERALD })] }),
+  new Paragraph({ spacing: { before: 80, after: 400 }, children: [new TextRun({ text: "Full Build Guide · Complete Technical Plan · Deep Analysis · Gap Fixes · 3D Landing Design", size: 22, font: "Arial", color: SLATE, italics: true })] }),
+  divider(),
+  table(
+    ["Property", "Value"],
+    [
+      ["Version", "3.0 — Post-ZIP Deep Analysis"],
+      ["Source", "integrity-solve-handoff.zip (17 files fully analysed)"],
+      ["Stack", "React 18 · Vite · Wouter · Express · Drizzle · PostgreSQL · BullMQ · Stripe"],
+      ["Design", "Tailwind v3 (project pin) + shadcn/ui + OKLCH tokens · Three.js R3F 3D Hero"],
+      ["Phases", "Phase 0 (Bootstrap) + Phases 1–5 + Diamond Layer + Landing Page"],
+      ["Milestones", "M1–M10 with full code patterns, acceptance criteria, and gap analysis"],
+      ["New Research", "Tailwind v4 OKLCH theming · React Three Fiber best practices · Drizzle RLS"],
+      ["Document Sections", "19 parts, ~120 pages equivalent content"],
+    ],
+    [2800, 6400]
+  ),
+  pageBreak()
+);
+
+// ─── TOC ───
+C.push(
+  h1("📋 Table of Contents"),
+  p("Part 1  ─  Scope & ZIP Analysis Summary.......................................................................  3"),
+  p("Part 2  ─  Stack Deep Dive & Research-Backed Decisions.............................................  4"),
+  p("Part 3  ─  Architecture: Isolation, RBAC, Audit, WebSockets.......................................  6"),
+  p("Part 4  ─  Complete Folder Structure Annotated...........................................................  9"),
+  p("Part 5  ─  Database Schema Deep Dive (All Tables + Enums).....................................  11"),
+  p("Part 6  ─  StrategyNavigator Feature Lift Map (60% Pre-built)....................................  15"),
+  p("Part 7  ─  Phase 0: Bootstrap & Repository Setup.......................................................  17"),
+  p("Part 8  ─  Phase 1: Foundation & Auth (M1–M2)...........................................................  19"),
+  p("Part 9  ─  Phase 2: Program Wizard & Documents (M3–M5)..........................................  24"),
+  p("Part 10 ─  Phase 3: Customer Onboarding & Workflows (M6–M7)..................................  29"),
+  p("Part 11 ─  Phase 4: Provider Integrations & Billing (M8–M9).......................................  35"),
+  p("Part 12 ─  Phase 5: Hardening & Production (M10).....................................................  40"),
+  p("Part 13 ─  💎 Diamond Feature Layer (All 8 Features).................................................  44"),
+  p("Part 14 ─  🎨 3D Landing Page: Design, Code Patterns & Tailwind System...................  52"),
+  p("Part 15 ─  Testing Strategy (Vitest · Playwright · k6)..................................................  58"),
+  p("Part 16 ─  Environment & Secrets Reference...............................................................  61"),
+  p("Part 17 ─  Deployment on Replit (Reserved VM)...........................................................  63"),
+  p("Part 18 ─  🔧 Gap Analysis & Better Solutions (12 Critical Gaps).................................  65"),
+  p("Part 19 ─  🔬 New Research Summary & Final Recommendations...................................  70"),
+  pageBreak()
+);
+
+// ─── PART 1 ───
+C.push(
+  h1("Part 1 — Scope & ZIP Analysis Summary"),
+  h2("1.1 What the ZIP Contains (All 17 Files)"),
+  p("The integrity-solve-handoff.zip has been fully read and analysed. Every file has been treated as authoritative. Nothing has been skipped. The package is a complete build handoff for a production-grade AML/CTF compliance SaaS platform, re-architected from an original Next.js/NestJS/Prisma spec onto a proven StrategyNavigator-compatible Express/Drizzle/React stack for single-workflow Replit deployment."),
+  spacer(),
+  table(
+    ["File", "Purpose", "Key Insight"],
+    [
+      ["README.md", "Reading order + critical rules", "6 non-negotiable rules summarised. The receiving agent must read all 17 files BEFORE writing any code."],
+      ["AGENT_PROMPT.md", "The prompt to paste into a fresh Replit project", "Contains 10 non-negotiable technical constraints. Phase 0 must complete before any feature work begins."],
+      ["01-overview-and-stack.md", "Mission, users, business model, final stack", "Stack switched from Next.js+NestJS+Prisma to React+Express+Drizzle to match StrategyNavigator code reuse pattern."],
+      ["02-architecture.md", "3-layer workspace isolation, RBAC, audit log, cron/jobs, error handling, rate limiting, CSP, WebSockets", "Three defensive layers: Express middleware + storage convention + Postgres RLS. Audit log has DB trigger backstop."],
+      ["03-folder-structure.md", "Exact file tree (single repo, /client + /server + /shared)", "97+ files listed with exact paths. Lazy-loading on all /app/** pages. Landing 3D scene also lazy-loaded."],
+      ["04-database-schema.md", "Complete Drizzle schema — all tables, enums, indexes, FKs", "33 tables (core + Diamond). All IDs use cuid2. All tenant tables have workspace_id NOT NULL FK."],
+      ["05-feature-inventory.md", "What StrategyNavigator provides (60%) vs net-new (40%)", "Categories A–N covering auth, RBAC, notifications, billing, file handling, audit, UI. Net-new: state machine, providers, 3D landing, AI narrative, customer portal, evidence pack."],
+      ["06-phase-1-foundation.md", "M1 (Core Foundation) + M2 (Business Registration)", "23 backend tasks + 18 frontend tasks. ABN/ACN registry adapter. Support access provisioning with audit."],
+      ["07-phase-2-program-wizard.md", "M3 (6-step wizard) + M4 (document generation) + M5 (program maintenance)", "Step 5 CO appointment must link to real workspace user or pending invite — blocks completion. DOCX+PDF generation pipeline with WebSocket progress push."],
+      ["08-phase-3-customer-onboarding.md", "M6 (CDD state machine) + M7 (escalation/ECDD/SOF/SOW)", "12-state customer file state machine with role gates, preconditions, reason requirement (≥10 chars). 6 form types for M7."],
+      ["09-phase-4-providers-and-billing.md", "M8 (provider adapter layer) + M9 (Stripe billing)", "Full adapter pattern interface. 6-tier pricing matrix. Past-due/suspension UX with 7/30/90-day grace periods."],
+      ["10-phase-5-hardening.md", "M10 — security, performance, monitoring, documentation, pre-launch checklist", "11 security checklist items. 6 performance targets. 7 monitoring tools. 30-item pre-launch checklist."],
+      ["11-diamond-features.md", "8 high-value differentiators with priority order", "Build order: D2 (monitoring) → D1 (AI) → D3 (evidence pack) → D7 (portal) → D4 (group) → D6 (regulatory) → D5 (training) → D8 (benchmarking)."],
+      ["12-landing-page-design.md", "3D hero scene, 11 sections, brand tokens, copy, conversion mechanics, accessibility", "CrystallineShield icosahedron with MeshTransmissionMaterial. 4 OrbitingArtefacts cards. ScrollTrigger dissassembly animation."],
+      ["13-testing-strategy.md", "Vitest + Playwright + k6 with concrete test cases by milestone", "35 test files mapped. 5 UAT scripts. CI pipeline pseudocode. 100% RBAC matrix coverage required."],
+      ["14-environment-and-secrets.md", "Every secret by phase with where to obtain it", "36 secrets total. Zod env schema template. Phase-gated disclosure so user is not overwhelmed at day 1."],
+      ["15-deployment-on-replit.md", "Reserved VM deployment, health checks, backups, pre-deploy checklist", "Reserved VM (not Autoscale) for stable BullMQ + WebSockets. Path-based customer portal (not subdomain) for MVP."],
+    ],
+    [2000, 1800, 5400]
+  ),
+  spacer(),
+  h2("1.2 Project Scope in Numbers"),
+  table(
+    ["Metric", "Count"],
+    [
+      ["Database tables (core + Diamond)", "33"],
+      ["Database enums", "28"],
+      ["Backend route files", "26"],
+      ["Backend storage files", "18"],
+      ["Backend service files", "30"],
+      ["Frontend page files", "50+"],
+      ["Shared form schema JSON files", "17"],
+      ["Background job types", "13"],
+      ["Provider adapters (including mock)", "5 (plus 3 real providers)"],
+      ["Test files", "35"],
+      ["Milestone deliverables", "10 (M1–M10)"],
+      ["Diamond features", "8"],
+      ["Landing page sections", "11"],
+      ["Environment secrets required", "36"],
+      ["Build weeks (estimated)", "19–23"],
+    ],
+    [4400, 4800]
+  ),
+  pageBreak()
+);
+
+// ─── PART 2 ───
+C.push(
+  h1("Part 2 — Stack Deep Dive & Research-Backed Decisions"),
+  h2("2.1 Why Every Stack Choice Was Made"),
+  p("The ZIP package explicitly re-architects from the original Next.js 14 + NestJS + Prisma spec. This is not a downgrade — it is a deliberate code-reuse decision. The StrategyNavigator codebase is a proven, battle-tested foundation. Lifting it saves 6–8 weeks of work and avoids re-solving auth, RBAC, billing, notifications, and file handling from scratch."),
+  spacer(),
+  table(
+    ["Layer", "Final Choice", "Switched From (Original)", "Research-Backed Reason"],
+    [
+      ["Frontend Framework", "React 18 + Vite + Wouter", "Next.js 14 App Router", "Portal is a SPA — no SEO or SSR requirements. Vite builds are significantly faster in dev. Wouter is ~1KB vs Next.js routing overhead. Full code reuse with StrategyNavigator."],
+      ["State Management", "Zustand (wizard state) + TanStack Query v5 (server state)", "Same as original plan", "TanStack Query v5 already wired in StrategyNavigator. Zustand for ephemeral form state avoids re-fetching on every wizard step change."],
+      ["UI Components", "shadcn/ui + Radix UI + Tailwind CSS v3", "shadcn/ui (same)", "~50 components already themed. Note: ZIP pins Tailwind v3 (tailwind.config.ts file exists). Research confirms Tailwind v4 with Vite+shadcn is now stable (see Part 19) but migration adds risk during initial build."],
+      ["Backend", "Express + TypeScript", "NestJS", "Express matches StrategyNavigator exactly. NestJS DI overhead unnecessary for single-team build. Express is easier to test with supertest."],
+      ["ORM", "Drizzle ORM + PostgreSQL", "Prisma", "Drizzle is type-safe, tree-shakeable. Translation from Prisma is mechanical (see schema in Part 5). Drizzle Kit for migrations. PostgreSQL RLS supported natively."],
+      ["Auth", "httpOnly cookie sessions + bcrypt", "Clerk", "Full data sovereignty. No external auth dependency. Session table in own DB = full audit capability. bcrypt cost 12."],
+      ["File Storage", "Cloudflare R2 (S3-compatible)", "AWS S3", "R2 has zero egress fees. AWS SDK works against R2 endpoint. Lifecycle policies supported. Workspace-prefixed keys for isolation."],
+      ["Background Jobs", "BullMQ + Redis (Upstash). Fallback: node-cron + job_locks table", "BullMQ + Redis (same)", "Redis optional in dev. job_locks fallback is clean distributed-lock pattern. 13 job types identified (see Part 3 §2.4)."],
+      ["Email", "Nodemailer + Gmail SMTP + React Email templates", "Resend (original plan)", "StrategyNavigator already uses this. ~12 email templates needed. React Email renders to HTML at send time."],
+      ["Payments", "Stripe (Subscriptions + Metered Usage)", "Same", "6-tier pricing matrix (TRIAL/STARTER/PROFESSIONAL/ENTERPRISE/GROUP/LIFETIME). Metered usage for paid provider checks."],
+      ["3D Landing", "Three.js + @react-three/fiber + @react-three/drei + GSAP + Lenis", "Net-new", "R3F v9 for declarative Three.js. @react-three/postprocessing for Bloom/CA/Vignette. GSAP ScrollTrigger for scroll-driven animations. Lenis for smooth scroll."],
+      ["Document Generation", "docx (Node) for DOCX + pdf-lib for PDF (or LibreOffice subprocess)", "Same", "Server-side generation from structured data. Deterministic and reproducible. Template maps in separate files."],
+      ["Monitoring", "Sentry + Pino structured logs", "Same", "workspaceId + userId + requestId in every log line. JSON in prod, pretty in dev."],
+      ["Deployment", "Replit Reserved VM (not Autoscale)", "Vercel + Railway (original)", "Reserved VM required for stable BullMQ workers + WebSocket connections + cron jobs. Single deployment surface."],
+    ],
+    [1700, 2100, 1800, 3600]
+  ),
+  spacer(),
+  h2("2.2 Tailwind CSS Version Decision (Research-Backed)"),
+  callout("The ZIP templates use Tailwind v3 (tailwind.config.ts file included). Research as of May 2026 shows Tailwind v4 + Vite + shadcn/ui is now stable via the shadcn canary CLI. However, the ZIP's tailwind.config.ts and postcss.config.js are v3. Recommendation: build with v3 for stability; plan v4 migration for Phase 5 hardening if the team wants OKLCH colors and CSS-first config.", "warn"),
+  spacer(),
+  p("If choosing to use Tailwind v4 from the start (higher risk, higher reward):"),
+  bullet("Replace tailwind.config.ts with a CSS-first @theme directive in globals.css"),
+  bullet("Use OKLCH color space for all brand tokens (OKLCH is more perceptually uniform than HSL)"),
+  bullet("Replace @layer base with direct :root and .dark selectors"),
+  bullet("Remove tailwindcss-animate plugin — use @tailwindcss/animate or native CSS animations"),
+  bullet("Run: npm install tailwindcss@next @tailwindcss/postcss@next && npx shadcn@canary init"),
+  spacer(),
+  p("Tailwind v4 OKLCH equivalent of the ZIP brand tokens:"),
+  code("@theme {"),
+  code("  --color-brand-navy:    oklch(0.15 0.08 240);   /* #0B1A33 */"),
+  code("  --color-brand-surface: oklch(0.19 0.09 240);   /* #0F2447 */"),
+  code("  --color-brand-emerald: oklch(0.69 0.17 160);   /* #10B981 */"),
+  code("  --color-brand-amber:   oklch(0.79 0.17 70);    /* #F59E0B */"),
+  code("  --color-brand-red:     oklch(0.62 0.22 26);    /* #EF4444 */"),
+  code("  --color-brand-gold:    oklch(0.87 0.17 87);    /* #F4C430 */"),
+  code("  --color-risk-low:      var(--color-brand-emerald);"),
+  code("  --color-risk-medium:   var(--color-brand-amber);"),
+  code("  --color-risk-high:     oklch(0.72 0.20 45);    /* #F97316 */"),
+  code("  --color-risk-critical: var(--color-brand-red);"),
+  code("}"),
+  pageBreak()
+);
+
+// ─── PART 3 ───
+C.push(
+  h1("Part 3 — Architecture: Isolation, RBAC, Audit, WebSockets"),
+  h2("3.1 Workspace Isolation — Three Defensive Layers"),
+  callout("This is the most critical architectural invariant. Code review rule: if you see a Drizzle query touching a tenant table without a workspaceId filter, reject the PR unconditionally.", "danger"),
+  spacer(),
+  h3("Layer 1 — Express middleware withWorkspace"),
+  code("// server/middleware/withWorkspace.ts"),
+  code("export async function withWorkspace(req, res, next) {"),
+  code("  const workspaceId = req.user.session.workspaceId || req.headers['x-workspace-id'];"),
+  code("  if (!workspaceId) return res.status(403).json({ code: 'WORKSPACE_REQUIRED' });"),
+  code("  const membership = await db.query.workspaceMemberships.findFirst({"),
+  code("    where: and("),
+  code("      eq(workspaceMemberships.userId, req.user.id),"),
+  code("      eq(workspaceMemberships.workspaceId, workspaceId),"),
+  code("      eq(workspaceMemberships.status, 'ACTIVE'),"),
+  code("    )"),
+  code("  });"),
+  code("  if (!membership) return res.status(403).json({ code: 'WORKSPACE_ACCESS_DENIED' });"),
+  code("  req.workspace = { id: workspaceId };"),
+  code("  req.membership = membership;"),
+  code("  next();"),
+  code("}"),
+  spacer(),
+  h3("Layer 2 — Storage layer convention"),
+  code("// Every storage function MUST take workspaceId as first param"),
+  code("// server/storage/customer.storage.ts"),
+  code("export async function getCustomer(workspaceId: string, customerId: string) {"),
+  code("  return db.query.customers.findFirst({"),
+  code("    where: and("),
+  code("      eq(customers.workspaceId, workspaceId),  // <-- MANDATORY"),
+  code("      eq(customers.id, customerId),"),
+  code("    )"),
+  code("  });"),
+  code("}"),
+  spacer(),
+  h3("Layer 3 — Postgres Row Level Security (RLS)"),
+  code("-- Run as migration after db:push"),
+  code("ALTER TABLE customers ENABLE ROW LEVEL SECURITY;"),
+  code("-- Repeat for: customer_files, customer_forms, evidence_files, check_requests,"),
+  code("-- check_results, escalations, periodic_reviews, program_forms, program_versions,"),
+  code("-- program_documents, training_records, notifications"),
+  code(""),
+  code("CREATE POLICY workspace_isolation ON customers"),
+  code("  USING (workspace_id = current_setting('app.current_workspace', true));"),
+  code(""),
+  code("-- Set per-request in server/db.ts"),
+  code("await db.transaction(async (tx) => {"),
+  code("  await tx.execute(sql`SET LOCAL app.current_workspace = ${workspaceId}`);"),
+  code("  // All queries inside this tx are RLS-scoped automatically"),
+  code("});"),
+  spacer(),
+  h2("3.2 RBAC Permission Matrix — All 8 Roles × All Actions"),
+  table(
+    ["Action", "ADMIN", "CO", "CONTRIB", "ONBOARD", "REVIEWER", "READ", "PLATFORM", "SUPPORT"],
+    [
+      ["workspace.update", "✅", "—", "—", "—", "—", "—", "✅", "—"],
+      ["members.invite", "✅", "—", "—", "—", "—", "—", "✅", "—"],
+      ["members.changeRole", "✅", "—", "—", "—", "—", "—", "✅", "—"],
+      ["program.read", "✅", "✅", "✅", "✅", "✅", "✅", "✅", "✅"],
+      ["program.editForm", "✅", "✅", "✅", "—", "—", "—", "✅", "—"],
+      ["program.submit", "✅", "✅", "—", "—", "—", "—", "✅", "—"],
+      ["program.regenerate", "✅", "✅", "—", "—", "—", "—", "✅", "—"],
+      ["customer.create", "✅", "✅", "—", "✅", "—", "—", "✅", "—"],
+      ["customer.read", "✅", "✅", "✅", "✅", "✅", "✅", "✅", "✅"],
+      ["customer.editCdd", "✅", "✅", "—", "✅", "—", "—", "✅", "—"],
+      ["customer.uploadEvidence", "✅", "✅", "—", "✅", "✅", "—", "✅", "—"],
+      ["customer.runCheck", "✅", "✅", "—", "✅", "—", "—", "✅", "—"],
+      ["customer.transitionState", "✅", "✅", "—", "✅", "✅", "—", "✅", "—"],
+      ["customer.approve", "✅", "✅", "—", "—", "✅", "—", "✅", "—"],
+      ["customer.decline", "✅", "✅", "—", "—", "—", "—", "✅", "—"],
+      ["ecdd.complete", "✅", "✅", "—", "—", "✅", "—", "✅", "—"],
+      ["ecdd.approve", "✅", "✅", "—", "—", "✅", "—", "✅", "—"],
+      ["escalation.assign", "✅", "✅", "—", "—", "✅", "—", "✅", "—"],
+      ["escalation.decide", "✅", "✅", "—", "—", "✅", "—", "✅", "—"],
+      ["audit.read", "✅", "✅", "✅", "—", "✅", "✅", "✅", "✅"],
+      ["audit.export", "✅", "✅", "—", "—", "—", "—", "✅", "—"],
+      ["billing.read", "✅", "—", "—", "—", "—", "—", "✅", "—"],
+      ["billing.update", "✅", "—", "—", "—", "—", "—", "✅", "—"],
+      ["integrations.configure", "✅", "—", "—", "—", "—", "—", "✅", "—"],
+      ["platform.admin", "—", "—", "—", "—", "—", "—", "✅", "—"],
+      ["support.access", "—", "—", "—", "—", "—", "—", "✅", "—"],
+    ],
+    [2200, 720, 720, 800, 800, 800, 640, 900, 800]
+  ),
+  spacer(),
+  h2("3.3 Audit Log — Append-Only with Database Hardening"),
+  callout("The audit log is irreplaceable for regulatory compliance. Every mutation writes a before/after snapshot. The reason field must be ≥10 chars for approval/rejection/override actions.", "danger"),
+  spacer(),
+  code("// server/middleware/withAudit.ts"),
+  code("export function withAudit({ entityType, action }) {"),
+  code("  return async (req, res, next) => {"),
+  code("    const before = await loadEntitySnapshot(entityType, req.params.id, req.workspace.id);"),
+  code("    const originalSend = res.json.bind(res);"),
+  code("    res.json = (data) => {"),
+  code("      const after = extractAuditableFields(entityType, data);"),
+  code("      auditService.insert({"),
+  code("        workspaceId: req.workspace.id,"),
+  code("        actorUserId: req.user.id,"),
+  code("        action, entityType,"),
+  code("        entityId: req.params.id || data?.id,"),
+  code("        oldValue: before, newValue: after,"),
+  code("        reason: req.body?.reason,"),
+  code("        ipAddress: req.ip,"),
+  code("        userAgent: req.get('user-agent'),"),
+  code("        requestId: req.id,"),
+  code("      }).catch(logger.error); // never block the response"),
+  code("      return originalSend(data);"),
+  code("    };"),
+  code("    next();"),
+  code("  };"),
+  code("}"),
+  spacer(),
+  h2("3.4 Background Job Catalog — Complete Reference"),
+  table(
+    ["Job Name", "Schedule", "Purpose", "Fallback"],
+    [
+      ["document.generate", "On-demand (enqueued)", "DOCX+PDF generation for Risk Assessment, Policy, Procedures, Governance Summary", "Retry 3×; status=FAILED; notification to CO with retry button"],
+      ["check.submit", "On-demand (enqueued)", "Submit check to provider; update providerRequestId", "Retry 3× exponential; status=ERROR; create pending task for CO"],
+      ["check.poll", "Every 60s", "Poll providers in PROCESSING state past threshold", "If still unresolved → schedule reconcile"],
+      ["check.reconcile", "Daily 02:00", "Find PROCESSING checks older than provider timeout; alert CO + Platform Admin", "Alert only; manual override required"],
+      ["webhook.process", "On-demand (enqueued)", "Idempotent processing of inbound provider webhooks", "Retry 3×; processedAt guard prevents duplicate side effects"],
+      ["review.scheduler", "Daily 03:00", "Find files with nextReviewDue ≤ today+30d; create REVIEW_DUE tasks; email notifications", "Task created; email sent; file state transitioned"],
+      ["screening.recurring", "Daily 04:00", "Re-screen active customers per risk-tier cadence (Diamond 2)", "Skip individual on provider error; log alert"],
+      ["watchlist.delta", "Daily 05:00", "Compare screening results against updated watchlists (Diamond 2)", "Requires provider delta support; skip silently if unavailable"],
+      ["regulatory.feed", "Daily 06:00", "Fetch AUSTRAC/FATF updates; NLP-tag by industry (Diamond 6)", "Cache last successful fetch; serve stale on error"],
+      ["billing.usage.report", "Hourly", "Push unreported UsageEvents to Stripe Usage Records", "Idempotent; retry; alert if >24h unreported"],
+      ["evidence.pack.generate", "On-demand (enqueued)", "Assemble compliance evidence pack ZIP (Diamond 3)", "Retry 1×; status=FAILED; notify requester"],
+      ["notification.digest", "Daily 09:00", "Send daily email digest for unread notifications per user timezone", "Skip user if SMTP error; log; retry next day"],
+      ["audit.export.cron", "Daily 01:00", "Incremental audit log export to separate R2 bucket", "Alert Platform Admin if export fails"],
+    ],
+    [2000, 1400, 3400, 2400]
+  ),
+  spacer(),
+  h2("3.5 WebSocket Architecture"),
+  code("// server/ws.ts — WebSocketService"),
+  code("const wsMap = new Map<string, Set<WebSocket>>();  // userId → connections"),
+  code(""),
+  code("export const broadcastToUser = (userId: string, event: WsEvent) => {"),
+  code("  wsMap.get(userId)?.forEach(ws => ws.send(JSON.stringify(event)));"),
+  code("};"),
+  code(""),
+  code("export const broadcastToWorkspace = (workspaceId: string, event: WsEvent) => {"),
+  code("  // look up all users in workspace, broadcast to each"),
+  code("  getMemberUserIds(workspaceId).then(ids =>"),
+  code("    ids.forEach(id => broadcastToUser(id, event)));"),
+  code("};"),
+  code(""),
+  code("// Event types used in Integrity Solve:"),
+  code("// check.completed | check.status_changed | document.generated"),
+  code("// escalation.assigned | escalation.resolved | task.assigned"),
+  code("// notification.new | billing.status_changed"),
+  pageBreak()
+);
+
+// ─── PART 4 ───
+C.push(
+  h1("Part 4 — Complete Folder Structure Annotated"),
+  h2("4.1 Root Level"),
+  code("integrity-solve/"),
+  code("  client/              # React 18 + Vite frontend (all user-facing UI)"),
+  code("  server/              # Express + TypeScript backend (API + jobs + services)"),
+  code("  shared/              # Code shared between client and server (schema, types, RBAC)"),
+  code("  tests/               # Vitest unit + integration + Playwright E2E"),
+  code("  drizzle/             # Generated SQL migrations"),
+  code("  drizzle.config.ts    # Drizzle Kit config"),
+  code("  vite.config.ts       # Vite build config with path aliases"),
+  code("  tailwind.config.ts   # Tailwind v3 config with brand tokens"),
+  code("  postcss.config.js    # PostCSS with Tailwind plugin"),
+  code("  tsconfig.json        # Frontend TS config"),
+  code("  tsconfig.server.json # Backend TS config (targets Node)"),
+  code("  package.json         # Single package.json — all dependencies"),
+  code("  replit.md            # Agent long-term memory file — keep updated"),
+  code("  .env.example         # All 36 secrets documented (never commit real .env)"),
+  spacer(),
+  h2("4.2 /shared — Single Source of Truth"),
+  callout("shared/ is the most important directory. It is imported by both client AND server. Changes here affect both. The Drizzle schema is the master data contract.", "info"),
+  table(
+    ["File", "Contains", "Consumers"],
+    [
+      ["schema.ts", "Complete Drizzle schema — all 33 tables + enums + relations + inferred types", "server/db.ts (writes), client queries (read via API only)"],
+      ["enums.ts", "TypeScript enums mirroring Postgres pgEnum values", "Both client and server — never hardcode enum strings"],
+      ["zod-schemas.ts", "Zod validation schemas for every form and API endpoint", "Both — zodResolver on client forms; z.parse on Express handlers"],
+      ["rbac.ts", "PERMISSIONS matrix + can(role, action) function", "Server middleware (requireAction) + React (PermissionGate, usePermission)"],
+      ["state-machines.ts", "FileTransition[] for customer file + WorkspaceTransition[] for workspace", "Server (customer-file-state.service, workspace-state.service)"],
+      ["risk-rules.ts", "Pure risk scoring rules returning LOW/MEDIUM/HIGH/CRITICAL with factor breakdown", "Server (risk-calculator.service) — must be unit-tested 100%"],
+      ["form-schemas/", "JSON form schemas for DynamicFormRenderer (17 files)", "Client (DynamicFormRenderer) + server (form validation)"],
+    ],
+    [2000, 3500, 3700]
+  ),
+  spacer(),
+  h2("4.3 /server — Backend Services & Routes"),
+  table(
+    ["Directory", "Files", "Notes"],
+    [
+      ["routes/", "26 route files (one per resource)", "Thin — only HTTP parsing, auth guards, validation, then delegate to service"],
+      ["services/", "30 service files (pure business logic, no Express)", "No req/res objects. Testable in isolation. Dependency-injected via constructor or module import."],
+      ["storage/", "18 storage files (DB queries only)", "Always workspace-scoped. Returns typed Drizzle results. No business logic."],
+      ["providers/", "5 subdirectories (types, registry, mock, facia, aml-watcher, abr)", "ProviderAdapter interface defined in types.ts. Registry resolves by capability + workspace config."],
+      ["jobs/", "13 job files + index.ts + scheduler.ts", "BullMQ jobs primary; node-cron + withDistributedLock fallback. Stagger cron times by 30s to avoid thundering herd."],
+      ["middleware/", "9 middleware files", "requireAuth, withWorkspace, requireAction, withAudit, rateLimit, requestId, errorHandler, billingActive"],
+      ["templates/", "5 DOCX templates + maps/", "Template content provided by client/compliance expert. Maps in maps/*.map.ts extract variables from riskSnapshotJson."],
+      ["emails/", "12 React Email templates", "Rendered to HTML at send time. Base template with Integrity Solve branding. All compliance emails have mandatory footer links."],
+    ],
+    [1600, 2000, 5600]
+  ),
+  spacer(),
+  h2("4.4 /client/src — Frontend Structure"),
+  table(
+    ["Directory", "Key Files", "Notes"],
+    [
+      ["pages/public/", "Landing.tsx, Pricing.tsx, Features.tsx, Compliance.tsx, About.tsx, Contact.tsx", "All public routes. Landing.tsx composes all 11 sections. Lazy-loaded. 3D scene also lazy with Suspense."],
+      ["pages/auth/", "Login, Register, VerifyEmail, VerifyMobile, VerifyIdentity, ForgotPassword, ResetPassword, AcceptInvite, RegisterBusiness", "Multi-step flows. RHF + Zod. VerifyIdentity is a stub in M1; wired to Facia in M8."],
+      ["pages/app/", "Dashboard, DashboardOnboarding, setup/Step1-6, program/*, clients/*, escalations/*, reviews/*, billing/*, settings/*", "All protected routes. Lazy-loaded. Role-gated via PermissionGate and ProtectedRoute."],
+      ["components/landing/", "Hero3D, HeroScene, CrystallineShield, OrbitingArtefacts, ParticleField, + 14 more", "The 3D scene. Code-split from app shell entirely. Three.js + R3F + GSAP."],
+      ["components/wizard/", "WizardLayout, StepNavigator, AutosaveIndicator, StepValidation, ContextHelpPanel", "Shared across 6 implementation wizard steps. Never unmounts between steps."],
+      ["components/workflow/", "FileStateBadge, FileTimeline, RiskRatingCard, ReviewDecisionModal, EscalationCard", "CDD workflow UI. FileStateBadge has pulsing dot for PENDING_CHECKS state."],
+      ["hooks/", "useAuth, useWorkspace, usePermission, useWebSocket, useAutosave, useDocumentGenerationProgress, useToast", "Custom hooks. useAutosave debounces 2s and shows Saving/Saved/Failed states."],
+      ["lib/", "api.ts, queryClient.ts, stripe.ts, ws-client.ts, format.ts, routes.ts, utils.ts", "api.ts is the central typed fetch wrapper with 401 refresh + 403 toast. Never use raw fetch elsewhere."],
+    ],
+    [1800, 2400, 5000]
+  ),
+  pageBreak()
+);
+
+// ─── PART 5 ───
+C.push(
+  h1("Part 5 — Database Schema Deep Dive"),
+  h2("5.1 ID Strategy & Conventions"),
+  bullet("All PKs: cuid2 via @paralleldrive/cuid2 — collision-resistant, URL-safe, sortable"),
+  bullet("All timestamps: timestamp with timezone (withTimezone: true) — never store without timezone in AML context"),
+  bullet("All enum types: defined TWICE — pgEnum (Drizzle/Postgres) + TypeScript enum (shared/enums.ts)"),
+  bullet("All tenant tables: workspace_id NOT NULL with FK to workspaces(id) ON DELETE RESTRICT"),
+  bullet("Flexible form data: jsonb column + extracted typed columns for key reporting fields"),
+  bullet("Soft-delete pattern NOT used — compliance requires hard records with closed/declined states"),
+  spacer(),
+  h2("5.2 All 28 Enums"),
+  table(
+    ["Enum", "Values (key ones)"],
+    [
+      ["userRoleEnum", "WORKSPACE_ADMIN · COMPLIANCE_OFFICER · PROGRAM_CONTRIBUTOR · ONBOARDING_USER · REVIEWER · READ_ONLY · PLATFORM_ADMIN · SUPPORT"],
+      ["identityStatusEnum", "PENDING · IN_PROGRESS · VERIFIED · FAILED · EXPIRED"],
+      ["registryStatusEnum", "PENDING · VERIFIED · MANUAL · MISMATCH"],
+      ["industryPathwayEnum", "ACCOUNTING · LEGAL · REAL_ESTATE · FINANCIAL_SERVICES · GAMBLING · PRECIOUS_METALS · TRUST_COMPANY_SERVICES · OTHER"],
+      ["implementationStatusEnum", "NOT_STARTED · IN_PROGRESS · COMPLETE · REQUIRES_REVISION"],
+      ["billingStatusEnum", "INACTIVE · SETUP_PENDING · TRIALING · ACTIVE · PAST_DUE · SUSPENDED · CANCELLED"],
+      ["membershipStatusEnum", "PENDING · ACTIVE · SUSPENDED · REVOKED"],
+      ["programStepEnum", "BUSINESS_PROFILE · DESIGNATED_SERVICES · GOVERNANCE · ROLES_RESPONSIBILITIES · CO_APPOINTMENT · PERSONNEL_SUITABILITY"],
+      ["formStatusEnum", "NOT_STARTED · IN_PROGRESS · SUBMITTED · COMPLETED · REQUIRES_REVISION"],
+      ["customerTypeEnum", "INDIVIDUAL · COMPANY · TRUST · PARTNERSHIP · ASSOCIATION · OTHER"],
+      ["customerStatusEnum", "DRAFT · ACTIVE · INACTIVE · CLOSED"],
+      ["fileStateEnum", "DRAFT · CDD_IN_PROGRESS · PENDING_CHECKS · CHECKS_RETURNED · ECDD_REQUIRED · UNDER_REVIEW · APPROVED · APPROVED_WITH_CONTROLS · HELD · DECLINED · REVIEW_DUE · CLOSED"],
+      ["riskRatingEnum", "LOW · MEDIUM · HIGH · CRITICAL"],
+      ["documentTypeEnum", "RISK_ASSESSMENT · POLICY · PROCEDURES · GOVERNANCE_SUMMARY · COMPLETION_PACK"],
+      ["docFormatEnum", "DOCX · PDF"],
+      ["documentStatusEnum", "GENERATING · CURRENT · SUPERSEDED · FAILED"],
+      ["subjectTypeEnum", "INDIVIDUAL · ENTITY · BENEFICIAL_OWNER"],
+      ["providerCapabilityEnum", "IDENTITY_VERIFICATION · AML_SCREENING · KYB_VERIFICATION · BILLING_AUTHORIZATION · ADVERSE_MEDIA · PEP_SCREENING"],
+      ["checkStatusEnum", "QUEUED · PROCESSING · PASSED · FAILED · PARTIAL · ESCALATED · ERROR · MANUAL_OVERRIDE"],
+      ["escalationStatusEnum", "OPEN · UNDER_REVIEW · ACTION_REQUIRED · RESOLVED · WITHDRAWN"],
+      ["escalationDecisionEnum", "PROCEED · PROCEED_WITH_CONTROLS · HOLD · DECLINE · REFER_SUSPICIOUS_MATTER"],
+      ["periodicReviewOutcomeEnum", "NO_CHANGE · RISK_UPGRADED · RISK_DOWNGRADED · ECDD_REQUIRED · CLOSE_RELATIONSHIP"],
+      ["sofConclusionEnum", "SATISFACTORY · FURTHER_INFORMATION · ESCALATE"],
+      ["trainingTypeEnum", "INDUCTION · REFRESHER · CO · SYSTEM · OTHER"],
+      ["taskStatusEnum", "OPEN · IN_PROGRESS · COMPLETED · CANCELLED"],
+      ["taskPriorityEnum", "LOW · MEDIUM · HIGH · URGENT"],
+      ["notificationChannelEnum", "IN_APP · EMAIL · SMS · WEBHOOK"],
+      ["subscriptionTierEnum", "TRIAL · STARTER · PROFESSIONAL · ENTERPRISE · GROUP · LIFETIME"],
+    ],
+    [2400, 6800]
+  ),
+  spacer(),
+  h2("5.3 All 33 Tables — Purpose & Critical Fields"),
+  table(
+    ["Table", "Purpose", "Critical Columns / Notes"],
+    [
+      ["users", "Login identity and profile", "identityStatus (PENDING until Facia verified). isPlatformAdmin separates SUPPORT from Platform Admin."],
+      ["workspaces", "Business tenant/account", "implementationStatus gates full dashboard. billingStatus gates paid checks. currentProgramVersionId FK for quick access."],
+      ["workspace_memberships", "User-workspace role assignment", "expiresAt for time-limited SUPPORT access. UNIQUE(userId, workspaceId)."],
+      ["invitations", "Token-based workspace invitations + customer portal invites", "token UNIQUE. expiresAt 7 days default. acceptedAt / rejectedAt audit."],
+      ["sessions", "httpOnly cookie sessions", "workspaceId tracks active workspace per session. lastSeenAt rolled on every request."],
+      ["verification_codes", "6-digit OTP for email + mobile", "codeHash (bcrypt). attempts max 3 before lockout. expiresAt 10 minutes."],
+      ["program_forms", "6-step implementation wizard data", "UNIQUE(workspaceId, stepCode). dataJson + lastSavedAt for autosave. version increments on each submit."],
+      ["program_versions", "Immutable snapshots of program at a point in time", "No UPDATE allowed. isCurrent boolean. Supersession creates new row; does NOT update old."],
+      ["program_documents", "DOCX + PDF files generated from program versions", "filePath = R2 key. checksum = SHA-256 for integrity. dataSnapshotJson for reproducibility."],
+      ["training_records", "Manual training session records", "participants jsonb [{userId?, name, role}]. Export to CSV for evidence packs."],
+      ["program_reviews", "Formal program review/update records", "trigger (SCHEDULED/EVENT/REGULATORY). Submission creates new ProgramVersion."],
+      ["customers", "Customer master record", "externalRef for CRM integration. riskRating at customer level (highest of files)."],
+      ["customer_files", "CDD matter/relationship file", "fileReference UNIQUE 'CF-20260502-0001'. state = 12-state machine. nextReviewDue auto-set from risk rating."],
+      ["customer_forms", "Dynamic form submissions (CDD/ECDD/SOF/SOW/etc.)", "formType is a string (not enum) for extensibility. aiAssisted flag for Diamond 1 audit trail."],
+      ["beneficial_owners", "Owners/controllers linked to entity files", "personRecordId links to shared person record (gap fix). screeningStatus per person."],
+      ["person_records", "Shared person de-duplication across files", "UNIQUE(workspaceId, fullName, dateOfBirth). Allows sharing screening results across files."],
+      ["evidence_files", "Uploaded documents and evidence", "filePath = R2 key. checksum SHA-256. Linked to customerFile AND optionally to specific customerForm."],
+      ["file_state_history", "Immutable log of every state transition", "fromState nullable (first transition). reason required. Full chain of custody."],
+      ["check_requests", "Provider check request records", "idempotencyKey UNIQUE prevents duplicate billing. providerEnvironment tracks SANDBOX vs PRODUCTION."],
+      ["check_results", "Normalized provider results", "rawPayloadRef = R2 key for full provider response (encrypted at rest). reviewOutcome for match resolution."],
+      ["webhook_events", "Raw inbound provider webhooks", "UNIQUE(providerName, providerEventId) for replay protection. signatureValid logged even for rejected events."],
+      ["escalations", "High-risk file escalation records", "smrConsidered flag triggers confirmation step. decisionReason required (≥10 chars)."],
+      ["periodic_reviews", "Periodic review records", "newRiskRating nullable (only set if changed). newReviewDue recalculated from new rating."],
+      ["source_of_funds_assessments", "SOF form records", "conclusion from sofConclusionEnum. evidenceFileIds jsonb links to evidence_files."],
+      ["source_of_wealth_assessments", "SOW form records", "Same structure as SOF. Separate table for clear audit trail."],
+      ["tasks", "Human action items", "priority URGENT for SMR considerations. dueAt auto-set (review tasks = 30d before due)."],
+      ["notifications", "In-app + email + SMS notifications", "type = dotted string 'escalation.assigned'. link for one-click navigation. readAt for bell counter."],
+      ["notification_preferences", "Per-user notification opt-out", "Some notification types (billing.suspended) cannot be muted — enforce at service layer."],
+      ["audit_log", "Append-only immutable audit trail", "No UPDATE/DELETE. DB trigger raises exception. requestId for distributed tracing."],
+      ["usage_events", "Billable check usage records", "UNIQUE idempotencyKey prevents duplicate Stripe charges. reportedToStripeAt tracks sync status."],
+      ["stripe_webhook_events", "Stripe webhook deduplication", "PK = Stripe event ID (globally unique). processedAt for idempotent processing."],
+      ["provider_connections", "Per-workspace provider config", "secretRef is a POINTER (never raw secret). UNIQUE(workspaceId, capability). One active per capability."],
+      ["job_locks", "Distributed lock for cron jobs", "INSERT ON CONFLICT DO NOTHING pattern. expiresAt for stale-lock cleanup."],
+    ],
+    [2100, 1900, 5200]
+  ),
+  spacer(),
+  h2("5.4 Diamond Feature Tables (Additional 10 Tables)"),
+  table(
+    ["Table", "Diamond Feature", "Purpose"],
+    [
+      ["ai_narrative_drafts", "Diamond 1", "Stores AI-generated draft + final approved text. promptVersion for reproducibility. aiAssisted flag links to customer_forms."],
+      ["monitoring_rules", "Diamond 2", "JSON-configurable rules per workspace. Workspace Admin can tune parameters within platform bounds."],
+      ["monitoring_alerts", "Diamond 2", "Generated by background jobs. Severity: info/warning/critical. Status: OPEN/ACKNOWLEDGED/DISMISSED/ACTIONED."],
+      ["evidence_packs", "Diamond 3", "ZIP package metadata. passwordProtected flag. filePath = R2 key. status GENERATING → COMPLETED."],
+      ["training_courses", "Diamond 5", "workspaceId nullable = platform-wide course. passScore default 80. active flag for deprecation."],
+      ["training_lessons", "Diamond 5", "ordering column for lesson sequence. contentMarkdown or videoUrl (or both)."],
+      ["training_quizzes", "Diamond 5", "questionsJson [{question, options, correctAnswer, explanation}]."],
+      ["training_enrollments", "Diamond 5", "UNIQUE(userId, courseId). score + passed. expiresAt for recertification tracking."],
+      ["regulatory_updates", "Diamond 6", "UNIQUE(source, externalId). industryTags jsonb for filtering by pathway. impactArea for change assessment."],
+      ["regulatory_alert_acks", "Diamond 6", "UNIQUE(workspaceId, updateId). Status ACKNOWLEDGED/DISMISSED/ACTIONED. Audit trail for regulatory awareness."],
+      ["customer_portal_invites", "Diamond 7", "token UNIQUE single-use. expiresAt 14 days. submissionsJson tracks what was submitted."],
+      ["benchmarking_snapshots", "Diamond 8", "Anonymised aggregate. Min sample size 30. p50/p75/p90 only. Never raw points."],
+    ],
+    [2200, 1400, 5600]
+  ),
+  pageBreak()
+);
+
+// ─── PART 6 ───
+C.push(
+  h1("Part 6 — StrategyNavigator Feature Lift Map"),
+  callout("StrategyNavigator provides ~60% of the load-bearing infrastructure. File 05 (feature-inventory.md) lists 13 categories (A–N). This part summarises each category with lift cost and adaptation notes.", "info"),
+  spacer(),
+  table(
+    ["Category", "Feature", "Lift Cost", "Key Adaptations for Integrity Solve"],
+    [
+      ["A — Auth", "httpOnly cookie auth + JWT refresh", "Easy", "Add identityStatus check — only VERIFIED users can access /app/* routes. Add workspace_id to sessions table."],
+      ["A — Auth", "Email + mobile OTP (6-digit, bcrypt, 3 attempts, 10min)", "Easy", "Mobile OTP is MANDATORY (not optional) for Australian AML compliance. Twilio Verify replaces any SMS provider."],
+      ["A — Auth", "Password reset (token, 1h expiry, one-use)", "Trivial", "None — identical pattern."],
+      ["A — Auth", "Session expiry 401 → refresh → redirect", "Trivial", "None — identical api.ts wrapper."],
+      ["B — Tenancy", "workspace_id isolation (companyId rename)", "Trivial", "Rename companyId → workspaceId. Add Postgres RLS as third layer."],
+      ["B — Tenancy", "RBAC permission matrix + can() helper", "Easy", "Expand 3 roles → 8 roles. Rewrite PERMISSIONS matrix with new action names."],
+      ["B — Tenancy", "PermissionGate React component", "Trivial", "None — identical pattern with new action strings."],
+      ["B — Tenancy", "Workspace switcher (PATCH /sessions/me)", "Easy", "None — Diamond 4 group structure is a sub-case handled by groupWorkspaceId FK."],
+      ["C — Invitations", "Token-based invitation system", "Easy", "Extend role enum. Customer Portal (Diamond 7) reuses same primitive with customer as recipient."],
+      ["C — Invitations", "Welcome modal + guided tour", "Easy", "Tour points at wizard, client list, escalation queue. 4-step tour."],
+      ["D — Notifications", "Nodemailer + Gmail SMTP + React Email", "Trivial", "Add 10 new templates. Compliance emails (billing.suspended) cannot be muted."],
+      ["D — Notifications", "In-app notification bell + WebSocket push", "Easy", "New notification types: escalation.assigned, check.completed, document.generated."],
+      ["D — Notifications", "Notification preferences (per-user opt-out)", "Trivial", "Billing and regulatory notifications cannot be muted — enforce at service layer."],
+      ["D — Notifications", "Daily digest emails (cron, timezone-bucketed)", "Easy", "None — identical pattern."],
+      ["E — Jobs", "Distributed lock (job_locks table)", "Trivial", "None — copy verbatim."],
+      ["E — Jobs", "Cron scheduling with stagger", "Trivial", "New job catalog (13 jobs vs original's ~5)."],
+      ["E — Jobs", "AI request concurrency limiting (semaphore)", "Trivial", "Used by Diamond 1 (narratives), Diamond 6 (regulatory tagging)."],
+      ["F — Files", "Multer upload + whitelist + checksum", "Easy", "Switch from local disk to R2. Add ClamAV virus scan (optional)."],
+      ["F — Files", "Cloudflare R2 / S3 wrapper with signed URLs", "Moderate", "Workspace-prefixed keys. Lifecycle policies: 7yr for evidence/*, 30d for temporary/*."],
+      ["G — Audit", "Audit log table + withAudit interceptor", "Easy", "Make reason mandatory (≥10 chars) for approval/decline. Add DB trigger backstop."],
+      ["G — Audit", "Audit trail UI (paginated, filterable, export)", "Easy", "Add per-customer-file audit view. Export to PDF for Diamond 3 evidence packs."],
+      ["H — UI", "~50 shadcn/ui primitives", "Trivial", "Re-skin with Integrity Solve navy+emerald brand tokens (CSS custom properties)."],
+      ["H — UI", "Dark/light theme toggle", "Easy", "CSS class toggle without next-themes. Auth pages: dark left rail, light right rail."],
+      ["H — UI", "Mobile bottom navigation", "Trivial", "Tabs: Dashboard / Clients / Reviews / More."],
+      ["I — Forms", "React Hook Form + Zod shared schemas", "Trivial", "Many more forms; identical pattern."],
+      ["I — Forms", "Autosave with debounce (2s)", "Trivial", "Apply to all 6 wizard steps + ECDD + SOF/SOW + periodic review forms."],
+      ["J — Dashboards", "Dashboard widget framework", "Easy", "New cards: program health score, files by state, escalations open, training compliance, billing usage."],
+      ["K — Billing", "Stripe subscriptions + webhooks", "Moderate", "Add metered usage for paid checks (Stripe Usage Records). 6-tier matrix instead of 3."],
+      ["K — Billing", "Billing guards (402 if inactive)", "Trivial", "Apply to all /checks/* POST routes. Structured JSON error with action + link."],
+      ["K — Billing", "Past-due / grace periods / suspension UX", "Easy", "7d grace (checks blocked), 30d (read-only), 90d (data export window). Banners per state."],
+      ["L — Ops", "DB indexing, N+1 fixes, code splitting", "Easy", "All indexes in Part 5. Lazy-load all /app/** pages. Landing 3D scene lazy-loaded separately."],
+      ["L — Ops", "Rate limiting tiers", "Trivial", "Tighter on /checks/trigger (30 req/min per workspace). All tiers in middleware/rateLimit.ts."],
+    ],
+    [1600, 2000, 1000, 4600]
+  ),
+  spacer(),
+  h2("6.1 Net-New Builds (40% Effort)"),
+  callout("These have no StrategyNavigator equivalent and must be built from scratch using the plan files as the specification.", "warn"),
+  table(
+    ["Net-New Feature", "Plan File", "Estimated Effort"],
+    [
+      ["Document generation (DOCX templates + PDF + R2 + versioning)", "07 — M4", "1.5 weeks"],
+      ["Customer-file state machine (12 states, role-gated transitions)", "08 — M6", "2 weeks"],
+      ["Provider adapter layer (ProviderRegistry + 5 adapters)", "09 — M8", "2.5 weeks"],
+      ["Webhook gateway (signature validation + idempotency + replay protection)", "09 — M8", "1 week"],
+      ["3D landing page hero (Three.js + R3F + GSAP + Lenis)", "12 — Landing", "1.5 weeks"],
+      ["AI risk narrative generator (Anthropic + concurrency limiter)", "11 — Diamond 1", "1 week"],
+      ["Customer-facing CDD portal (token-based sub-app)", "11 — Diamond 7", "2 weeks"],
+      ["Compliance evidence pack ZIP generator", "11 — Diamond 3", "1 week"],
+      ["Identity verification integration (Facia SDK + webhooks)", "09 — M8", "1 week"],
+      ["AML screening integration (AML Watcher API)", "09 — M8", "1 week"],
+    ],
+    [3200, 1800, 1800]
+  ),
+  pageBreak()
+);
+
+// ─── PART 7 ───
+C.push(
+  h1("Part 7 — Phase 0: Bootstrap & Repository Setup"),
+  callout("Phase 0 MUST complete before any feature work. The agent should spend the first 90 minutes on these setup tasks only.", "warn"),
+  spacer(),
+  h2("7.1 Phase 0 Checklist (Do In Order)"),
+  num("Unzip integrity-solve-handoff.zip into the project root"),
+  num("Read ALL files in order: README.md → AGENT_PROMPT.md → 01 through 15 in sequence"),
+  num("Copy templates/replit.md to project root. This is the agent's long-term memory."),
+  num("Copy templates/package.json (exact dependency versions — do NOT modify without research)"),
+  num("Run: npm install"),
+  num("Copy templates/drizzle.config.ts to project root"),
+  num("Copy templates/tsconfig.json and templates/tsconfig.server.json"),
+  num("Copy templates/vite.config.ts"),
+  num("Copy templates/tailwind.config.ts and templates/postcss.config.js"),
+  num("Create shared/schema.ts from templates/schema-starter.ts (Phase 0 tables only)"),
+  num("Provision Replit Postgres via the database skill; get DATABASE_URL"),
+  num("Generate SESSION_SECRET: openssl rand -base64 64"),
+  num("Add DATABASE_URL and SESSION_SECRET to Replit Secrets"),
+  num("Create server/env.ts with full Zod schema (validate at startup, fail fast)"),
+  num("Run: npm run db:push (creates Phase 0 tables: users, workspaces, sessions, verification_codes, audit_log, job_locks, workspace_memberships)"),
+  num("Verify: npm run db:studio shows all tables"),
+  num("Create single Replit workflow: name='Integrity Solve', command='NODE_ENV=development npm run dev'"),
+  num("Verify app starts on port from process.env.PORT, bound to 0.0.0.0"),
+  num("Hit GET /healthz — should return 200 { ok: true, db: 'ok' }"),
+  spacer(),
+  h2("7.2 package.json — Key Dependency Versions (From Template)"),
+  table(
+    ["Package", "Version", "Purpose"],
+    [
+      ["react + react-dom", "^18.3.1", "Core UI framework"],
+      ["vite", "^6.0.3", "Frontend build tool + dev server"],
+      ["wouter", "^3.3.5", "Client-side routing (~1KB)"],
+      ["@tanstack/react-query", "^5.62.7", "Server state management"],
+      ["@tanstack/react-table", "^8.20.5", "Headless table for data grids"],
+      ["drizzle-orm", "^0.36.4", "ORM — single source of truth"],
+      ["drizzle-zod", "^0.5.1", "Auto-generate Zod schemas from Drizzle tables"],
+      ["drizzle-kit", "^0.30.1", "Migration + schema push CLI"],
+      ["express", "^4.21.2", "Backend HTTP framework"],
+      ["@paralleldrive/cuid2", "^2.2.2", "ID generation for all PKs"],
+      ["three", "^0.171.0", "3D rendering engine (landing page)"],
+      ["@react-three/fiber", "^8.17.10", "React renderer for Three.js"],
+      ["@react-three/drei", "^9.116.0", "R3F helper library"],
+      ["@react-three/postprocessing", "^2.16.3", "Bloom, CA, Vignette post-FX"],
+      ["gsap", "^3.12.5", "Animation + ScrollTrigger"],
+      ["@studio-freight/lenis", "^1.0.42", "Smooth scroll (drives GSAP timeline)"],
+      ["framer-motion", "^11.13.1", "Non-3D micro-interactions"],
+      ["@anthropic-ai/sdk", "^0.30.0", "Claude API for Diamond 1"],
+      ["bullmq", "^5.34.0", "Background job queue (Redis-backed)"],
+      ["stripe", "^17.4.0", "Billing + metered usage"],
+      ["bcrypt", "^5.1.1", "Password hashing (cost 12)"],
+      ["pino + pino-http", "^9.5.0 + ^10.3.0", "Structured logging"],
+      ["docx", "^9.0.3", "DOCX generation for AML program documents"],
+      ["pdf-lib", "^1.17.1", "PDF assembly/conversion"],
+      ["archiver", "^7.0.1", "ZIP creation for evidence packs (Diamond 3)"],
+      ["twilio", "^5.4.0", "SMS OTP verification"],
+      ["ws", "^8.18.0", "WebSocket server"],
+      ["@sentry/node + @sentry/react", "^8.42.0", "Error tracking (Phase 5)"],
+    ],
+    [2800, 1400, 5000]
+  ),
+  spacer(),
+  h2("7.3 Single Workflow Pattern"),
+  code("// server/index.ts — entry point"),
+  code("import { createApp } from './app';"),
+  code("import { env } from './env';"),
+  code("import { startJobs } from './jobs';"),
+  code("import { createWebSocketServer } from './ws';"),
+  code(""),
+  code("const app = createApp();"),
+  code("const server = app.listen(env.PORT, '0.0.0.0', () => {"),
+  code("  logger.info({ port: env.PORT }, 'Integrity Solve started');"),
+  code("  startJobs();"),
+  code("});"),
+  code("createWebSocketServer(server);"),
+  code(""),
+  code("// In dev: Vite middleware serves client"),
+  code("// In prod: Express serves dist/public with long-cache"),
+  pageBreak()
+);
+
+// ─── PART 8 ───
+C.push(
+  h1("Part 8 — Phase 1: Foundation & Auth (M1–M2)"),
+  h2("Milestone 1 — Core Foundation (Weeks 1–2)"),
+  callout("Every security invariant is established in M1. RBAC, workspace isolation, audit log — all built here. It is expensive to retrofit these later. Invest properly.", "warn"),
+  spacer(),
+  h3("M1 Backend — Complete Task Table"),
+  table(
+    ["Task", "File", "Critical Detail"],
+    [
+      ["Express app factory", "server/app.ts", "Testable factory (no side effects in module scope). Helmet + CORS limited to APP_URL. JSON body limit 5MB. Request ID middleware on every request."],
+      ["Drizzle init", "server/db.ts + shared/schema.ts", "Import schema-starter.ts. Run db:push. Run audit_log hardening SQL immediately after. Run RLS migration for Phase 0 tables."],
+      ["Seed script", "server/seed.ts", "Platform admin + demo workspace 'Acme Accounting Pty Ltd' + 3 customers in mixed states + mock provider connections. Run with npm run db:seed."],
+      ["Env validation", "server/env.ts", "Zod schema validates ALL process.env at startup. fail fast — throw if any required var missing. See Part 16 for full schema."],
+      ["Pino logger", "server/logger.ts", "JSON in prod, pretty (pino-pretty) in dev. Every line: workspaceId, userId, requestId, action. Never console.log in production code."],
+      ["Auth service", "server/services/auth.service.ts", "register() → bcrypt hash (cost 12) → insert user → send verify email. login() → compare hash → create session → set httpOnly cookie. logout() → delete session row."],
+      ["Auth routes", "server/routes/auth.routes.ts", "POST /auth/register, /auth/login, /auth/logout, /auth/verify-email, /auth/verify-mobile, /auth/forgot-password, /auth/reset-password, GET /auth/me"],
+      ["Email service", "server/services/email.service.ts", "Nodemailer transporter (Gmail SMTP). sendEmail({ to, subject, react }) renders React Email component to HTML string. Queue with retry if SMTP fails."],
+      ["SMS service", "server/services/sms.service.ts", "Twilio Verify or direct Twilio SMS. sendOtp(mobile, code). verifyOtp(mobile, code) — always consume code on verification."],
+      ["requireAuth middleware", "server/middleware/requireAuth.ts", "Read sid cookie → look up sessions row → check expiresAt → attach req.user. Roll lastSeenAt. Return 401 if expired or not found."],
+      ["withWorkspace middleware", "server/middleware/withWorkspace.ts", "Read workspaceId from req.user.session OR X-Workspace-Id header. Validate ACTIVE membership. Attach req.workspace + req.membership. Return 403 if invalid."],
+      ["requireAction middleware", "server/middleware/requireAction.ts", "requireAction('customer.approve') → checks can(req.membership.role, action). 403 if denied. Frontend gate is decorative."],
+      ["withAudit middleware", "server/middleware/withAudit.ts", "Load before snapshot → run handler → load after snapshot → INSERT audit_log row. Reason from req.body.reason. Never block response on audit failure."],
+      ["Workspace state service", "server/services/workspace-state.service.ts", "Explicit transitions: registered → identity_verified → business_verified → setup_in_progress → setup_complete → active. Guards prevent skipping. Each transition logs to audit."],
+      ["Workspaces routes", "server/routes/workspaces.routes.ts", "CRUD + GET /workspaces/:id/setup-progress (returns per-step status + completion percentages + billing status)."],
+      ["Memberships routes", "server/routes/memberships.routes.ts", "Invite by email (creates invitations row + sends email). Accept invite (validates token + email match + not expired). Change role. Revoke."],
+      ["Rate limiting", "server/middleware/rateLimit.ts", "Auth: 10/min IP. Mutations: 100/min user. Check trigger: 30/min workspace. File upload: 20/min user. Webhooks: 1000/min provider IP."],
+      ["Health check", "server/routes/health.ts", "GET /healthz → DB ping (SELECT 1) + Redis ping if configured → { ok, db, redis }. No auth. Bind to server, not Express app (bypass middleware for Replit health probes)."],
+      ["RBAC module", "shared/rbac.ts", "PERMISSIONS record (see Part 3 §2.2 matrix). can(role, action) pure function. Import in both requireAction AND React's usePermission hook."],
+    ],
+    [2100, 2600, 4500]
+  ),
+  spacer(),
+  h3("M1 Frontend — Complete Task Table"),
+  table(
+    ["Task", "File", "Critical Detail"],
+    [
+      ["Vite config", "vite.config.ts", "Path aliases: @/ → client/src/, @shared/ → shared/. React plugin. Proxy /api → Express in dev."],
+      ["Tailwind theme", "tailwind.config.ts", "Brand tokens: risk.{low/medium/high/critical}, brand.{navy/surface/emerald/gold}. Risk palette: emerald/amber/orange/red. See brand tokens in Part 2."],
+      ["Theme provider", "client/src/components/ThemeProvider.tsx", "CSS class toggle (dark on html element). Persisted in localStorage. System default. No next-themes package — minimal custom implementation."],
+      ["App router", "client/src/App.tsx", "Wouter Switch with lazy-loaded pages. ProtectedRoute HOC. Suspense with PageSkeleton fallback. Landing route is code-split from entire app bundle."],
+      ["API client", "client/src/lib/api.ts", "fetchJson() with credentials:'include'. Intercepts 401 → refresh attempt → redirect on fail. Intercepts 403 → toast notification. workspaceId in X-Workspace-Id header."],
+      ["TanStack Query", "client/src/lib/queryClient.ts", "staleTime: 30s default. refetchOnWindowFocus: true. onError: toast notification. 401 triggers auth refresh."],
+      ["useAuth hook", "client/src/hooks/useAuth.ts", "Wraps GET /auth/me. isAuthenticated boolean. user object. logout() mutation with optimistic clear."],
+      ["useWorkspace hook", "client/src/hooks/useWorkspace.ts", "Wraps GET /workspaces/me/active. switchWorkspace(id) → PATCH /sessions/me. Invalidates all queries on switch."],
+      ["usePermission hook", "client/src/hooks/usePermission.ts", "can(action) → calls can(user.role, action) from shared/rbac.ts. Memoized. Used by PermissionGate and manually where needed."],
+      ["ProtectedRoute HOC", "client/src/components/auth/ProtectedRoute.tsx", "Redirect to /login?next=... if !isAuthenticated. Optional requireImplementationStatus → redirect to /app/dashboard-onboarding if not COMPLETE."],
+      ["PermissionGate", "client/src/components/auth/PermissionGate.tsx", "Renders null when can(action) is false. Never renders disabled — that is handled separately per use case."],
+      ["Register page", "client/src/pages/auth/Register.tsx", "Step 1: email + password + terms. Step 2: email OTP. Step 3: mobile OTP. Progress bar. RHF + Zod. All validation inline."],
+      ["Login page", "client/src/pages/auth/Login.tsx", "Email + password. Forgot password link. Remember me (extends session). SSO placeholder."],
+      ["Verify identity stub", "client/src/pages/auth/VerifyIdentity.tsx", "M1: 'Identity verification — click to mark as verified' button (dev only). M8: replaces with Facia SDK. Never skip for production."],
+      ["App shell", "client/src/components/layout/AppShell.tsx", "Sidebar + TopBar + main content area + MobileBottomNav. Responsive: sidebar collapses on mobile."],
+      ["Sidebar", "client/src/components/layout/Sidebar.tsx", "Role-gated nav items via PermissionGate. Workspace switcher at top. Collapse to icon-only on md breakpoint."],
+      ["TopBar", "client/src/components/layout/TopBar.tsx", "Notification bell (unread count badge + WebSocket push). Theme toggle. User avatar dropdown (profile, settings, logout)."],
+      ["Mobile bottom nav", "client/src/components/layout/MobileBottomNav.tsx", "4 icons: Dashboard, Clients, Reviews, More. Visible only below md breakpoint."],
+    ],
+    [2100, 2600, 4500]
+  ),
+  spacer(),
+  h3("M1 Acceptance Criteria"),
+  callout("ALL criteria must be green before moving to M2. No exceptions.", "danger"),
+  bullet("User can register, verify email, verify mobile, and reach /app/dashboard-onboarding"),
+  bullet("Workspace auto-created at register; user assigned WORKSPACE_ADMIN"),
+  bullet("All data workspace-scoped — proven by tests/integration/workspace-isolation.test.ts"),
+  bullet("Direct URL /app/customers for READ_ONLY user → 403 (not 200, not 404)"),
+  bullet("Audit log entry created for login, logout, role change, workspace creation"),
+  bullet("User A with valid JWT passing Workspace B's ID → 403 never data"),
+  bullet("npm run dev starts entire app on single port"),
+  bullet("GET /healthz returns 200 { ok: true, db: 'ok' } from external probe"),
+  spacer(),
+  h2("Milestone 2 — Business Registration & Restricted State (Week 3)"),
+  h3("M2 Backend Tasks"),
+  table(
+    ["Task", "File", "Detail"],
+    [
+      ["ABN/ACN registry adapter", "server/providers/abr/abr-kyb.adapter.ts", "Free ABR XML web service (no cost, free ABR_GUID). Cache per ABN for 24h in jobLocks table or Redis. Graceful fallback to manual entry on timeout. Returns: registered_name, status, address, entity type, GST registered."],
+      ["Setup progress endpoint", "GET /workspaces/:id/setup-progress", "Returns { identityVerified, mobileVerified, businessVerified, programSteps: [{step, status, completionPct, lastSavedAt}], billingStatus, isComplete }. Called by frontend every 30s + on window focus."],
+      ["Stripe customer init", "server/services/billing.service.ts", "ensureStripeCustomer(workspace) → Stripe Customer at registration. Store stripeCustomerId. billingStatus = INACTIVE. Do NOT require payment method at this stage."],
+      ["Support access provisioning", "POST /workspaces/:id/support-access", "Platform admin requests time-limited access (default 24h). Creates WorkspaceMembership with role=SUPPORT, expiresAt=+24h. Client admin must approve via in-portal action. Full audit trail. Revocable at any time."],
+      ["Workspace soft-disable", "DELETE /workspaces/:id", "Requires WORKSPACE_ADMIN + reason (≥30 chars). Cascades to soft-disable all memberships. Does NOT delete data. Creates audit entry."],
+    ],
+    [2200, 2600, 4400]
+  ),
+  spacer(),
+  h3("M2 Frontend Tasks"),
+  table(
+    ["Task", "Component", "Detail"],
+    [
+      ["Register Business page", "pages/auth/RegisterBusiness.tsx", "ABN/ACN input → call GET /workspaces/registry-lookup?abn=... → prefill card with matched data → user confirms → authority declaration checkbox → submit. Manual entry if lookup fails (flagged for admin review)."],
+      ["Restricted dashboard", "pages/app/DashboardOnboarding.tsx", "SetupProgressCard (animated 6 steps) + LockedFeaturePreview (3 modules) + BillingStatusCard + SupportCard. Each locked module shows WHAT it unlocks and WHY it's locked. Not just grey boxes."],
+      ["SetupProgressCard", "components/onboarding/SetupProgressCard.tsx", "Polls setup-progress every 30s + on focus. Click on completed step → navigate to that wizard step. Click on locked step → tooltip explaining prerequisite. Progress ring animation."],
+      ["LockedFeaturePreview", "components/onboarding/LockedFeaturePreview.tsx", "3 previews: Onboard Clients (unlocks after wizard complete), Paid Checks (unlocks after billing active), Escalation Queue (unlocks after first APPROVED file). Padlock icon + emerald glow on hover."],
+      ["Billing setup page", "pages/app/billing/BillingSetup.tsx", "Plan picker with tier matrix (TRIAL / STARTER / PROFESSIONAL / ENTERPRISE). Stripe Elements PaymentElement. Skip option with prominent warning: paid checks remain blocked. Annual/monthly toggle."],
+      ["Settings workspace page", "pages/app/settings/Workspace.tsx", "Edit legal/trading name, brand colour picker, brand logo upload (R2). Country pathway selector. Industry pathway affects risk form questions."],
+    ],
+    [2200, 2600, 4400]
+  ),
+  pageBreak()
+);
+
+// ─── PART 9 ───
+C.push(
+  h1("Part 9 — Phase 2: Program Wizard & Documents (M3–M5)"),
+  h2("Milestone 3 — Six-Step Implementation Wizard (Weeks 4–6)"),
+  callout("The wizard is the first tangible customer value. It transforms a compliance document into a guided, structured, autosaving workflow. The JSON form schemas drive both client-side rendering and server-side validation from the same source.", "info"),
+  spacer(),
+  h3("The Six Steps — Complete Specification"),
+  table(
+    ["Step", "Form Name", "Key Fields", "Conditional Logic", "Unlock Condition"],
+    [
+      ["1", "Business Profile Intake", "Industry pathway, business structure, staff count, office locations, jurisdictions (multi-select), client volume tiers, existing AML systems, reporting obligations, financial year end", "Industry pathway routes step 2 options. International jurisdictions add risk exposure flag. Financial year end sets review schedule.", "Workspace exists (always available)"],
+      ["2", "Designated Services Applicability", "Which designated services apply (checkbox grid filtered by step 1 pathway), transaction volumes, customer type mix, geographical exposure, transaction types, existing controls adequacy", "Only services relevant to selected industry pathway shown. High volume thresholds auto-trigger enhanced risk flags in risk calculator.", "Step 1 COMPLETED"],
+      ["3", "Governance & AML Program Setup", "Governing body type, board-level AML oversight mechanism, compliance reporting cycle (monthly/quarterly/annual), external AML support flag + provider details, internal audit approach, training schedule frequency", "External support flag affects CO appointment options in step 5. Reporting cycle sets review task auto-schedule.", "Step 2 COMPLETED"],
+      ["4", "AML Roles & Responsibilities", "Role allocation matrix (each function assigned to a named role or person), escalation path definition, deputy designation, external responsible person contact, decision authority matrix", "ALL functions must be allocated before step can be submitted. Escalation path must be complete before step 5 unlocks.", "Step 3 COMPLETED"],
+      ["5", "Compliance Officer Appointment", "Appointed CO full name, authority scope, qualifications, start date, tenure, support arrangement, contingency plan, CO user account link", "CO name prefills from step 4 allocation. MUST link to existing workspace_membership OR trigger pending invite. Orphan CO (no linked user) BLOCKS completion.", "Step 4 COMPLETED"],
+      ["6", "Personnel Suitability / Statutory Declaration", "Suitability assessment outcome, conflict of interest flags (per person), fitness & propriety declaration, authorised signatory name + date, declaration confirmation checkbox", "Conflict flag (any person) → auto-create compliance task assigned to CO. Declaration submission → enqueue 4 document generation jobs. This is the trigger.", "Step 5 COMPLETED"],
+    ],
+    [500, 1700, 2800, 2200, 1900]
+  ),
+  spacer(),
+  h3("Autosave Architecture — Code Pattern"),
+  code("// client/src/hooks/useAutosave.ts"),
+  code("export function useAutosave(values: unknown, mutationFn: (data: unknown) => Promise<void>, delay = 2000) {"),
+  code("  const [status, setStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle');"),
+  code("  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();"),
+  code("  "),
+  code("  useEffect(() => {"),
+  code("    clearTimeout(timeoutRef.current);"),
+  code("    setStatus('saving');"),
+  code("    timeoutRef.current = setTimeout(async () => {"),
+  code("      try {"),
+  code("        await mutationFn(values);"),
+  code("        setStatus('saved');"),
+  code("      } catch {"),
+  code("        setStatus('error');"),
+  code("      }"),
+  code("    }, delay);"),
+  code("    return () => clearTimeout(timeoutRef.current);"),
+  code("  }, [JSON.stringify(values)]);  // deep compare via stringify"),
+  code("  "),
+  code("  return status;  // used by <AutosaveIndicator>"),
+  code("}"),
+  spacer(),
+  h3("Step 5 CO Appointment Gap Fix"),
+  callout("GAP: Original spec says CO appointment must link to a real workspace user. If no user exists, a pending invite must be created. The system CANNOT complete step 5 with an orphan CO name — this would be a regulatory risk (an appointed person with no portal access).", "gap"),
+  code("// server/services/program-form.service.ts"),
+  code("async function validateCoAppointment(workspaceId: string, coUserId: string | null, coEmail: string) {"),
+  code("  if (coUserId) {"),
+  code("    const membership = await db.query.workspaceMemberships.findFirst({"),
+  code("      where: and(eq(wm.userId, coUserId), eq(wm.workspaceId, workspaceId))"),
+  code("    });"),
+  code("    if (!membership) throw new AppError(409, 'CO_NOT_WORKSPACE_MEMBER', 'CO must be a workspace member');"),
+  code("    return { valid: true };"),
+  code("  }"),
+  code("  // No user linked — check if invite exists"),
+  code("  const existingInvite = await db.query.invitations.findFirst({"),
+  code("    where: and(eq(inv.email, coEmail), eq(inv.workspaceId, workspaceId), isNull(inv.acceptedAt))"),
+  code("  });"),
+  code("  if (!existingInvite) {"),
+  code("    // Auto-create invite for the CO"),
+  code("    await createInvitation(workspaceId, coEmail, 'COMPLIANCE_OFFICER', systemUserId);"),
+  code("    return { valid: false, pendingInvite: true, message: 'Invite sent to CO email. Step completes when they join.' };"),
+  code("  }"),
+  code("  return { valid: false, pendingInvite: true, message: 'Invite pending CO acceptance.' };"),
+  code("}"),
+  spacer(),
+  h2("Milestone 4 — Document Generation Pipeline (Weeks 6–8)"),
+  h3("Generation Flow — Complete"),
+  code("// 1. Step 6 submit triggers:"),
+  code("POST /program/forms/PERSONNEL_SUITABILITY/submit"),
+  code(""),
+  code("// 2. Service creates ProgramVersion (IMMUTABLE):"),
+  code("const version = await db.insert(programVersions).values({"),
+  code("  workspaceId, versionNumber: '1.0',"),
+  code("  riskSnapshotJson: aggregateAllStepData(allForms),"),
+  code("  effectiveDate: new Date(), generatedBy: actorUserId, isCurrent: true,"),
+  code("}).returning();"),
+  code(""),
+  code("// 3. Mark previous version documents SUPERSEDED:"),
+  code("await db.update(programDocuments).set({ status: 'SUPERSEDED' })"),
+  code("  .where(and(eq(pd.workspaceId, workspaceId), ne(pd.programVersionId, version.id)));"),
+  code(""),
+  code("// 4. Enqueue 4 jobs:"),
+  code("['RISK_ASSESSMENT','POLICY','PROCEDURES','GOVERNANCE_SUMMARY'].forEach(docType => {"),
+  code("  documentGenerateQueue.add('generate', { workspaceId, versionId: version.id, docType });"),
+  code("});"),
+  code(""),
+  code("// 5. Each job:"),
+  code("//   → load template DOCX"),
+  code("//   → apply variable map from maps/<docType>.map.ts"),
+  code("//   → render to Buffer via docx library"),
+  code("//   → convert to PDF via pdf-lib or LibreOffice subprocess"),
+  code("//   → upload DOCX to R2: workspaces/<wsId>/program-documents/<vId>/<type>.docx"),
+  code("//   → upload PDF  to R2: workspaces/<wsId>/program-documents/<vId>/<type>.pdf"),
+  code("//   → compute SHA-256 checksum"),
+  code("//   → INSERT program_documents row with filePath + checksum + status=CURRENT"),
+  code("//   → WebSocket broadcast 'document.generated' to workspace members"),
+  code("//   → Send email 'document-ready' to CO + Workspace Admin"),
+  spacer(),
+  h3("Template Variable Mapping Pattern"),
+  code("// server/templates/maps/risk-assessment.map.ts"),
+  code("export function mapRiskAssessment(snapshot: RiskSnapshot): TemplateVariables {"),
+  code("  return {"),
+  code("    BUSINESS_NAME:      snapshot.businessProfile.legalName,"),
+  code("    INDUSTRY_PATHWAY:   snapshot.businessProfile.industryPathway,"),
+  code("    ASSESSMENT_DATE:    format(new Date(), 'dd MMMM yyyy'),"),
+  code("    RISK_RATING:        snapshot.riskCalculation.overallRating,"),
+  code("    DESIGNATED_SERVICES: snapshot.designatedServices.applicable.join(', '),"),
+  code("    HIGH_RISK_FACTORS:  snapshot.riskCalculation.highFactors.join('\\n'),"),
+  code("    CONTROLS_SUMMARY:   snapshot.governance.controlsDescription,"),
+  code("    REVIEW_SCHEDULE:    snapshot.governance.reportingCycle,"),
+  code("    CO_NAME:            snapshot.coAppointment.fullName,"),
+  code("    DECLARATION_DATE:   format(snapshot.declaration.date, 'dd MMMM yyyy'),"),
+  code("    // ... all ~40 variables"),
+  code("  };"),
+  code("}"),
+  spacer(),
+  h2("Milestone 5 — Manage My Program (Weeks 8–9)"),
+  h3("Program Health Score Calculation"),
+  code("// server/services/program-form.service.ts"),
+  code("export function calculateProgramHealthScore(workspace: Workspace, data: HealthData): number {"),
+  code("  let score = 0;"),
+  code("  // 40% — implementation completeness"),
+  code("  const completedSteps = data.programForms.filter(f => f.status === 'COMPLETED').length;"),
+  code("  score += (completedSteps / 6) * 40;"),
+  code("  // 20% — training recency (any training in last 12 months)"),
+  code("  const recentTraining = data.trainingRecords.some(t =>"),
+  code("    differenceInMonths(new Date(), t.trainingDate) < 12");
+  code("  );"),
+  code("  if (recentTraining) score += 20;"),
+  code("  // 15% — review currency (program reviewed in last 12 months)"),
+  code("  const recentReview = data.programReviews.some(r =>"),
+  code("    differenceInMonths(new Date(), r.createdAt) < 12");
+  code("  );"),
+  code("  if (recentReview) score += 15;"),
+  code("  // 15% — open task count (inverse — more open tasks = lower score)"),
+  code("  const openTaskPenalty = Math.min(data.openTasks * 3, 15);"),
+  code("  score += 15 - openTaskPenalty;"),
+  code("  // 10% — screening currency (all active files screened in past 12mo)"),
+  code("  const screenedRecently = data.activeFilesWithRecentScreen / data.totalActiveFiles;"),
+  code("  score += screenedRecently * 10;"),
+  code("  return Math.round(score);"),
+  code("}"),
+  pageBreak()
+);
+
+// ─── PART 10 ───
+C.push(
+  h1("Part 10 — Phase 3: Customer Onboarding & Workflows (M6–M7)"),
+  h2("Milestone 6 — Customer File State Machine (Weeks 10–12)"),
+  h3("The 12-State Machine — Full Definition"),
+  table(
+    ["State", "Entry Trigger", "Roles Permitted", "Preconditions", "Next States", "Auto-created Tasks"],
+    [
+      ["DRAFT", "New Client button clicked", "ONBOARDING_USER, CO, ADMIN", "None — minimal data needed", "CDD_IN_PROGRESS", "None"],
+      ["CDD_IN_PROGRESS", "CDD form started", "ONBOARDING_USER, CO", "Customer type selected, legal name saved", "PENDING_CHECKS / ECDD_REQUIRED / HELD", "None"],
+      ["PENDING_CHECKS", "Check request queued (auto)", "SYSTEM only", "At least 1 CheckRequest created", "CHECKS_RETURNED", "None (checks auto-resolve)"],
+      ["CHECKS_RETURNED", "All checks returned result (auto)", "SYSTEM only", "No outstanding QUEUED/PROCESSING checks", "UNDER_REVIEW / ECDD_REQUIRED / ESCALATED", "Review task if any checks FAILED or matchCount > 0"],
+      ["ECDD_REQUIRED", "High-risk trigger or screening hit", "ONBOARDING_USER (trigger), CO/REVIEWER (complete)", "ECDD form exists for this file", "APPROVED / APPROVED_WITH_CONTROLS / HELD / DECLINED", "ECDD completion task assigned to CO"],
+      ["UNDER_REVIEW", "Pending reviewer decision", "CO, REVIEWER", "Reason ≥10 chars on transition", "APPROVED / APPROVED_WITH_CONTROLS / HELD / DECLINED", "Review task assigned to CO if unassigned"],
+      ["APPROVED", "CO/REVIEWER approves clean file", "CO, REVIEWER, ADMIN", "Reason ≥10 chars. No unresolved open escalations.", "REVIEW_DUE / ESCALATED", "nextReviewDue auto-set (LOW=12mo, MED=6mo, HIGH=3mo, CRITICAL=1mo)"],
+      ["APPROVED_WITH_CONTROLS", "Higher risk accepted with conditions", "CO, ADMIN", "Reason ≥10 chars. Controls description required in ECDD form.", "REVIEW_DUE / ESCALATED", "nextReviewDue set to HIGH schedule (3mo minimum)"],
+      ["HELD", "Information missing or unresolved concern", "CO, REVIEWER", "Reason ≥10 chars (explains what is missing)", "UNDER_REVIEW / DECLINED", "Task: request missing info from customer"],
+      ["DECLINED", "Unacceptable risk or unresolvable concern", "CO, ADMIN", "Reason ≥10 chars. Double-confirm required. TERMINAL — no reversal.", "CLOSED", "None — relationship ended"],
+      ["REVIEW_DUE", "nextReviewDue date ≤ today (cron auto-trigger)", "SYSTEM only", "File is APPROVED or APPROVED_WITH_CONTROLS", "APPROVED / ECDD_REQUIRED / ESCALATED", "Periodic review form task assigned to CO"],
+      ["CLOSED", "DECLINED finalised OR relationship ended by ADMIN", "ADMIN", "File is DECLINED or explicit closure reason provided", "(terminal)", "None"],
+    ],
+    [1300, 1700, 1500, 1600, 1500, 1600]
+  ),
+  spacer(),
+  h3("State Machine TypeScript Definition"),
+  code("// shared/state-machines.ts"),
+  code("export type FileTransition = {"),
+  code("  from: FileState | FileState[];"),
+  code("  to: FileState;"),
+  code("  allowedRoles: UserRole[];"),
+  code("  requireReason: boolean;"),
+  code("  preconditions: (file: CustomerFile, ctx: TransitionContext) => true | string;"),
+  code("  onSuccess?: (file: CustomerFile, ctx: TransitionContext) => Promise<void>;"),
+  code("};"),
+  code(""),
+  code("export const FILE_TRANSITIONS: FileTransition[] = ["),
+  code("  {"),
+  code("    from: 'DRAFT', to: 'CDD_IN_PROGRESS',"),
+  code("    allowedRoles: ['ONBOARDING_USER','COMPLIANCE_OFFICER','WORKSPACE_ADMIN'],"),
+  code("    requireReason: false,"),
+  code("    preconditions: (file) => file.customerId ? true : 'Customer must be selected',"),
+  code("  },"),
+  code("  {"),
+  code("    from: 'UNDER_REVIEW', to: 'APPROVED',"),
+  code("    allowedRoles: ['COMPLIANCE_OFFICER','REVIEWER','WORKSPACE_ADMIN'],"),
+  code("    requireReason: true,"),
+  code("    preconditions: (file) => {"),
+  code("      const openEscalations = file.escalations?.filter(e => e.status === 'OPEN');"),
+  code("      return openEscalations?.length === 0 ? true : 'All escalations must be resolved';"),
+  code("    },"),
+  code("    onSuccess: async (file, ctx) => {"),
+  code("      await setNextReviewDue(file, ctx.db);"),
+  code("      await createTask({ title: 'File approved', customerFileId: file.id, ... });"),
+  code("    }"),
+  code("  },"),
+  code("  // ... all 15+ transitions"),
+  code("];"),
+  spacer(),
+  h3("Risk Calculator — Rule Set Reference"),
+  table(
+    ["Risk Factor", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
+    [
+      ["Customer type", "Individual (standard)", "Company (private)", "Trust / Partnership", "Association (foreign)"],
+      ["Jurisdiction", "AU / NZ / UK", "EU / US / Canada", "High-risk jurisdictions", "FATF grey/black-listed"],
+      ["PEP status", "None", "Close associate", "Former PEP", "Current PEP"],
+      ["Service type", "Standard consulting", "Property transaction", "Cash-intensive service", "High-value transactions"],
+      ["Ownership complexity", "1 natural person", "Simple corporate structure", "Trust / chain of entities", "Nominee / bearer shares"],
+      ["Source of funds", "Salary / wages", "Business income", "Investment proceeds", "Unknown / complex"],
+    ],
+    [2000, 1800, 1800, 1800, 1800]
+  ),
+  spacer(),
+  h2("Milestone 7 — Escalation & Review Workflows (Weeks 12–14)"),
+  h3("M7 Form Details — All 6 High-Risk Forms"),
+  table(
+    ["Form", "Trigger", "Key Fields", "Decision Options", "Role Required"],
+    [
+      ["Enhanced CDD", "High risk rating / PEP / complex ownership / screening match / jurisdiction flag", "Trigger reason; additional verification obtained (list); senior approval confirmation; revised risk assessment; controls to apply; decision with reason", "PROCEED / PROCEED_WITH_CONTROLS / HOLD / DECLINE", "CO or REVIEWER to complete; CO or ADMIN for final decision"],
+      ["Source of Funds", "Entity customer / high-value service / jurisdiction risk / ECDD trigger", "Funds source description; evidence obtained (link to evidence_files); plausibility assessment; gaps and mitigants; conclusion reason", "SATISFACTORY / FURTHER_INFORMATION / ESCALATE", "ONBOARDING_USER can start; CO required for conclusion"],
+      ["Source of Wealth", "ECDD trigger / PEP status / high net worth indicators", "Wealth origin (employment, inheritance, investment, business sale); evidence; consistency check against known profile; conclusion reason", "SATISFACTORY / FURTHER_INFORMATION / ESCALATE", "Same as SOF"],
+      ["Escalation", "Any file trigger / suspicious activity / unresolved concern / screening match", "Category (ownership/funds/screening/suspicion/jurisdiction/other); urgency (LOW/MEDIUM/HIGH/CRITICAL); detailed summary; evidence refs; assigned reviewer", "PROCEED / PROCEED_WITH_CONTROLS / HOLD / DECLINE / REFER_SUSPICIOUS_MATTER", "ONBOARDING_USER creates; CO or REVIEWER decides"],
+      ["Unusual Activity Review", "Staff observation / monitoring alert / transaction pattern flag", "Activity description; timeline of events; suspicion basis; internal review outcome; SMR reportability assessment", "NO_FURTHER_ACTION / ENHANCED_MONITORING / ESCALATE / CONSIDER_SMR", "ONBOARDING_USER creates; CO decides"],
+      ["Periodic Review", "nextReviewDue date reached / ownership change / jurisdiction change / service change", "Review scope; verification currency; screening refresh result; risk re-assessment; controls adequacy; updated decision", "NO_CHANGE / RISK_UPGRADED / RISK_DOWNGRADED / ECDD_REQUIRED / CLOSE_RELATIONSHIP", "CO completes; auto-updates risk rating and sets next review date"],
+    ],
+    [1200, 1700, 2400, 1900, 1800]
+  ),
+  spacer(),
+  h3("SMR (Suspicious Matter Report) Workflow — Gap Fill"),
+  callout("GAP: The original spec references 'consider reportability' and 'REFER_SUSPICIOUS_MATTER' as decision options but never specifies the actual SMR workflow. This is a critical compliance gap for Australian AML/CTF. Here is the minimum viable SMR workflow:", "gap"),
+  bullet("SMR_CONSIDERATION_REQUIRED state added to escalation flow when escalationDecision = REFER_SUSPICIOUS_MATTER"),
+  bullet("Separate SMR form: structured fields for AUSTRAC report requirements — date range, nature of suspicion, relevant transactions, entities involved, reporter details"),
+  bullet("SMR access restricted to CO + PLATFORM_ADMIN only — not visible to ONBOARDING_USER"),
+  bullet("SMR form is NOT submitted via the portal — it is recorded as filed manually with AUSTRAC"),
+  bullet("smrReferenceId field on escalations table stores AUSTRAC confirmation number"),
+  bullet("Audit log records SMR consideration decision, SMR filing decision, and reference number"),
+  bullet("SMR records have elevated encryption and restricted visibility (CO + ADMIN only)"),
+  pageBreak()
+);
+
+// ─── PART 11 ───
+C.push(
+  h1("Part 11 — Phase 4: Provider Integrations & Billing (M8–M9)"),
+  h2("Milestone 8 — Provider Adapter Layer (Weeks 14–17)"),
+  h3("ProviderAdapter Interface — Complete"),
+  code("// server/providers/types.ts"),
+  code("export interface ProviderAdapter {"),
+  code("  readonly capability: ProviderCapability;"),
+  code("  readonly providerName: string;"),
+  code("  readonly defaultEnvironment: 'SANDBOX' | 'PRODUCTION';"),
+  code(""),
+  code("  createRequest(input: CheckRequestEnvelope): Promise<ProviderStartResult>;"),
+  code("  pollStatus(providerRequestId: string): Promise<NormalizedCheckResult>;"),
+  code("  normalizeResponse(raw: unknown): Promise<NormalizedCheckResult>;"),
+  code("  verifyWebhook(signature: string, body: Buffer, secret: string): boolean;"),
+  code("  mapWebhookToRequestId(body: unknown): string;"),
+  code("}"),
+  code(""),
+  code("export interface CheckRequestEnvelope {"),
+  code("  requestId: string;        // portal idempotency key"),
+  code("  workspaceId: string;"),
+  code("  subjectType: SubjectType;"),
+  code("  subjectId: string;"),
+  code("  capability: ProviderCapability;"),
+  code("  payload: Record<string, unknown>;  // capability-specific fields"),
+  code("}"),
+  code(""),
+  code("export interface NormalizedCheckResult {"),
+  code("  outcome: CheckStatus;"),
+  code("  matchCount: number;"),
+  code("  decisionsJson: {          // capability-specific normalized output"),
+  code("    identityStatus?:   'verified' | 'not_verified' | 'failed';"),
+  code("    livenessStatus?:   'passed' | 'failed';"),
+  code("    confidence?:       number;"),
+  code("    sanctionsResult?:  'clear' | 'match' | 'potential_match';"),
+  code("    pepResult?:        'clear' | 'match' | 'potential_match';"),
+  code("    mediaResult?:      'clear' | 'match' | 'potential_match';"),
+  code("    registryStatus?:   'active' | 'cancelled' | 'not_found';"),
+  code("    directors?:        Array<{ name: string; dob?: string; role: string }>;"),
+  code("  };"),
+  code("  rawPayloadRef?: string;   // R2 key for full encrypted provider response"),
+  code("}"),
+  spacer(),
+  h3("Mock Adapter — Complete Example"),
+  code("// server/providers/mock/mock-aml.adapter.ts"),
+  code("export class MockAmlAdapter implements ProviderAdapter {"),
+  code("  capability = 'AML_SCREENING' as const;"),
+  code("  providerName = 'mock';"),
+  code("  defaultEnvironment = 'SANDBOX' as const;"),
+  code(""),
+  code("  private config: { mode: 'always_pass' | 'always_fail' | 'random_match' };"),
+  code(""),
+  code("  async createRequest(input) {"),
+  code("    const providerRequestId = `mock-aml-${createId()}`;"),
+  code("    // Simulate async processing (1-2s)"),
+  code("    await sleep(1000 + Math.random() * 1000);"),
+  code("    return { providerRequestId, mode: 'webhook' };"),
+  code("  }"),
+  code(""),
+  code("  async normalizeResponse(raw) {"),
+  code("    const match = this.config.mode === 'random_match' ? Math.random() < 0.2 : this.config.mode === 'always_fail';"),
+  code("    return {"),
+  code("      outcome: match ? 'PARTIAL' : 'PASSED',"),
+  code("      matchCount: match ? 1 : 0,"),
+  code("      decisionsJson: {"),
+  code("        sanctionsResult: match ? 'potential_match' : 'clear',"),
+  code("        pepResult: 'clear', mediaResult: 'clear',"),
+  code("      }"),
+  code("    };"),
+  code("  }"),
+  code(""),
+  code("  verifyWebhook() { return true; }  // mock always passes"),
+  code("  mapWebhookToRequestId(body) { return body.providerRequestId; }"),
+  code("}"),
+  spacer(),
+  h3("Provider Integration Matrix — All Capabilities"),
+  table(
+    ["Capability", "MVP Provider", "Integration Type", "Normalized Output", "Failure Handling"],
+    [
+      ["IDENTITY_VERIFICATION", "Facia", "Session SDK + HMAC webhook", "identityStatus, livenessStatus, confidence_score, document_match_status", "Hold file in PENDING state; retry option; manual override by CO with reason"],
+      ["AML_SCREENING (individual)", "AML Watcher or Personr", "Synchronous REST API", "sanctionsResult, pepResult, mediaResult, matchCount, report_reference", "On match: reviewMatchTask created; CO must clear/accept/escalate"],
+      ["AML_SCREENING (entity)", "AML Watcher or My Data Boss", "Synchronous REST API", "entityWatchlistResult, mediaResult, matchCount", "Same as individual screening"],
+      ["KYB_VERIFICATION", "ABR (free) + KYB partner", "REST API", "registryStatus, registeredName, directors[], registrationDate, address", "Manual confirmation required before save; flag if mismatch"],
+      ["ADVERSE_MEDIA (future)", "Any provider", "REST API", "mediaRiskScore, articles[], sentiment", "Create task for review if mediaRiskScore > threshold"],
+      ["PEP_SCREENING (future)", "Any provider", "REST API", "pepStatus, pepLevel, pepCountry, pepRole", "Auto-trigger ECDD if PEP confirmed"],
+    ],
+    [1600, 1700, 1500, 2800, 1600]
+  ),
+  spacer(),
+  h3("Webhook Security — Idempotency + Replay Protection"),
+  code("// server/routes/webhooks.routes.ts"),
+  code("router.post('/:provider', express.raw({ type: '*/*' }), async (req, res) => {"),
+  code("  const { provider } = req.params;"),
+  code("  const adapter = await providerRegistry.resolveByName(provider);"),
+  code("  "),
+  code("  // 1. Validate HMAC signature"),
+  code("  const signature = req.headers['x-provider-signature'] as string;"),
+  code("  const secret = env[`${provider.toUpperCase()}_WEBHOOK_SECRET`];"),
+  code("  if (!adapter.verifyWebhook(signature, req.body, secret)) {"),
+  code("    logger.warn({ provider }, 'Invalid webhook signature — rejected');"),
+  code("    return res.status(401).json({ error: 'INVALID_SIGNATURE' });"),
+  code("  }"),
+  code("  "),
+  code("  // 2. Timestamp validation (reject if >5 min old)"),
+  code("  const eventTime = extractEventTime(req.body);"),
+  code("  if (Date.now() - eventTime.getTime() > 5 * 60 * 1000) {"),
+  code("    return res.status(400).json({ error: 'WEBHOOK_TOO_OLD' });"),
+  code("  }"),
+  code("  "),
+  code("  // 3. Idempotency — INSERT ... ON CONFLICT DO NOTHING"),
+  code("  const providerEventId = adapter.extractEventId(req.body);"),
+  code("  const [inserted] = await db.insert(webhookEvents).values({"),
+  code("    providerName: provider, providerEventId,"),
+  code("    rawPayload: req.body, signatureValid: true,"),
+  code("  }).onConflictDoNothing().returning();"),
+  code("  "),
+  code("  if (!inserted) {"),
+  code("    return res.status(200).json({ message: 'ALREADY_PROCESSED' });  // idempotent 200"),
+  code("  }"),
+  code("  "),
+  code("  // 4. Enqueue processing job (async — return 200 immediately)"),
+  code("  await webhookProcessQueue.add('process', { webhookEventId: inserted.id });"),
+  code("  res.status(200).json({ ok: true });"),
+  code("});"),
+  spacer(),
+  h2("Milestone 9 — Billing & Usage (Weeks 17–19)"),
+  h3("Subscription Tier Matrix"),
+  table(
+    ["Tier", "Price/Month", "Users", "Paid Checks/Month", "Key Features", "Stripe Price ID Env Var"],
+    [
+      ["TRIAL", "$0 (30 days)", "All", "Mock only", "All features, mock providers only", "N/A"],
+      ["STARTER", "$99", "3", "0 included", "Real providers (sandbox), $5/check overage", "STRIPE_PRICE_STARTER"],
+      ["PROFESSIONAL", "$299", "10", "50 included", "Production providers, $4/check overage", "STRIPE_PRICE_PROFESSIONAL"],
+      ["ENTERPRISE", "$799", "Unlimited", "250 included", "Custom branding, all Diamond features, SSO-ready, $3/check overage", "STRIPE_PRICE_ENTERPRISE"],
+      ["GROUP", "$1,499", "Unlimited", "1000 included", "All Enterprise + Diamond 4 group workspace, $2.50/check overage", "STRIPE_PRICE_GROUP"],
+      ["LIFETIME", "$9,999 one-time", "Unlimited", "500 free, then $3", "All Enterprise features forever, no monthly charge", "STRIPE_PRICE_LIFETIME"],
+    ],
+    [1300, 1200, 1000, 1500, 2500, 1800]
+  ),
+  spacer(),
+  h3("Past-Due / Suspension UX States"),
+  table(
+    ["billingStatus", "What Is Blocked", "Banner Message", "Grace Period", "Reversible"],
+    [
+      ["PAST_DUE", "New paid checks only", "Warning banner on all pages. 'Your payment failed — checks paused in 7 days.'", "7 days before checks blocked. Emails: day 0, 3, 6.", "Yes — add valid payment method → ACTIVE"],
+      ["SUSPENDED (checks blocked)", "All paid checks. New CDD creation.", "'Paid checks are paused. Your existing data is safe. Add a payment method to resume.'", "30 days past payment failure OR admin action.", "Yes — add valid payment → ACTIVE"],
+      ["SUSPENDED (read-only)", "All mutations. Upload. Checks. Program updates.", "'Your account is in read-only mode. Data is safe. Contact support or add payment.'", "90 days past payment failure.", "Yes — payment restores ACTIVE"],
+      ["CANCELLED", "Everything except data export", "'Your subscription is cancelled. Export your data in the next 60 days before scheduled deletion.'", "60-day data export window before deletion.", "No — must sign up again"],
+    ],
+    [1700, 2000, 2800, 2000, 800]
+  ),
+  pageBreak()
+);
+
+// ─── PART 12 ───
+C.push(
+  h1("Part 12 — Phase 5: Hardening & Production (M10)"),
+  h2("10.1 Security Hardening Checklist"),
+  table(
+    ["Area", "Requirement", "Validation Method"],
+    [
+      ["Workspace isolation", "Triple-layer: Express middleware + storage convention + Postgres RLS. No cross-tenant access possible with valid JWT.", "Automated: User A JWT + Workspace B ID → 403. Storage function without workspaceId filter → PR rejected."],
+      ["RBAC completeness", "All 8 roles × all endpoints tested. Blocked actions return 403, not 404 or 500.", "Matrix test suite: role × endpoint → 200 or 403. Every combination tested."],
+      ["Provider secrets", "All API keys in Replit Secrets. Never in DB plain columns. Never committed.", "gitleaks scan in CI. Schema audit: no *_key or *_secret columns with raw values."],
+      ["PII encryption", "Provider payloads (ID docs, selfies) encrypted at rest in R2 (AES-256). Field-level encryption via pgcrypto for sensitive DB columns.", "Verify R2 BucketEncryption=AES256. Test that rawPayloadRef returns encrypted blob."],
+      ["Audit log immutability", "No UPDATE/DELETE grants. DB trigger raises exception. No cascade delete from referenced entities.", "Attempt UPDATE on audit_log with app role → exception. No FK cascade on audit rows."],
+      ["Webhook signatures", "All webhooks HMAC-validated. Invalid → 401 + log + no data change. Replay protection via UNIQUE(providerName, providerEventId) + timestamp gate.", "Send webhook with bad signature → 401, 0 DB changes. Send same webhook twice → second is 200 no-op."],
+      ["Rate limiting", "Auth: 10/min IP. Mutations: 100/min user. Checks: 30/min workspace. File: 20/min user. Webhooks: 1000/min provider.", "Load test: 100 rapid check requests from same workspace → later requests rate-limited."],
+      ["Security headers", "CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.", "securityheaders.com on staging URL → A+ rating required."],
+      ["Input validation", "All routes: Zod validation on req.body and req.query. No raw user input in queries.", "OWASP ZAP baseline scan on staging. SQL injection tests on all input fields."],
+      ["Auth hardening", "bcrypt cost 12. Session tokens CSPRNG. Session fixation prevented (regenerate on login). Cookie: httpOnly + Secure + SameSite=Lax.", "Manual review + automated test for session regeneration on login."],
+      ["Dependency scanning", "npm audit in CI. Fail on high/critical. Dependabot enabled.", "CI gate — build fails if npm audit finds high/critical."],
+    ],
+    [1900, 3200, 4100]
+  ),
+  spacer(),
+  h2("10.2 Performance Targets"),
+  table(
+    ["Metric", "Target", "Measurement Tool"],
+    [
+      ["Dashboard initial load", "< 2 seconds p95 (including Vite code splitting)", "Synthetic monitoring + Lighthouse DevTools"],
+      ["API response (non-check endpoints)", "< 300ms p95", "Pino logs + Sentry performance"],
+      ["Check trigger → WebSocket status update", "< 5 seconds for synchronous providers (mock)", "E2E test with mock provider timing"],
+      ["Document generation", "< 90 seconds per document (4 docs in parallel)", "BullMQ job completion timestamp delta"],
+      ["Concurrent workspace sessions", "> 50 simultaneous users without degradation", "k6 load test: 50 VUs, 300s duration"],
+      ["Database connection pool", "< 70% saturation at peak", "pg_stat_activity + pool metrics"],
+      ["3D landing page Lighthouse mobile", "Performance ≥ 80 (3D scene deferred)", "Lighthouse mobile CI run"],
+    ],
+    [2600, 2000, 4600]
+  ),
+  spacer(),
+  h2("10.3 Pre-Launch Checklist (30 Items)"),
+  p("Critical items only — the full list is in 10-phase-5-hardening.md §M10 pre-launch checklist:"),
+  bullet("All M1–M9 acceptance criteria green"),
+  bullet("All 11 security checklist items validated"),
+  bullet("All 6 performance targets met under k6 load test"),
+  bullet("All 5 runbooks written and reviewed (Stripe webhook failure, provider outage, document generation failure, data export, data deletion)"),
+  bullet("Stripe PRODUCTION keys configured (not test keys)"),
+  bullet("Real provider production credentials for at least one capability"),
+  bullet("Sentry production project set up; source maps uploaded on deploy"),
+  bullet("R2 bucket lifecycle policies: 7yr on evidence/* and program-documents/*"),
+  bullet("Daily DB backups verified with restore drill"),
+  bullet("DNS configured; TLS active on Replit Reserved VM deployment"),
+  bullet("CSP headers verified A+ on securityheaders.com"),
+  bullet("Email DKIM/SPF/DMARC configured for EMAIL_FROM_ADDRESS domain"),
+  bullet("Privacy policy + terms of service pages published"),
+  bullet("Status page set up (BetterStack Status)"),
+  bullet("Audit log export cron verified running to separate R2 bucket"),
+  bullet("Initial platform admin account created via seed script with PROD email"),
+  bullet("Smoke test: login as platform admin → create workspace → complete wizard step 1 → logout"),
+  pageBreak()
+);
+
+// ─── PART 13 ───
+C.push(
+  h1("Part 13 — 💎 Diamond Feature Layer (All 8 Features)"),
+  callout("Build in the priority order from file 11: D2 → D1 → D3 → D7 → D4 → D6 → D5 → D8. Each is a standalone module. D1 (AI narrative) and D2 (monitoring) have the highest ROI-to-effort ratio.", "diamond"),
+  spacer(),
+  h2("💎 Diamond 1 — AI Risk Narrative Generator (Priority 2)"),
+  table(
+    ["Aspect", "Detail"],
+    [
+      ["Market gap it closes", "Compliance officers spend 2–4 hours writing escalation narratives, SOF assessments, and risk explanations per client file. AI drafts these in seconds."],
+      ["Model", "claude-sonnet-4-5 (specified in env: ANTHROPIC_MODEL). Rate: 50 narratives/workspace/day (configurable per tier)."],
+      ["Compliance safeguards", "AI draft labelled 'AI-Drafted — Requires CO Review'. aiAssisted flag set on customer_forms. Draft cannot be saved without explicit human approval step. Audit log records AI usage."],
+      ["Narrative types", "ESCALATION_SUMMARY · SOF_ASSESSMENT · RISK_EXPLANATION · UNUSUAL_ACTIVITY · ECDD_NARRATIVE"],
+      ["Prompt architecture", "Structured prompts in server/services/ai-prompts/ (one file per narrative type). Prompts include: form data injection, regulatory context, output format constraints, disclaimer requirement."],
+      ["Concurrency control", "concurrency.service.ts limitAIRequest() semaphore (max 5 concurrent). Prevents 429s from Anthropic."],
+      ["Storage", "ai_narrative_drafts table stores: draftText, finalText, promptVersion, modelName, tokensIn, tokensOut, reviewedBy, approvedAt."],
+      ["UI pattern", "Draft appears in editable textarea with 'AI-drafted' banner. CO edits inline. 'Approve & Save' button commits finalText to customer form."],
+    ],
+    [2400, 6800]
+  ),
+  spacer(),
+  h2("💎 Diamond 2 — Smart Ongoing Monitoring Engine (Priority 1 — Build First)"),
+  table(
+    ["Aspect", "Detail"],
+    [
+      ["Market gap it closes", "Most compliance tools handle initial onboarding but leave ongoing monitoring as manual. Automated monitoring is the biggest retention driver."],
+      ["Re-screening cadence", "LOW = annual (12mo). MEDIUM = semi-annual (6mo). HIGH = quarterly (3mo). CRITICAL = monthly (1mo). Triggered by recurring-screening.job.ts cron daily 04:00."],
+      ["Watchlist delta", "Daily comparison of current screening results against updated provider watchlists. Requires provider that supports delta/change detection. Alert if previously-clear record would now match."],
+      ["Ownership change alerts", "After each KYB refresh, compare director/officer list to previous snapshot. If changed → alert CO to review beneficial ownership form."],
+      ["Dormant file detection", "Files with no activity (no form updates, no checks, no evidence uploads) for >180 days → alert CO. Configurable threshold per workspace."],
+      ["Jurisdiction risk change", "Daily check of FATF grey/black list against active customer jurisdictions. If customer country moves to higher risk → immediate alert."],
+      ["Volume/pattern anomaly", "Rule-based flagging: >3× normal transaction volume in 30d; new service type not in original CDD; new jurisdiction not in onboarding. Configurable thresholds."],
+      ["UI", "pages/app/intelligence/MonitoringDashboard.tsx — shows files due for review (30/7 day windows), active alerts by severity, screening currency by risk tier. Drill-down to individual file."],
+      ["Alert states", "OPEN → ACKNOWLEDGED → DISMISSED / ACTIONED. Each requires actor and timestamp. ACTIONED creates task or transitions file."],
+    ],
+    [2400, 6800]
+  ),
+  spacer(),
+  h2("💎 Diamond 3 — Compliance Evidence Pack Generator (Priority 3)"),
+  table(
+    ["Aspect", "Detail"],
+    [
+      ["Market gap it closes", "Regulator audit prep currently takes 22 days (per landing page copy). This reduces it to minutes."],
+      ["ZIP contents (10 items)", "1. Risk Assessment DOCX+PDF · 2. AML/CTF Policy DOCX+PDF · 3. Procedures DOCX+PDF · 4. Training records summary · 5. Customer decision log (anonymisable) · 6. Escalation outcomes · 7. Program review records · 8. Audit trail export · 9. Provider check evidence (signed URLs, 30-day validity) · 10. index.pdf (pack manifest)"],
+      ["Password protection", "Optional via 7zip subprocess. Password stored ephemerally — never in DB. Provided to user once at download."],
+      ["Generation flow", "POST /compliance/evidence-pack → INSERT evidence_packs (GENERATING) → enqueue evidence-pack-generate job → job assembles ZIP → upload to R2 → status=COMPLETED → notify → download link emailed."],
+      ["Anonymisation", "Customer names replaced with internal reference numbers. File state history preserved. Useful for industry benchmarking submissions or sharing with external advisers."],
+      ["Audit", "Every evidence pack generation is recorded in audit_log. Who requested, what period, what scope, when generated, when downloaded."],
+      ["R2 path", "workspaces/<wsId>/evidence-packs/<packId>.zip. Lifecycle: keep 90 days."],
+    ],
+    [2400, 6800]
+  ),
+  spacer(),
+  h2("💎 Diamond 4 — Multi-Workspace Group Structure (Priority 5)"),
+  table(
+    ["Aspect", "Detail"],
+    [
+      ["Market gap it closes", "Accounting and legal firms with multiple entities or franchise structures. Each entity needs its own AML program but group oversight is required. Unlocks high-ARPU GROUP tier ($1,499/mo)."],
+      ["Implementation", "workspaces.groupWorkspaceId self-FK. GROUP tier subscription on the parent workspace. Child workspaces explicitly opt-in to group oversight (client admin action)."],
+      ["Group CO role", "GROUP_COMPLIANCE_OFFICER — add to UserRole enum. Read access to all child workspace dashboards. Write only on group's own workspace data. Cannot approve child workspace individual files."],
+      ["Group dashboard", "pages/app/group/GroupDashboard.tsx — aggregate stats: total active files, escalations across group, training compliance across group, billing usage across all children."],
+      ["Policy templates", "Group parent can publish policy templates. Child workspaces can adopt the group template (pre-fills their program wizard steps). Template adoption requires explicit admin action."],
+      ["Billing", "Single GROUP Stripe subscription. Per-workspace usage breakdown in billing page. Group admin sees consolidated invoice."],
+      ["Security critical", "Group read-only by default. Child workspace admin explicitly provisions group oversight. Tracked in audit log. Revocable at any time by child admin."],
+    ],
+    [2400, 6800]
+  ),
+  spacer(),
+  h2("💎 Diamond 5 — In-Portal Training & Competency Module (Priority 7)"),
+  table(
+    ["Aspect", "Detail"],
+    [
+      ["Market gap it closes", "AML/CTF training is a regulatory requirement. If Integrity Solve provides training, the product is stickier and clients spend less on third-party providers."],
+      ["Course types", "INDUCTION (new staff) · REFRESHER (annual) · CO (compliance officer specific) · SYSTEM (using Integrity Solve portal) · OTHER"],
+      ["Completion auto-record", "On passing the quiz (score ≥ passScore), the system automatically creates a training_record row. No manual entry. Linked to enrollment."],
+      ["Expiry tracking", "Courses have expiry periods (e.g., annual recertification). training_enrollments.expiresAt triggers reminder notifications at 30/14/7 days."],
+      ["Training compliance dashboard", "Shows: per-role training status (trained/overdue/upcoming), overall workspace training score, upcoming expirations list. Links to TrainingRecords list for evidence."],
+      ["Revenue model option", "Platform-level courses (workspaceId = null) can be licensed from a content provider. Workspace-level courses are custom content. Optional training-only plan for small operators."],
+    ],
+    [2400, 6800]
+  ),
+  spacer(),
+  h2("💎 Diamond 6 — Regulatory Update Feed & Impact Alerts (Priority 6)"),
+  table(
+    ["Aspect", "Detail"],
+    [
+      ["Market gap it closes", "Compliance officers miss regulatory changes. Being alerted of changes relevant to their industry pathway is a pure managed-service value-add."],
+      ["Sources", "AUSTRAC public communications · FATF public statements · ASIC releases · Attorney-General's Department AML/CTF guidance · Configured RSS/API feeds"],
+      ["NLP tagging", "Anthropic Claude used to tag each update with: industryTags (ACCOUNTING, LEGAL, etc.), impactArea (DESIGNATED_SERVICES, RISK_ASSESSMENT, TRAINING, etc.), severity (LOW/MEDIUM/HIGH)."],
+      ["Filtering", "Each workspace only sees updates relevant to their industryPathway. CO receives push notification + email for HIGH severity updates."],
+      ["Impact assessment", "'This update may affect your Designated Services selection — program review recommended.' One-click triggers a Program Review/Update Record form pre-filled with the regulatory reference."],
+      ["Acknowledgment tracking", "regulatory_alert_acks table: ACKNOWLEDGED/DISMISSED/ACTIONED. Provides evidence of regulatory awareness for audits. Exported in Diamond 3 evidence packs."],
+    ],
+    [2400, 6800]
+  ),
+  spacer(),
+  h2("💎 Diamond 7 — Customer-Facing CDD Portal (Priority 4)"),
+  table(
+    ["Aspect", "Detail"],
+    [
+      ["Market gap it closes", "Currently the onboarding officer manually enters customer information. The customer portal lets the customer enter their own information, reducing onboarding time by 60% and improving data quality."],
+      ["URL strategy", "Path-based for MVP: /customer-portal/<token> on the same domain. No separate subdomain needed. Express handles the token-based route without auth middleware."],
+      ["Token security", "customer_portal_invites.token is CSPRNG-generated, single-use, 14-day expiry. After submission, consumedAt set. Re-use attempt returns 410 Gone."],
+      ["What customer submits", "Identity documents (upload) + personal details form + beneficial ownership (if entity) + source of funds description + supporting evidence upload."],
+      ["Data flow", "Submission writes to: evidence_files (for documents), customer_forms (for form data), beneficial_owners (for BO data). All tagged with 'via customer-portal-invite <inviteId>'."],
+      ["Security isolation", "No access to main portal UI. No outbound links. ClamAV virus scan on all uploads before storage. Token validates against specific customerFileId only."],
+      ["Notification", "On submission: email to Onboarding User + CO (template customer-portal-invite.tsx updated). Creates task: 'Customer portal submission received — review required'."],
+      ["Branding", "Sub-app uses workspace.brandColorPrimary + workspace.brandLogoUrl for a white-label experience. Customer sees reporting entity's branding, not Integrity Solve brand."],
+    ],
+    [2400, 6800]
+  ),
+  spacer(),
+  h2("💎 Diamond 8 — Risk Benchmarking & Industry Insights (Priority 8 — Build Last)"),
+  table(
+    ["Aspect", "Detail"],
+    [
+      ["When to build", "Wait until ≥30 active workspaces in same industry pathway. Before that threshold, statistics are not meaningful and could expose individual workspace patterns."],
+      ["Opt-in required", "workspaces.benchmarkOptIn boolean. Explicit consent UI. Prominently labelled 'Your data contributes anonymously to industry benchmarks.' Opt-out removes data from future snapshots."],
+      ["Metrics computed weekly", "Average CDD completion time by customer type · Escalation rate · Most common risk factors · Training completion rate · Time-to-first-approval · Check pass rates"],
+      ["Display format", "Percentile bands only: p50/p75/p90. Never raw points. 'Your CDD completion time is in the top 25% for accounting firms.' Never attribution."],
+      ["Tier restriction", "Enterprise tier and above only. Listed as a feature differentiator on pricing page."],
+    ],
+    [2400, 6800]
+  ),
+  pageBreak()
+);
+
+// ─── PART 14 ───
+C.push(
+  h1("Part 14 — 🎨 3D Landing Page: Design, Code Patterns & Tailwind System"),
+  callout("The landing page is built as a completely separate code-split route. It loads Three.js + GSAP + Lenis only when the user visits the public site. The /app portal NEVER loads these libraries.", "info"),
+  spacer(),
+  h2("14.1 Brand System for Landing Page"),
+  table(
+    ["Token", "Value", "Use"],
+    [
+      ["Primary navy", "#0B1A33", "Page background, section backgrounds"],
+      ["Surface navy", "#0F2447", "Card backgrounds, input surfaces"],
+      ["Brand emerald", "#10B981", "CTAs, approved states, trust marks, accent glow"],
+      ["Risk amber", "#F59E0B", "Medium risk, caution states, warning callouts"],
+      ["Critical red", "#EF4444", "Decline states, critical risk, error states"],
+      ["Cool slate", "#64748B", "Body text on light backgrounds, secondary labels"],
+      ["Off-white", "#F8FAFC", "Light section backgrounds"],
+      ["Soft gold", "#F4C430", "Premium trust marks, lifetime pricing, star ratings"],
+      ["Hero gradient", "linear-gradient(135deg, #0B1A33 0%, #1E40AF 35%, #10B981 100%)", "Hero background, section dividers"],
+    ],
+    [2000, 1800, 5400]
+  ),
+  spacer(),
+  h2("14.2 Three.js Scene — Complete Code Pattern"),
+  code("// client/src/components/landing/HeroScene.tsx"),
+  code("import { useRef, useEffect } from 'react';"),
+  code("import { useFrame, useThree } from '@react-three/fiber';"),
+  code("import { Float, Environment, MeshTransmissionMaterial, Center } from '@react-three/drei';"),
+  code("import { Bloom, ChromaticAberration, Vignette, EffectComposer } from '@react-three/postprocessing';"),
+  code("import { useSpring, animated } from '@react-spring/three';"),
+  code("import { useScrollProgress } from '../../hooks/useScrollProgress';"),
+  code(""),
+  code("export function CrystallineShield() {"),
+  code("  const meshRef = useRef();"),
+  code("  const scroll = useScrollProgress();  // 0-1 driven by Lenis"),
+  code(""),
+  code("  // Scroll-driven animation: disassemble on scroll 0-25%"),
+  code("  const { rotation, scale } = useSpring({"),
+  code("    rotation: [0, scroll * Math.PI * 2, 0],"),
+  code("    scale: 1 - scroll * 0.3,"),
+  code("    config: { mass: 1, tension: 120, friction: 26 },"),
+  code("  });"),
+  code(""),
+  code("  useFrame((state) => {"),
+  code("    if (!meshRef.current) return;"),
+  code("    // Gentle idle float (on top of Spring animation)"),
+  code("    meshRef.current.rotation.y += 0.003;"),
+  code("  });"),
+  code(""),
+  code("  return ("),
+  code("    <animated.group rotation={rotation} scale={scale}>"),
+  code("      <Center>"),
+  code("        {/* Main crystal body */}"),
+  code("        <mesh ref={meshRef}>"),
+  code("          <icosahedronGeometry args={[1.4, 1]} />"),
+  code("          <MeshTransmissionMaterial"),
+  code("            thickness={0.6}"),
+  code("            roughness={0.05}"),
+  code("            transmission={1}"),
+  code("            ior={1.5}"),
+  code("            chromaticAberration={0.04}"),
+  code("            anisotropy={0.3}"),
+  code("            distortion={0.1}"),
+  code("            distortionScale={0.2}"),
+  code("            temporalDistortion={0.1}"),
+  code("            color='#10B981'"),
+  code("          />"),
+  code("        </mesh>"),
+  code(""),
+  code("        {/* Wireframe overlay */}"),
+  code("        <mesh>"),
+  code("          <icosahedronGeometry args={[1.42, 1]} />"),
+  code("          <meshBasicMaterial wireframe color='#10B981' opacity={0.2} transparent />"),
+  code("        </mesh>"),
+  code(""),
+  code("        {/* Inner emissive core */}"),
+  code("        <mesh>"),
+  code("          <sphereGeometry args={[0.4, 32, 32]} />"),
+  code("          <meshStandardMaterial emissive='#10B981' emissiveIntensity={2} toneMapped={false} />"),
+  code("        </mesh>"),
+  code("      </Center>"),
+  code("    </animated.group>"),
+  code("  );"),
+  code("}"),
+  spacer(),
+  h3("OrbitingArtefacts — 4 Floating Compliance Cards"),
+  code("// client/src/components/landing/OrbitingArtefacts.tsx"),
+  code("const ARTEFACTS = ["),
+  code("  { angle: 0,      label: 'Passport Verified', icon: '🛂', color: '#10B981' },"),
+  code("  { angle: Math.PI/2, label: 'Risk: LOW',     icon: '🟢', color: '#10B981' },"),
+  code("  { angle: Math.PI,   label: 'Audit Log',     icon: '📋', color: '#0F2447' },"),
+  code("  { angle: 3*Math.PI/2, label: 'Escalation Resolved', icon: '✅', color: '#F59E0B' },"),
+  code("];"),
+  code(""),
+  code("export function OrbitingArtefacts() {"),
+  code("  const groupRef = useRef();"),
+  code("  useFrame((state) => {"),
+  code("    groupRef.current.rotation.y = state.clock.elapsedTime * 0.12;"),
+  code("  });"),
+  code("  return ("),
+  code("    <group ref={groupRef}>"),
+  code("      {ARTEFACTS.map(({ angle, label, icon, color }) => ("),
+  code("        <Float key={label} speed={1.5} rotationIntensity={0.1} floatIntensity={0.3}"),
+  code("               position={[Math.cos(angle)*3.5, Math.sin(angle*0.5)*0.6, Math.sin(angle)*3.5]}>"),
+  code("          {/* Plane card with baked texture */}"),
+  code("          <mesh>"),
+  code("            <planeGeometry args={[1.8, 0.9]} />"),
+  code("            <meshStandardMaterial color={color} metalness={0.3} roughness={0.6} />"),
+  code("          </mesh>"),
+  code("        </Float>"),
+  code("      ))}"),
+  code("    </group>"),
+  code("  );"),
+  code("}"),
+  spacer(),
+  h2("14.3 All 11 Landing Page Sections"),
+  table(
+    ["Section", "Component", "Key Content", "Technical Implementation"],
+    [
+      ["S1 — Hero", "Hero3D.tsx + HeroScene.tsx", "Eyebrow: 'AML/CTF compliance, operationalised'. H1: 'Compliance that runs itself.' Two CTAs: Start free trial + Watch 90-second demo. Trust bar: 6 logos + 3 badges.", "Canvas 100vh. Crystalline shield floating centre. 4 orbiting artefact cards. Particle field (400 points). GSAP entrance animation on load."],
+      ["S2 — Problem stats", "ProblemStats.tsx", "3 counter columns: 73% spend ≥15h/week on admin · 1 in 5 SMRs filed late · Audit prep: 22 days → 11 minutes.", "CountUp animation on scroll-into-view. Framer Motion fade-in. Small SVG motion graphics per stat."],
+      ["S3 — How it works", "HowItWorks.tsx", "3 steps: Build your program → Onboard customers → Stay audit-ready", "GSAP ScrollTrigger pins each step for 100vh. Lenis smooth scroll drives GSAP timeline. Screenshot/diagram for each step."],
+      ["S4 — Feature constellation", "FeatureGrid.tsx", "4×3 grid of 12 features (6 core + 6 Diamond with 💎 badge). Each card: icon, name, description, Learn more accordion.", "CSS grid. Framer Motion hover lift + emerald glow shadow. Accordion expand/collapse."],
+      ["S5 — Interactive state diagram", "StateDiagramInteractive.tsx", "Clickable customer-file state machine. Each click animates a state transition + shows sample audit log entry.", "SVG state machine with Framer Motion animated connections. Click handlers show tooltip with audit entry example."],
+      ["S6 — Trust & security", "TrustBadges.tsx", "Security pills: SOC 2 · GDPR · ISO 27001 · OAIC · TLS 1.3 · AES-256. Workspace isolation explanation. Audit log immutability diagram.", "Static section. Dark background with emerald accent lines. SVG lock icon animations."],
+      ["S7 — Testimonials", "TestimonialCarousel.tsx", "3 compliance officer quotes with photo, name, firm, 1 paragraph quote.", "Radix Carousel on mobile. Static 3-column on desktop. Optional video placeholder."],
+      ["S8 — Pricing preview", "PricingPreview.tsx", "3 tier cards: STARTER $99 · PROFESSIONAL $299 · ENTERPRISE $799. Annual toggle (2 months free). Hover lift + emerald glow.", "Monthly/annual state toggle. CSS transform hover. Link to /pricing for full comparison + Lifetime tier."],
+      ["S9 — FAQ", "FaqAccordion.tsx", "8 FAQ items covering: vs competitors, regulator audit, migration from spreadsheets, AUSTRAC awareness, data isolation, provider change, pricing scale, time to live.", "Radix Accordion. Smooth height animation. Schema.org FAQ markup for SEO."],
+      ["S10 — Final CTA", "FinalCta.tsx", "H2: 'Spend less time on compliance admin.' Primary CTA repeats. Secondary: Book 20-min walkthrough.", "Subtle 3D scene continuation (emerald checkmark slowly rotating in corner). Email input for quick signup."],
+      ["S11 — Footer", "LandingFooter.tsx", "4 columns: Product / Company / Resources / Legal. Newsletter signup. Social icons.", "Standard footer. sitemap.xml served from /public. Dark navy background."],
+    ],
+    [800, 1800, 2400, 4200]
+  ),
+  spacer(),
+  h2("14.4 Tailwind CSS for Landing Page — Key Utility Classes"),
+  code("/* Glassmorphism card — used on feature grid and testimonials */"),
+  code(".glass-card {"),
+  code("  @apply bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl"),
+  code("         shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_32px_rgba(16,185,129,0.2)];"),
+  code("}"),
+  code(""),
+  code("/* Emerald glow CTA button */"),
+  code(".btn-primary {"),
+  code("  @apply bg-emerald-500 hover:bg-emerald-400 text-white font-semibold"),
+  code("         px-8 py-4 rounded-xl transition-all duration-200"),
+  code("         shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)]"),
+  code("         hover:-translate-y-0.5 active:translate-y-0;"),
+  code("}"),
+  code(""),
+  code("/* Risk state badges */"),
+  code(".risk-low      { @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30; }"),
+  code(".risk-medium   { @apply bg-amber-500/20  text-amber-400  border border-amber-500/30;  }"),
+  code(".risk-high     { @apply bg-orange-500/20 text-orange-400 border border-orange-500/30; }"),
+  code(".risk-critical { @apply bg-red-500/20    text-red-400    border border-red-500/30;    }"),
+  code(""),
+  code("/* Hero section */"),
+  code(".hero-bg {"),
+  code("  background: linear-gradient(135deg, #0B1A33 0%, #1E40AF 35%, #10B981 100%);"),
+  code("}"),
+  code(""),
+  code("/* Text gradient */"),
+  code(".text-gradient {"),
+  code("  @apply bg-clip-text text-transparent;"),
+  code("  background-image: linear-gradient(135deg, #10B981, #3B82F6);"),
+  code("}"),
+  spacer(),
+  h2("14.5 Performance Budget & Accessibility"),
+  table(
+    ["Requirement", "Target", "Implementation"],
+    [
+      ["Lighthouse mobile performance", "≥ 80", "3D scene lazy-loaded with Suspense. Static SVG poster as fallback during load. Particle count reduced on mobile."],
+      ["Initial JS bundle (gzip)", "< 220KB", "Landing route code-split from app. Three.js only loaded for landing route. No portal code in landing bundle."],
+      ["3D frame rate", "60fps desktop, 30fps mobile", "useFrame with time delta. pixelRatio capped at [1, 2]. useEffect to detect reduced motion."],
+      ["Reduced motion", "Static hero image fallback", "prefers-reduced-motion media query. if (reducedMotion) return <StaticHeroImage />"],
+      ["Accessibility", "WCAG AA", "3D scene aria-hidden='true'. Heading hierarchy strict (one H1). Focus rings visible. Section landmarks."],
+      ["SEO", "score 100", "JSON-LD SoftwareApplication schema. Open Graph image 1200×630. sitemap.xml. Heading keywords."],
+    ],
+    [2200, 1800, 5200]
+  ),
+  pageBreak()
+);
+
+// ─── PART 15 ───
+C.push(
+  h1("Part 15 — Testing Strategy (Vitest · Playwright · k6)"),
+  h2("15.1 Test Coverage Matrix"),
+  table(
+    ["Test Layer", "Tool", "Coverage Target", "Critical Focus"],
+    [
+      ["Unit tests", "Vitest", "≥ 80% on critical modules", "risk-calculator (100%), state machines (100%), RBAC matrix (100%), template variable mapping (100%)"],
+      ["Integration tests", "Vitest + supertest", "All route files have test sibling", "workspace-isolation.test.ts is the most important — prove cross-tenant data cannot be accessed"],
+      ["RBAC matrix tests", "Vitest + supertest", "100% — every role × every action", "Blocked actions return 403 (never 404 or 500). Permitted actions return 200. Brute-force every combination."],
+      ["Provider adapter tests", "Vitest + MSW", "All adapters + all webhook types", "Signature validation, replay protection, idempotency, timeout handling"],
+      ["Billing tests", "Vitest + Stripe CLI", "All Stripe webhook events", "Every subscription state change, payment failure, usage event idempotency"],
+      ["Security tests", "Vitest + OWASP ZAP", "Cross-tenant + auth + injection", "User A JWT + Workspace B ID → 403. SQL injection attempts. XSS in form fields."],
+      ["E2E browser tests", "Playwright (Chromium primary)", "5 critical user journeys", "UAT Script 1–5 from file 13 §13.5"],
+      ["Load tests", "k6", "50 concurrent VUs, 300s", "Dashboard < 2s p95. API < 300ms p95. No connection pool saturation."],
+    ],
+    [1800, 1400, 1700, 4300]
+  ),
+  spacer(),
+  h2("15.2 Critical Test Cases by Milestone"),
+  table(
+    ["Milestone", "Must-Pass Tests", "Test File"],
+    [
+      ["M1", "Cross-tenant: User A JWT + Workspace B ID → 403. Audit row on login. READ_ONLY → /app/customers → 403.", "workspace-isolation.test.ts, auth.routes.test.ts"],
+      ["M2", "ABN lookup prefill. Workspace state cannot skip. Stripe customer created at registration.", "workspaces.routes.test.ts, billing-webhook.test.ts"],
+      ["M3", "Step 4 submit before step 3 complete → 409. Step 5 orphan CO → pending invite created. Step 6 conflict flag → task created.", "program-forms.routes.test.ts"],
+      ["M4", "Step 6 submit → 4 documents within 60s. Re-download same version → identical checksum. DOCX opens in Word.", "program-wizard.routes.test.ts (E2E)"],
+      ["M5", "Form edit → pending banner. Program Review → new version + regeneration.", "program-forms.routes.test.ts"],
+      ["M6", "Risk calculator deterministic. State transition without reason → 400. BO sum > 100% → 422. Evidence signed URL audited.", "customer-file.routes.test.ts, customer-file.state-transition.test.ts"],
+      ["M7", "ECDD: ONBOARDING_USER cannot complete (403). Escalation auto-assigns CO. SMR flag → double-confirm step.", "customer-file.routes.test.ts"],
+      ["M8", "Invalid webhook → 401 + 0 DB changes. Duplicate webhook → 200 no-op. Provider timeout → pending task (never false clear).", "webhooks.routes.test.ts, checks.routes.test.ts"],
+      ["M9", "Add valid card → ACTIVE within 60s. Inactive billing check → 402. Each finalized check → exactly 1 usage_event.", "stripe-webhook.test.ts, billing-guard.test.ts"],
+      ["M10", "UPDATE audit_log → DB trigger exception. All cron jobs run per schedule. Sentry receives test exception. securityheaders.com A+.", "audit-immutability.test.ts"],
+    ],
+    [1000, 4400, 3800]
+  ),
+  spacer(),
+  h2("15.3 Five UAT Scripts (Playwright E2E)"),
+  table(
+    ["Script", "Name", "Steps Summary"],
+    [
+      ["UAT 1", "Low-Risk Individual", "Register → verify → ABN → wizard (6 steps) → documents generated → create individual customer → CDD (low risk) → mock identity check (PASS) → mock AML (CLEAR) → approve → nextReviewDue set 12 months out"],
+      ["UAT 2", "High-Risk Entity Escalation", "Create entity customer → CDD high-risk → 3 beneficial owners (one PEP=true) → AML screen (POTENTIAL_MATCH) → ReviewMatchModal → ESCALATED → ECDD → SOF → escalation → Reviewer approves APPROVED_WITH_CONTROLS → enhanced monitoring schedule set"],
+      ["UAT 3", "Billing Paywall", "Complete wizard (no payment) → attempt paid check → 402 received with structured message → navigate to billing → add Stripe test card 4242… → ACTIVE within 60s → retry check → usage_event recorded"],
+      ["UAT 4", "Customer Portal (Diamond 7)", "CO sends portal invite → customer opens invite link → submits ID docs + BO + SOF → main portal shows new evidence + BO records + task created → audit log shows 'via customer-portal-invite'"],
+      ["UAT 5", "Evidence Pack (Diamond 3)", "CO navigates to /app/compliance/evidence-packs → generate last 30 days → status GENERATING → COMPLETED within 5 min → download ZIP → verify 10 components present → index.pdf lists contents → audit log records generation"],
+    ],
+    [600, 2000, 6600]
+  ),
+  pageBreak()
+);
+
+// ─── PART 16 ───
+C.push(
+  h1("Part 16 — Environment & Secrets Reference"),
+  h2("16.1 All 36 Secrets by Phase"),
+  table(
+    ["Secret", "Phase", "Where to Obtain", "Notes"],
+    [
+      ["DATABASE_URL", "0", "Replit Postgres tool (auto-set)", "Format: postgresql://user:pass@host/db?sslmode=require"],
+      ["SESSION_SECRET", "0", "Generate: openssl rand -base64 64", "Min 64 chars. Never reuse across environments."],
+      ["NODE_ENV", "0", "Set in workflow command", "development in workflow; production on deploy."],
+      ["PORT", "0", "Replit-injected", "Default 5000. Bind to 0.0.0.0."],
+      ["APP_URL", "0", "Your Replit URL", "https://yourapp.replit.app in prod; http://localhost:5000 in dev."],
+      ["SMTP_HOST", "1", "smtp.gmail.com", "Or any SMTP provider."],
+      ["SMTP_PORT", "1", "587", "STARTTLS"],
+      ["SMTP_USER", "1", "Gmail address", "Must match EMAIL_FROM_ADDRESS."],
+      ["SMTP_PASS", "1", "Gmail app password", "Not your normal password. Enable 2FA first."],
+      ["EMAIL_FROM_ADDRESS", "1", "Your domain email", "Configure SPF/DKIM/DMARC for production delivery."],
+      ["EMAIL_FROM_NAME", "1", "Integrity Solve", "Display name in emails."],
+      ["R2_ACCOUNT_ID", "2", "Cloudflare R2 → Account ID", "Required for file storage."],
+      ["R2_ACCESS_KEY_ID", "2", "R2 → Manage R2 API Tokens → Create Token", "Read + Write permissions on bucket."],
+      ["R2_SECRET_ACCESS_KEY", "2", "Same as above", "Store in Replit Secrets immediately."],
+      ["R2_BUCKET_NAME", "2", "The bucket you create in R2", "Enable versioning. Set lifecycle policies."],
+      ["R2_PUBLIC_URL_BASE", "2", "Optional CDN prefix", "Default: https://<account>.r2.cloudflarestorage.com/<bucket>"],
+      ["R2_REGION", "2", "auto", "R2 is multi-region automatically."],
+      ["TWILIO_ACCOUNT_SID", "3", "Twilio Console", "Defer until mobile OTP implementation."],
+      ["TWILIO_AUTH_TOKEN", "3", "Twilio Console", "Keep secret — full API access."],
+      ["TWILIO_FROM_NUMBER", "3", "Twilio-purchased number", "Or use TWILIO_VERIFY_SERVICE_SID instead."],
+      ["TWILIO_VERIFY_SERVICE_SID", "3", "Twilio Console → Verify", "Recommended over raw SMS for OTP."],
+      ["STRIPE_SECRET_KEY", "4", "Stripe → Developers → API Keys", "Use test key in dev. Live key in prod only."],
+      ["STRIPE_PUBLIC_KEY", "4", "Same → Publishable key", "Used by Stripe.js in client."],
+      ["STRIPE_WEBHOOK_SECRET", "4", "Stripe → Developers → Webhooks → endpoint signing secret", "Register webhook URL: https://yourdomain/webhooks/stripe"],
+      ["STRIPE_PRICE_STARTER", "4", "Stripe Dashboard → Products → Price ID", "One per tier. Create products first."],
+      ["STRIPE_PRICE_PROFESSIONAL", "4", "Same", ""],
+      ["STRIPE_PRICE_ENTERPRISE", "4", "Same", ""],
+      ["STRIPE_PRICE_GROUP", "4", "Same", ""],
+      ["STRIPE_PRICE_LIFETIME", "4", "Same — one-time price type", ""],
+      ["STRIPE_PRICE_USAGE_CHECK", "4", "Stripe metered price", "For per-check billing above tier included amount."],
+      ["FACIA_API_KEY", "4", "Facia portal → API keys", "Sandbox key for staging; live key for production."],
+      ["FACIA_WEBHOOK_SECRET", "4", "Facia portal → Webhook signing secret", "Register webhook: https://yourdomain/webhooks/facia"],
+      ["FACIA_BASE_URL", "4", "Facia documentation", "https://api.facia.com/v2 or sandbox equivalent."],
+      ["AML_WATCHER_API_KEY", "4", "AML Watcher dashboard", "Use sandbox for M8 staging; live for production."],
+      ["AML_WATCHER_WEBHOOK_SECRET", "4", "AML Watcher dashboard", "Register webhook: https://yourdomain/webhooks/aml-watcher"],
+      ["SENTRY_DSN", "5", "Sentry project → Settings → Client Keys", "Separate DSN for frontend and backend if preferred."],
+      ["ANTHROPIC_API_KEY", "Diamond 1", "Anthropic Console", "Claude API for AI risk narratives."],
+      ["REDIS_URL", "Diamond 2", "Upstash console", "Optional — BullMQ falls back to job_locks table."],
+    ],
+    [2500, 700, 2500, 3500]
+  ),
+  pageBreak()
+);
+
+// ─── PART 17 ───
+C.push(
+  h1("Part 17 — Deployment on Replit"),
+  h2("17.1 Reserved VM — Why Not Autoscale"),
+  table(
+    ["Requirement", "Reserved VM", "Autoscale"],
+    [
+      ["BullMQ workers", "✅ Stable process lifetime", "❌ Instances spawn/kill — in-flight jobs lost"],
+      ["WebSocket connections", "✅ Persistent connections", "❌ Connections reset on instance swap"],
+      ["Cron jobs (node-cron)", "✅ Single instance, predictable", "✅ job_locks table handles multi-instance too"],
+      ["Cost (MVP scale)", "Fixed cost, predictable", "Variable — potentially cheaper at very low traffic"],
+      ["Recommended VM size (MVP)", "1 vCPU + 2 GB RAM (≤100 active workspaces)", "N/A for this project"],
+      ["Upgrade trigger", "p95 API > 300ms; doc gen queue depth > 5; CPU > 70%", "N/A"],
+    ],
+    [2800, 3000, 3400]
+  ),
+  spacer(),
+  h2("17.2 Customer Portal Domain Strategy"),
+  callout("For MVP: use path-based routing (/customer-portal/<token>) on the same domain. This is simpler — one TLS cert, one Express app, no subdomain DNS config needed. The Diamond 7 feature works perfectly with path-based routing.", "info"),
+  spacer(),
+  h2("17.3 Pre-Deploy Checklist (Critical Items)"),
+  bullet("All 36 secrets set in Replit Secrets (not env files)"),
+  bullet("NODE_ENV=production set on deployment"),
+  bullet("npm run build succeeds without errors or type errors"),
+  bullet("Database migration applied (npm run db:migrate, NOT db:push in production)"),
+  bullet("R2 bucket created with: BucketEncryption=AES256, lifecycle policies (7yr evidence/*, 7yr program-documents/*, 30d temporary/*)"),
+  bullet("Stripe production keys configured; webhook endpoint registered for all events"),
+  bullet("Provider (Facia + AML Watcher) webhook URLs registered in provider dashboards"),
+  bullet("Sentry production project; source maps uploaded as part of deploy process"),
+  bullet("DNS pointed to Replit Reserved VM; TLS certificate active"),
+  bullet("Email DKIM/SPF/DMARC configured for EMAIL_FROM_ADDRESS domain"),
+  bullet("Audit log export cron configured with separate R2 bucket for audit-only backups"),
+  bullet("Smoke test: login as platform admin → create demo workspace → complete wizard step 1 → verify audit log → logout"),
+  pageBreak()
+);
+
+// ─── PART 18 ───
+C.push(
+  h1("Part 18 — 🔧 Gap Analysis & Better Solutions"),
+  callout("12 critical gaps identified across all 17 source files. Each gap has a specific recommended fix. Gaps are ordered by risk impact.", "gap"),
+  spacer(),
+  table(
+    ["Gap #", "Gap Location", "Problem", "Recommended Fix", "Risk if Unfixed"],
+    [
+      ["G1", "File 08 — M7 Unusual Activity", "SMR (Suspicious Matter Report) workflow mentioned as 'consider reportability' but no actual workflow defined. No SMR form. No tracking. No access control.", "Add SMR_CONSIDERATION escalation sub-state. Add minimal SMR record form (date range, suspicion nature, entities, reporter details). Restrict to CO + PLATFORM_ADMIN only. Track smrReferenceId on escalations. Export in Diamond 3 evidence packs.", "CRITICAL — regulatory non-compliance. AUSTRAC expects evidence of SMR decision-making."],
+      ["G2", "File 07 — M3 Step 5", "CO appointment form can create an 'orphan CO' — a person appointed in the form but with no portal user account. This person can never take regulatory action in the system.", "Backend validation: if coUserId is null, check for existing pending invite or auto-create one. Block step 5 completion until CO email matches a workspace member or a pending invite exists.", "HIGH — appointed CO cannot fulfil regulatory duties if they cannot access the portal."],
+      ["G3", "File 08 — M6 Beneficial Owners", "BeneficialOwner records are file-specific. If the same person (e.g., a director) appears in multiple customer files, their screening results are duplicated — increasing costs and creating inconsistency.", "PersonRecord table (already in schema). BeneficialOwner.personRecordId FK links to shared person. Screening results shared across files. Re-screen on demand rather than duplicate checks.", "MEDIUM — unnecessary billing costs; compliance inconsistency if same person has different screening outcomes in different files."],
+      ["G4", "File 04 — Notifications", "Certain notifications (billing.suspended, SMR consideration) should be MANDATORY and cannot be muted. The notification_preferences schema allows muting all types.", "In notification.service.ts: before checking preferences, check MANDATORY_TYPES list. If notification type is mandatory, bypass the user preference check and always send.", "MEDIUM — suspended billing notification is critical for client awareness. SMR notification cannot be opt-out."],
+      ["G5", "Files 09 + 10 — Provider layer", "Provider timeout is treated as an error. But the spec says 'never treat timeout as a clear result.' The distinction between ERROR (retryable) and FAILED (terminal) is not clearly defined.", "Define timeout_threshold per provider in providerConnections.configJson. On timeout: status=PROCESSING (not ERROR). Cron check.poll retries. After N polls: status=ERROR + pending task. Only human override can move ERROR to MANUAL_OVERRIDE.", "HIGH — regulatory risk if a timeout is treated as a clear result and a flagged person is onboarded."],
+      ["G6", "File 09 — M9 Billing", "When billingStatus transitions to PAST_DUE, there is no mechanism to notify active workspace users (only the admin). Staff processing customer files may not know checks are blocked.", "On PAST_DUE transition: send email to WORKSPACE_ADMIN + COMPLIANCE_OFFICER role users (not just admin). Show in-portal banner for ALL authenticated users in that workspace (not just admin pages).", "MEDIUM — compliance officer may attempt to process high-risk file, trigger check, get 402, and be confused about why."],
+      ["G7", "File 02 + File 10 — Data retention", "7-year retention mentioned in M10 pre-launch checklist but no implementation plan. No cron job to enforce it. No notification before deletion. R2 lifecycle policies alone are not sufficient for structured DB data.", "Add data_retention_policies table per workspace. Add retention.cleanup.job.ts cron (daily at midnight). Pre-deletion notification 60 days out. Hard delete of evidence_files + program_documents + customer_forms after retention period. Audit log NEVER deleted.", "HIGH — OAIC and AML/CTF Act require specific retention periods. Over-retention is also a risk."],
+      ["G8", "File 02 — Architecture", "RLS policy uses SET LOCAL which only works inside transactions. Not all queries use transactions. Queries outside transactions bypass RLS.", "Wrap ALL database queries in server/db.ts in a request-scoped transaction that sets the session variable. Use a middleware that creates the transaction context and attaches it to req. All storage functions receive the tx, not raw db.", "HIGH — RLS bypass possible for non-transactional queries."],
+      ["G9", "File 05 — Feature inventory", "No mention of virus scanning for file uploads. Evidence files, ID documents, and portal submissions are uploaded to R2 without malware scanning.", "Add ClamAV via clamscan npm package (or ClamAV via subprocess) before files move from multer temp storage to R2. Reject file if scan returns INFECTED. Log all scan results. Block upload completely on scanner unavailability (fail-safe).", "MEDIUM — compliance portals are targets for malicious file uploads. ID document forgeries may include embedded malware."],
+      ["G10", "File 06 — M1 Auth", "Identity verification is a stub in M1 ('click to mark as verified'). The original spec requires facial ID + liveness verification at registration. The stub creates a false sense of completeness.", "M1 stub is acceptable for development only. Add clear TODO comment and UI indicator: 'DEVELOPMENT ONLY — Facia integration required before production.' The production gate is: Facia API keys in Replit Secrets + identityStatus must be VERIFIED before workspace creation is allowed.", "HIGH — if stub code reaches production, any user can create a workspace without identity verification. Regulatory non-compliance."],
+      ["G11", "File 13 — Testing", "No test for document checksum integrity — verifying that re-downloading the same ProgramDocument version returns identical bytes.", "Add tests/unit/document-checksum.test.ts: generate same document twice from same input data → assert SHA-256 checksums match. Also test that modifying input data changes the checksum. Critical for evidence integrity.", "MEDIUM — if document generation is non-deterministic, the checksum is meaningless and evidence integrity is undermined."],
+      ["G12", "File 12 — Landing page", "Exit-intent modal is desktop-only per spec. Mobile users (potentially 40% of traffic) get no exit-intent engagement.", "Replace exit-intent (which doesn't reliably work on mobile) with a sticky bottom CTA bar for mobile: 'Start free trial →' appears after scrolling past the hero on mobile. Converts better than modal on mobile.", "LOW — conversion optimization only. No compliance risk."],
+    ],
+    [600, 1500, 2400, 3000, 1900]
+  ),
+  spacer(),
+  h2("18.1 Better Solutions — Alternative Approaches"),
+  table(
+    ["Decision in ZIP", "Better Alternative", "Tradeoff"],
+    [
+      ["Tailwind v3 (pinned in template)", "Tailwind v4 with CSS-first config and OKLCH colors. Supported by shadcn canary CLI as of March 2025.", "Higher setup complexity, possible component compatibility issues early. Better long-term DX. Recommend for Phase 5 if initial build is stable."],
+      ["pdf-lib for PDF generation", "LibreOffice subprocess (docker container in production). Better fidelity for complex DOCX → PDF conversion. Fonts, tables, and page breaks render more accurately.", "Requires LibreOffice to be available on the Replit instance. May need a separate PDF generation microservice if Replit Reserved VM doesn't support LibreOffice. Test early in M4."],
+      ["node-cron + job_locks as Redis fallback", "BullMQ from day one (Upstash Redis free tier available). More robust retry logic, better visibility, real queue semantics.", "Upstash free tier has rate limits. Reserved connection mode needed for reliability. Worthwhile trade — use BullMQ from M1, not as a fallback."],
+      ["path-based customer portal /customer-portal/<token>", "Same — path-based is the right MVP choice. No subdomain management, no additional TLS cert.", "N/A — this is already the recommended approach."],
+      ["Mock adapter for all capabilities in M1-M7", "Mock with realistic latency simulation (0.5-2s random delay). Ensures UI handles async correctly. Avoids UX surprises when real providers take 1-3s.", "No additional code — just add Math.random() delay to mock adapters. High value for realistic testing."],
+    ],
+    [2400, 3600, 3200]
+  ),
+  pageBreak()
+);
+
+// ─── PART 19 ───
+C.push(
+  h1("Part 19 — 🔬 New Research Summary & Final Recommendations"),
+  h2("19.1 Key Research Findings"),
+  table(
+    ["Topic", "Finding", "Impact on Build"],
+    [
+      ["Tailwind v4 + Vite + shadcn", "Tailwind v4 with Vite is now stable (shadcn@canary init works). CSS-first config removes tailwind.config.ts. OKLCH colors are the new standard. Migration tool: npx @tailwindcss/upgrade@next", "Optional upgrade. If starting fresh: use Tailwind v4 from day 1. If adapting the ZIP templates: keep v3, plan v4 migration for Phase 5."],
+      ["shadcn/ui updates (2025)", "All shadcn components updated for React 19 + Tailwind v4. forwardRef removed. data-slot attributes added for styling. Toast component deprecated in favor of sonner.", "Use sonner for toasts instead of the shadcn toast component. Consider React 19 upgrade in Phase 5."],
+      ["OKLCH color space", "OKLCH is perceptually uniform — colors are more consistent across brightness levels. The brand navy (#0B1A33) in OKLCH is oklch(0.15 0.08 240). Emerald (#10B981) is oklch(0.69 0.17 160).", "If adopting Tailwind v4, define all brand tokens in OKLCH for better dark mode consistency and accessible color relationships."],
+      ["@react-three/fiber v9", "R3F v9 is stable and works with React 18. @react-three/drei v9.116 is current. MeshTransmissionMaterial for the crystalline shield is in drei. @react-three/postprocessing v2.16 for Bloom/CA/Vignette.", "All versions already in the ZIP package.json template. No version changes needed."],
+      ["GSAP + Vite", "GSAP v3.12.5 works with Vite out of the box. ScrollTrigger plugin must be registered: gsap.registerPlugin(ScrollTrigger). Import ScrollTrigger from 'gsap/ScrollTrigger'.", "Add registerPlugin call in landing page init. Use Lenis.on('scroll', ScrollTrigger.update) to sync smooth scroll with GSAP."],
+      ["Drizzle ORM v0.36 + RLS", "Drizzle v0.36 supports raw SQL via sql`` template. RLS SET LOCAL works within Drizzle transactions. drizzle-kit v0.30 for migrations.", "Use db.transaction(async tx => { await tx.execute(sql`SET LOCAL app.current_workspace = ${wsId}`); }) pattern for RLS enforcement."],
+      ["BullMQ v5 + Redis", "BullMQ v5 requires Redis 7+. Upstash Redis is compatible. BullMQ has excellent retry logic: exponential backoff, dead-letter queues, job progress reporting.", "Configure maxAttempts=3 and backoff: { type: 'exponential', delay: 1000 } on all check jobs. Use job.log() for progress tracking in document generation."],
+      ["Facia integration pattern", "Facia uses a session-based SDK. createSession() → embed SDK in page → webhook on completion. Session expires in 30min. Multiple attempts allowed within a session.", "In VerifyIdentity page: POST /checks (capability=IDENTITY_VERIFICATION) → receive Facia session URL → open in iframe/redirect → poll or wait for webhook → update identityStatus."],
+    ],
+    [2000, 3500, 3700]
+  ),
+  spacer(),
+  h2("19.2 Final Recommendations Summary"),
+  h3("Architecture"),
+  bullet("Build workspace isolation triple-layer (middleware + storage + RLS) in M1. Non-negotiable. Cannot be retrofitted later without significant risk."),
+  bullet("Use BullMQ from day 1 (not as a fallback). Configure Upstash Redis free tier for development. job_locks fallback is a safety net, not the primary path."),
+  bullet("Mock adapters should simulate realistic latency (0.5–2s random delay) to catch async UX issues early."),
+  bullet("Route all file uploads through multer → ClamAV scan → R2. Never store to R2 directly without scanning."),
+  spacer(),
+  h3("Design & UX"),
+  bullet("Use Tailwind v3 for the initial build (ZIP template is pre-configured). Plan v4 migration for Phase 5."),
+  bullet("The 3D landing scene is code-split from the portal. Never let Three.js load in the app shell bundle."),
+  bullet("Pulsing dot on PENDING_CHECKS FileStateBadge is a small detail with high UX impact — implement it in M6."),
+  bullet("The interactive state diagram (S5 on landing page) is the single most powerful demo tool for compliance officers — prioritise its quality."),
+  spacer(),
+  h3("Compliance Grade"),
+  bullet("SMR workflow is the most critical gap — address it in M7 alongside the escalation workflow."),
+  bullet("Every state transition must write to file_state_history — this is the chain of custody. Never update customer_files.state without inserting a history row."),
+  bullet("The reason field (≥10 chars) on every approval/decline is not optional. Reject at the API level. The frontend should show a minimum-length indicator."),
+  bullet("Audit log must be tested for immutability in M10. Run: await db.update(auditLog) → must throw."),
+  spacer(),
+  h3("Timeline Confidence"),
+  table(
+    ["Phase", "Milestones", "Weeks", "Confidence"],
+    [
+      ["Phase 0 + Phase 1", "Bootstrap + M1 + M2", "1–3", "High — 60% is StrategyNavigator lift"],
+      ["Phase 2", "M3 + M4 + M5", "4–9", "Medium-High — wizard is complex but well-specified"],
+      ["Phase 3", "M6 + M7", "10–14", "Medium — state machine + escalation workflows have many edge cases"],
+      ["Phase 4", "M8 + M9", "14–19", "Medium-Low — provider integration timing depends on sandbox access"],
+      ["Phase 5", "M10", "19–23", "High — well-defined checklist"],
+      ["Diamond Layer", "D1–D8 (priority order)", "+8–16 weeks after M10", "High — each Diamond is isolated and well-specified"],
+      ["Landing Page", "3D hero + 11 sections", "Parallel with Phase 1 (no backend dependencies)", "High — can start immediately"],
+    ],
+    [1600, 2000, 1200, 4400]
+  ),
+  spacer(),
+  divider(),
+  new Paragraph({
+    spacing: { before: 200, after: 100 },
+    alignment: AlignmentType.CENTER,
+    children: [new TextRun({ text: "INTEGRITY SOLVE — FULL BUILD GUIDE · ALL 17 ZIP FILES ANALYSED · NO DETAIL SKIPPED", size: 18, font: "Arial", color: SLATE, bold: true })]
+  }),
+  new Paragraph({
+    spacing: { before: 0, after: 200 },
+    alignment: AlignmentType.CENTER,
+    children: [new TextRun({ text: "Deep Analysis + Gap Fixes + Research Summary + 3D Landing Design · May 2026 · Version 3.0 · Confidential", size: 16, font: "Arial", color: "94A3B8", italics: true })]
+  })
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ASSEMBLE DOCUMENT
+// ══════════════════════════════════════════════════════════════════════════════
+const doc = new Document({
+  numbering: {
+    config: [
+      {
+        reference: "bullets",
+        levels: [
+          { level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT,
+            style: { paragraph: { indent: { left: 720, hanging: 360 } } } },
+          { level: 1, format: LevelFormat.BULLET, text: "◦", alignment: AlignmentType.LEFT,
+            style: { paragraph: { indent: { left: 1080, hanging: 360 } } } },
+        ]
+      },
+      {
+        reference: "numbers",
+        levels: [
+          { level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT,
+            style: { paragraph: { indent: { left: 720, hanging: 360 } } } },
+        ]
+      }
+    ]
+  },
+  styles: {
+    default: {
+      document: { run: { font: "Arial", size: 21 } }
+    },
+    paragraphStyles: [
+      { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true,
+        run: { size: 38, bold: true, font: "Arial", color: WHITE },
+        paragraph: { spacing: { before: 400, after: 200 }, outlineLevel: 0 } },
+      { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
+        run: { size: 30, bold: true, font: "Arial", color: NAVY },
+        paragraph: { spacing: { before: 320, after: 140 }, outlineLevel: 1 } },
+      { id: "Heading3", name: "Heading 3", basedOn: "Normal", next: "Normal", quickFormat: true,
+        run: { size: 24, bold: true, font: "Arial", color: SURFACE },
+        paragraph: { spacing: { before: 220, after: 80 }, outlineLevel: 2 } },
+    ]
+  },
+  sections: [{
+    properties: {
+      page: {
+        size: { width: 12240, height: 15840 },
+        margin: { top: 1080, right: 1000, bottom: 1080, left: 1000 }
+      }
+    },
+    headers: {
+      default: new Header({
+        children: [
+          new Paragraph({
+            border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: EMERALD } },
+            children: [
+              new TextRun({ text: "INTEGRITY SOLVE — AML/CTF Compliance Portal · Full Build Guide", size: 17, font: "Arial", color: SLATE }),
+              new TextRun({ text: "\t", size: 17 }),
+              new TextRun({ text: "v3.0 · Deep Analysis · May 2026", size: 17, font: "Arial", color: "94A3B8" })
+            ],
+            tabStops: [{ type: TabStopType.RIGHT, position: 10240 }]
+          })
+        ]
+      })
+    },
+    footers: {
+      default: new Footer({
+        children: [
+          new Paragraph({
+            border: { top: { style: BorderStyle.SINGLE, size: 2, color: BORDER_CLR } },
+            children: [
+              new TextRun({ text: "Confidential — Integrity Solve Pty Ltd", size: 15, font: "Arial", color: "94A3B8" }),
+              new TextRun({ text: "\t", size: 15 }),
+              new TextRun({ text: "19 Parts · 33 Database Tables · 10 Milestones · 8 Diamond Features · 12 Gap Fixes", size: 15, font: "Arial", color: "94A3B8" })
+            ],
+            tabStops: [{ type: TabStopType.RIGHT, position: 10240 }]
+          })
+        ]
+      })
+    },
+    children: C
+  }]
+});
+
+Packer.toBuffer(doc).then(buf => {
+  fs.writeFileSync('/home/claude/integrity_solve_full_guide.docx', buf);
+  console.log('Built successfully');
+}).catch(e => { console.error(e); process.exit(1); });
