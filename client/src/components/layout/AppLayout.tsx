@@ -105,7 +105,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem asChild>
-                <Link href="/settings"><a className="cursor-pointer">Settings</a></Link>
+                <Link href="/settings" className="cursor-pointer">Settings</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

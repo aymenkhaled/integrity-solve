@@ -105,7 +105,7 @@ export default function EscalationsPage() {
                   <RiskBadge rating={esc.riskRating} />
                   <StatusBadge status={esc.status} />
                   <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/escalations/${esc.id}`}><a>View</a></Link>
+                    <Link href={`/escalations/${esc.id}`}>View</Link>
                   </Button>
                 </div>
               </CardContent>

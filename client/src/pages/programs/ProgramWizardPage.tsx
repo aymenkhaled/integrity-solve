@@ -106,7 +106,7 @@ export default function ProgramWizardPage() {
     <div>
       <div className="flex items-center gap-2 mb-6">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/programs"><a><ArrowLeft className="h-4 w-4" />Programs</a></Link>
+          <Link href="/programs" className="flex items-center gap-1"><ArrowLeft className="h-4 w-4" />Programs</Link>
         </Button>
         <span className="text-muted-foreground">/</span>
         <span className="text-sm font-medium">{program.title}</span>

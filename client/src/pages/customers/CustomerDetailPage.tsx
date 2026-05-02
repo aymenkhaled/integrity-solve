@@ -27,7 +27,7 @@ export default function CustomerDetailPage() {
     return (
       <div>
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/customers"><a><ArrowLeft className="h-4 w-4" /></a></Link>
+          <Link href="/customers"><ArrowLeft className="h-4 w-4" /></Link>
           <Skeleton className="h-7 w-48" />
         </div>
         <div className="grid lg:grid-cols-3 gap-6">
@@ -46,14 +46,14 @@ export default function CustomerDetailPage() {
       <div className="text-center py-20">
         <p className="text-muted-foreground">Customer not found.</p>
         <Button variant="outline" className="mt-4" asChild>
-          <Link href="/customers"><a>Back to customers</a></Link>
+          <Link href="/customers">Back to customers</Link>
         </Button>
       </div>
     );
   }
 
-  const displayName = customer.entityName ??
-    `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim() ||
+  const displayName = (customer.entityName ??
+    `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim()) ||
     'Unknown Customer';
 
   return (
@@ -61,7 +61,7 @@ export default function CustomerDetailPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-6">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/customers"><a><ArrowLeft className="h-4 w-4" />Customers</a></Link>
+          <Link href="/customers" className="flex items-center gap-1"><ArrowLeft className="h-4 w-4" />Customers</Link>
         </Button>
         <span className="text-muted-foreground">/</span>
         <span className="text-sm font-medium">{displayName}</span>

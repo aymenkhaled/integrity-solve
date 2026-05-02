@@ -36,7 +36,7 @@ export default function NewCustomerPage() {
     <div>
       <div className="flex items-center gap-2 mb-6">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/customers"><a><ArrowLeft className="h-4 w-4" />Customers</a></Link>
+          <Link href="/customers" className="flex items-center gap-1"><ArrowLeft className="h-4 w-4" />Customers</Link>
         </Button>
         <span className="text-muted-foreground">/</span>
         <span className="text-sm font-medium">New Customer</span>
@@ -180,7 +180,7 @@ export default function NewCustomerPage() {
               )}
             </Button>
             <Button type="button" variant="outline" asChild>
-              <Link href="/customers"><a>Cancel</a></Link>
+              <Link href="/customers">Cancel</Link>
             </Button>
           </div>
         </form>

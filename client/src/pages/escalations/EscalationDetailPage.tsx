@@ -58,7 +58,7 @@ export default function EscalationDetailPage() {
       <div className="text-center py-20">
         <p className="text-muted-foreground">Escalation not found.</p>
         <Button variant="outline" className="mt-4" asChild>
-          <Link href="/escalations"><a>Back</a></Link>
+          <Link href="/escalations">Back</Link>
         </Button>
       </div>
     );
@@ -70,7 +70,7 @@ export default function EscalationDetailPage() {
     <div>
       <div className="flex items-center gap-2 mb-6">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/escalations"><a><ArrowLeft className="h-4 w-4" />Escalations</a></Link>
+          <Link href="/escalations" className="flex items-center gap-1"><ArrowLeft className="h-4 w-4" />Escalations</Link>
         </Button>
       </div>
 

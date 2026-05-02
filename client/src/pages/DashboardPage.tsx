@@ -120,7 +120,7 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Recent Customers</CardTitle>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/customers"><a>View all</a></Link>
+              <Link href="/customers">View all</Link>
             </Button>
           </CardHeader>
           <CardContent>
@@ -131,28 +131,24 @@ export default function DashboardPage() {
             ) : customersData.items.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 No customers yet.{' '}
-                <Link href="/customers/new">
-                  <a className="text-primary hover:underline">Add your first customer</a>
-                </Link>
+                <Link href="/customers/new" className="text-primary hover:underline">Add your first customer</Link>
               </div>
             ) : (
               <div className="divide-y">
                 {customersData.items.map((customer) => (
-                  <Link key={customer.id} href={`/customers/${customer.id}`}>
-                    <a className="flex items-center justify-between py-3 hover:bg-muted/50 -mx-2 px-2 rounded transition-colors">
-                      <div>
-                        <div className="font-medium text-sm">
-                          {customer.entityName ?? `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim() || 'Unknown'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {customer.referenceNumber} · {formatDate(customer.createdAt)}
-                        </div>
+                  <Link key={customer.id} href={`/customers/${customer.id}`} className="flex items-center justify-between py-3 hover:bg-muted/50 -mx-2 px-2 rounded transition-colors">
+                    <div>
+                      <div className="font-medium text-sm">
+                        {(customer.entityName ?? `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim()) || 'Unknown'}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <RiskBadge rating={customer.riskRating} />
-                        <StatusBadge status={customer.status} />
+                      <div className="text-xs text-muted-foreground">
+                        {customer.referenceNumber} · {formatDate(customer.createdAt)}
                       </div>
-                    </a>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RiskBadge rating={customer.riskRating} />
+                      <StatusBadge status={customer.status} />
+                    </div>
                   </Link>
                 ))}
               </div>
@@ -165,7 +161,7 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Open Tasks</CardTitle>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/tasks"><a>View all</a></Link>
+              <Link href="/tasks">View all</Link>
             </Button>
           </CardHeader>
           <CardContent>
@@ -209,7 +205,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-100 flex-shrink-0" asChild>
-              <Link href="/programs"><a>Create program</a></Link>
+              <Link href="/programs">Create program</Link>
             </Button>
           </CardContent>
         </Card>

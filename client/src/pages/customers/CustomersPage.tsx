@@ -26,7 +26,7 @@ export default function CustomersPage() {
         description="Manage your customer records, CDD status, and risk ratings."
         actions={
           <Button asChild>
-            <Link href="/customers/new"><a><Plus className="h-4 w-4" />New customer</a></Link>
+            <Link href="/customers/new" className="flex items-center gap-2"><Plus className="h-4 w-4" />New customer</Link>
           </Button>
         }
       />
@@ -56,7 +56,7 @@ export default function CustomersPage() {
               description="Start by adding your first customer to begin the CDD process."
               action={
                 <Button asChild>
-                  <Link href="/customers/new"><a>Add customer</a></Link>
+                  <Link href="/customers/new">Add customer</Link>
                 </Button>
               }
               className="py-20"
@@ -89,8 +89,8 @@ export default function CustomersPage() {
                         <td className="px-4 py-3">
                           <Link href={`/customers/${customer.id}`}>
                             <a className="text-sm font-medium hover:text-primary transition-colors">
-                              {customer.entityName ??
-                                `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim() ||
+                              {(customer.entityName ??
+                                `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim()) ||
                                 '—'}
                             </a>
                           </Link>
