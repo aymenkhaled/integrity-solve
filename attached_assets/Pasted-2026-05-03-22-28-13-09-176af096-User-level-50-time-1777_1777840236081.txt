@@ -1,0 +1,109 @@
+2026-05-03 22:28:13.09
+176af096
+User
+{"level":50,"time":1777840093092,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"ioigdo5d3cpj8j19gksl5u3w","msg":"Unhandled server error"}
+2026-05-03 22:28:13.71
+176af096
+User
+{"level":50,"time":1777840093716,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"y4s06173lugerow42ef6krpj","msg":"Unhandled server error"}
+2026-05-03 22:28:14.71
+176af096
+User
+{"level":50,"time":1777840094709,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"tcmkucaz4nd5no4ftgez5h12","msg":"Unhandled server error"}
+2026-05-03 22:28:15.43
+176af096
+User
+{"level":50,"time":1777840095433,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"rgc0cgvt4gbhs4936zucwqxh","msg":"Unhandled server error"}
+2026-05-03 22:28:17.21
+176af096
+User
+{"level":50,"time":1777840097216,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"r8cnwunt8poo8ls4c1qn5erx","msg":"Unhandled server error"}
+2026-05-03 22:28:18.36
+176af096
+User
+{"level":50,"time":1777840098367,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"ayzcn8f3jwt3tf8x8p2710i4","msg":"Unhandled server error"}
+2026-05-03 22:28:19.12
+176af096
+User
+{"level":50,"time":1777840099122,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"udsts29471tvkoqcpere7163","msg":"Unhandled server error"}
+2026-05-03 22:28:20.38
+176af096
+User
+{"level":50,"time":1777840100385,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"u7e0dif2vck7f0seu0i6y7bm","msg":"Unhandled server error"}
+2026-05-03 22:28:21.77
+176af096
+User
+{"level":50,"time":1777840101771,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"f99trl1tq7yr21qjlxaaadf6","msg":"Unhandled server error"}
+2026-05-03 22:28:22.43
+176af096
+User
+{"level":50,"time":1777840102430,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"btnqkbvgqje0dc2atn65f0i2","msg":"Unhandled server error"}
+2026-05-03 22:28:23.71
+176af096
+User
+{"level":50,"time":1777840103714,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"rusvpnmd1jl3sm4jpvxqkzux","msg":"Unhandled server error"}
+2026-05-03 22:28:25.59
+176af096
+User
+{"level":50,"time":1777840105595,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"cfrih68nm4gcc11jcyhb8clh","msg":"Unhandled server error"}
+2026-05-03 22:28:26.30
+176af096
+User
+{"level":50,"time":1777840106300,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"w06b7zhw7fu5i25l0ok6bi3l","msg":"Unhandled server error"}
+2026-05-03 22:28:26.42
+176af096
+User
+{"level":50,"time":1777840106420,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"bbve3tht5gazl61yss27kc9c","msg":"Unhandled server error"}
+2026-05-03 22:28:27.67
+176af096
+User
+{"level":50,"time":1777840107678,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"f4vi4fhj8eq42dmasen5cu99","msg":"Unhandled server error"}
+2026-05-03 22:28:28.42
+176af096
+User
+{"level":50,"time":1777840108424,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"zi1zwp72cgnmpdbn4im4ztpo","msg":"Unhandled server error"}
+2026-05-03 22:28:30.34
+176af096
+User
+{"level":50,"time":1777840110344,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"yymxmeewg2y12wpocmrjp7uc","msg":"Unhandled server error"}
+2026-05-03 22:28:32.18
+176af096
+User
+{"level":50,"time":1777840112186,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"vllly785jsfgo7uojr5h3baq","msg":"Unhandled server error"}
+2026-05-03 22:28:33.77
+176af096
+User
+{"level":50,"time":1777840113774,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"lhbltubx8ii92q5b68ht004e","msg":"Unhandled server error"}
+2026-05-03 22:28:33.98
+176af096
+User
+{"level":50,"time":1777840113982,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"vem2e8dgm5qs76ruh6zg4io9","msg":"Unhandled server error"}
+2026-05-03 22:28:35.01
+176af096
+User
+{"level":50,"time":1777840115016,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"f0esnt5wfo0c8enweo5lmk98","msg":"Unhandled server error"}
+2026-05-03 22:28:36.40
+176af096
+User
+{"level":50,"time":1777840116407,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"zqr3zj83sfh7ku7wtcd0l209","msg":"Unhandled server error"}
+
+2026-05-03 22:28:38.34
+176af096
+User
+{"level":50,"time":1777840118349,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"xxargkm4xv5voegnwh5du247","msg":"Unhandled server error"}
+2026-05-03 22:28:39.01
+176af096
+User
+{"level":50,"time":1777840119016,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"nfhzloox8i7ogql5jw15f2fr","msg":"Unhandled server error"}
+2026-05-03 22:28:39.84
+176af096
+User
+{"level":50,"time":1777840119844,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"iwhnbbzagrvvfqnphj840jqw","msg":"Unhandled server error"}
+2026-05-03 22:28:40.40
+176af096
+User
+{"level":50,"time":1777840120403,"pid":32,"hostname":"localhost","err":{"type":"Error","message":"ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","stack":"Error: ENOENT: no such file or directory, stat '/home/runner/workspace/dist/server/public/index.html'","errno":-2,"code":"ENOENT","syscall":"stat","path":"/home/runner/workspace/dist/server/public/index.html","expose":false,"statusCode":404,"status":404},"requestId":"pav8gamlkcsv1qellqvemhr0","msg":"Unhandled server error"}
+2026-05-03 22:28:41.48
+176af096
+User
+{"level":50,"time":1777840121483,"pid":32,"hostname":"localhost","err":

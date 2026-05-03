@@ -128,7 +128,7 @@ export function createApp() {
 
   // ─── Static files (production) ────────────────────────────────────────────
   if (!isDev) {
-    const distPath = path.resolve(__dirname, '../public');
+    const distPath = path.resolve(__dirname, '../../public');
     app.use(express.static(distPath));
     // SPA fallback
     app.get('*', (_req, res) => {
