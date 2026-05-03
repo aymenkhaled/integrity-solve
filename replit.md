@@ -112,14 +112,16 @@ client/src/
     utils.ts       — cn, initials, formatDate, formatRelative, formatDateTime
 ```
 
-## Brand / Design System — LeadPilot 2.0 (Updated)
-- **Background**: `#0a0a0f` (forced dark via `html { @apply dark; }`)
+## Brand / Design System — LeadPilot 2.0 (Final)
+- **Default theme**: Dark (`html { @apply dark; }` in index.css). Body uses `hsl(var(--background))` (CSS variable, not hardcoded).
+- **Theme toggle**: Light/dark via `ThemeContext` (localStorage key `is-theme`), `ThemeToggle` button in top bar. `OnboardingTour` shown once on first login (localStorage key `is_tour_v2_done`).
+- **Background dark**: `#0a0a0f` via `.dark { --background: 240 6% 6% }`, light via `:root { --background: 0 0% 100% }`
 - **Primary accent**: Indigo-600 `#6366f1`, Secondary: Violet-500 `#8b5cf6`
-- **Semantic success/green**: `text-green-400 bg-green-500/10 border-green-500/20`
-- **CSS utilities**: `.glass`, `.glow-indigo`, `.glow-violet`, `.gradient-text` (indigo→violet), `.noise`, `.spin-slow`, `.nav-active`, `.orb-indigo`, `.orb-violet`, `.float`, `.counter`
-- **3D Hero**: `client/src/components/hero/HeroScene.tsx` (R3F Canvas with Float+Sphere+MeshDistortMaterial+Stars). Falls back to CSS `FallbackOrb` via `ErrorBoundary` when WebGL unavailable.
-- **New files**: `client/src/components/hero/HeroScene.tsx`, `client/src/components/ErrorBoundary.tsx`
-- **button.tsx** outline variant: `bg-transparent` (not `bg-background`) for dark mode compatibility
+- **CSS utilities**: `.glass`, `.glow-indigo`, `.glow-violet`, `.gradient-text` (indigo→violet), `.noise`, `.spin-slow`, `.nav-active`, `.orb-indigo`, `.orb-violet`, `.float`, `.counter`, `.card-3d`, `.stat-card`, `.auth-bg`, `.hero-bg`
+- **Hero**: `ComplianceCommandCenter` — pure CSS/Framer Motion animated dashboard widget (no WebGL/R3F needed). Live feed ticker, risk gauge, entity network, SMR bullet chart.
+- **Auth pages**: Always dark (inline `backgroundColor: '#0a0a0f'` with indigo orbs + glassmorphism panel)
+- **Badge variants**: `default`, `secondary`, `destructive`, `outline`, `success`, `warning`, `danger`
+- **button.tsx** outline variant: `bg-transparent` for dark mode compatibility
 
 ## Navigation Groups (sidebar)
 - **Core**: Dashboard, Customers, AML Program
@@ -205,8 +207,14 @@ PATCH /api/whitelabel
 ## shadcn/ui Components Available
 badge, button, card, checkbox, dialog, dropdown-menu, input, label, select, separator, skeleton, switch, tabs, textarea
 
-## API Health — ALL 28 ENDPOINTS PASSING ✅
-All GET endpoints return 200. Auth, customers, escalations, alerts, tasks, documents, reviews, training, programs, audit, billing, analytics (SMR/training/reviews), risk (analytics/signals), providers, groups, gateway, whitelabel, notifications, checks — all verified.
+## API Health — ALL ENDPOINTS PASSING ✅
+All GET endpoints return `{"ok":true}`. Auth, customers, escalations, alerts, tasks, documents, reviews, training, programs, audit, billing, analytics (SMR/training/reviews), risk (analytics/signals), providers, groups, gateway, whitelabel, notifications, checks, workspace members — all verified.
+
+## Known Data Bugs Fixed
+- `esc.summary` → `esc.subject` in DashboardPage escalation feed (summary is body text, subject is title)
+- `task.priority` → `task.status` in DashboardPage open tasks StatusBadge
+- `body { background-color }` changed from hardcoded `#0a0a0f` to `hsl(var(--background))` so light theme works
+- `autocomplete="new-password"` added to RegisterPage password field (browser accessibility)
 
 ### Server Bug Fixes Applied
 - `analytics/training`: replaced invalid `sql\`status = 'PASSED'\`` with `eq(trainingRecords.status, 'COMPLETED')` — `PASSED` not in `training_status` enum

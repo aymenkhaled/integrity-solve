@@ -37,6 +37,7 @@ import providerRoutes     from './routes/providers.js';
 import gatewayRoutes     from './routes/gateway.js';
 import whitelabelRoutes  from './routes/whitelabel.js';
 import groupRoutes       from './routes/groups.js';
+import seedRoutes        from './routes/seed.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -123,6 +124,7 @@ export function createApp() {
   app.use('/api/gateway',      gatewayRoutes);
   app.use('/api/whitelabel',   whitelabelRoutes);
   app.use('/api/groups',       groupRoutes);
+  app.use('/api/seed',         seedRoutes);
 
   // ─── Static files (production) ────────────────────────────────────────────
   if (!isDev) {

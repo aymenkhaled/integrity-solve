@@ -1,6 +1,7 @@
 import { Switch, Route, Redirect } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+import { OnboardingTour } from '@/components/OnboardingTour';
 
 // Auth pages
 import LoginPage        from '@/pages/auth/LoginPage';
@@ -71,6 +72,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <>
     <Switch>
       {/* Landing */}
       <Route path="/" component={LandingPage} />
@@ -223,5 +225,7 @@ export default function App() {
       {/* Fallback */}
       <Route><Redirect to="/" /></Route>
     </Switch>
+    <OnboardingTour />
+    </>
   );
 }

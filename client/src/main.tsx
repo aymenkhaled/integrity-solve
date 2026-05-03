@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
+import { ThemeProvider } from './contexts/ThemeContext.tsx';
 import App from './App.tsx';
 import './index.css';
 
@@ -24,15 +25,17 @@ if (!root) throw new Error('Root element not found');
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
-      <Toaster
-        richColors
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: { fontFamily: 'Inter, system-ui, sans-serif' },
-        }}
-      />
+      <ThemeProvider>
+        <App />
+        <Toaster
+          richColors
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: { fontFamily: 'Inter, system-ui, sans-serif' },
+          }}
+        />
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

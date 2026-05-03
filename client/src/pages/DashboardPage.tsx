@@ -286,7 +286,7 @@ export default function DashboardPage() {
                           {task.dueAt ? `Due ${formatDate(task.dueAt)}` : formatRelative(task.createdAt)}
                         </div>
                       </div>
-                      <StatusBadge status={task.priority} />
+                      <StatusBadge status={task.status} />
                     </div>
                   ))}
                 </div>
@@ -317,7 +317,7 @@ export default function DashboardPage() {
                     <Link key={esc.id} href={`/escalations/${esc.id}`}
                       className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors group">
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium text-xs truncate">{esc.summary}</div>
+                        <div className="font-medium text-xs truncate">{esc.subject}</div>
                         <div className="text-[11px] text-muted-foreground">{formatRelative(esc.createdAt)}</div>
                       </div>
                       <StatusBadge status={esc.status} />

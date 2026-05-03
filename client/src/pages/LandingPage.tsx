@@ -1,41 +1,13 @@
-import { Suspense, lazy } from 'react';
 import { Link } from 'wouter';
 import { motion } from 'framer-motion';
 import {
   Shield, CheckCircle, ArrowRight, Lock, FileText,
-  Users, BarChart3, Zap, Globe, Star, ChevronRight,
-  AlertTriangle, Clock, TrendingUp, Database, Cpu,
-  Brain, Key, Palette, Network, GraduationCap,
+  Users, BarChart3, Zap, Star, ChevronRight,
+  AlertTriangle, TrendingUp, Clock, Database, Globe,
+  Brain, Key, Palette, Network, GraduationCap, Cpu,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-
-const HeroScene = lazy(() => import('@/components/hero/HeroScene'));
-
-/* ── CSS fallback rings (for devices without WebGL) ─────────────────────── */
-function FallbackOrb() {
-  return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      <div className="absolute w-80 h-80 rounded-full border border-indigo-500/20 spin-slow" />
-      <div className="absolute w-60 h-60 rounded-full border border-violet-500/20 spin-slow-rev" />
-      <div className="absolute w-40 h-40 rounded-full border border-indigo-400/30" />
-      <div
-        className="w-28 h-28 rounded-full glow-indigo"
-        style={{ background: 'radial-gradient(circle, #6366f1, #8b5cf6)', boxShadow: '0 0 60px 20px rgba(99,102,241,0.35)' }}
-      />
-      {[0, 60, 120, 180, 240, 300].map((deg, i) => (
-        <div
-          key={i}
-          className="absolute w-2 h-2 rounded-full animate-pulse"
-          style={{
-            background: ['#6366f1','#8b5cf6','#a78bfa','#818cf8','#6366f1','#7c3aed'][i],
-            transform: `rotate(${deg}deg) translateX(120px)`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+import ComplianceCommandCenter from '@/components/hero/ComplianceCommandCenter';
 
 /* ── Data ────────────────────────────────────────────────────────────────── */
 const FEATURES = [
@@ -171,18 +143,12 @@ export default function LandingPage() {
               </div>
             </motion.div>
 
-            {/* Right: 3D orb */}
-            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
-              className="relative h-[480px] lg:h-[560px] flex items-center justify-center">
-              <ErrorBoundary fallback={<FallbackOrb />}>
-                <Suspense fallback={<FallbackOrb />}>
-                  <HeroScene />
-                </Suspense>
-              </ErrorBoundary>
-              {/* Glow underneath */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-72 h-72 rounded-full" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)' }} />
-              </div>
+            {/* Right: Compliance Command Center visualization */}
+            <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.9, delay: 0.25, ease: 'easeOut' }}
+              className="relative h-[500px] lg:h-[580px]">
+              <div className="absolute inset-0 pointer-events-none"
+                style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.12) 0%, transparent 70%)' }} />
+              <ComplianceCommandCenter />
             </motion.div>
           </div>
         </div>

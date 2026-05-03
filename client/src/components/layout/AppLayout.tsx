@@ -14,6 +14,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const NAV_GROUPS = [
   {
@@ -220,6 +221,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <div className="flex-1" />
+
+          <ThemeToggle />
 
           <Button variant="ghost" size="icon" className="relative h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
             <Link href="/alerts"><Bell className="h-4 w-4" /></Link>

@@ -53,7 +53,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit((data) => register_.mutate(data))} className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-white/60 text-xs uppercase tracking-wider">Full name</Label>
-              <Input placeholder="Jane Smith"
+              <Input placeholder="Jane Smith" autoComplete="name"
                 className="h-10 text-white placeholder:text-white/20"
                 style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }}
                 {...register('fullName')} />
@@ -62,7 +62,7 @@ export default function RegisterPage() {
 
             <div className="space-y-1.5">
               <Label className="text-white/60 text-xs uppercase tracking-wider">Work email</Label>
-              <Input type="email" placeholder="jane@firm.com.au"
+              <Input type="email" placeholder="jane@firm.com.au" autoComplete="email"
                 className="h-10 text-white placeholder:text-white/20"
                 style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }}
                 {...register('email')} />
@@ -73,6 +73,7 @@ export default function RegisterPage() {
               <Label className="text-white/60 text-xs uppercase tracking-wider">Password</Label>
               <div className="relative">
                 <Input type={showPass ? 'text' : 'password'} placeholder="Min. 8 chars, uppercase + number"
+                  autoComplete="new-password"
                   className="h-10 text-white placeholder:text-white/20 pr-10"
                   style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }}
                   {...register('password')} />
