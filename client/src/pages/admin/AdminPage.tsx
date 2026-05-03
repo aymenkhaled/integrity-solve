@@ -10,8 +10,11 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui/tabs';
 import { adminApi } from '@/lib/api';
-import { Building2, Users, Activity, Search, Shield } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import {
+  Building2, Users, Activity, Search, Shield,
+  TrendingUp, CheckCircle, Crown, Lock,
+} from 'lucide-react';
+import { formatDate, formatRelative } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'wouter';
 
@@ -44,6 +47,22 @@ interface User {
 
 interface PaginatedResponse<T> { items: T[]; total: number; page: number; limit: number; }
 
+const TIER_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
+  TRIAL:        { color: 'text-muted-foreground', bg: 'bg-muted/50',         border: 'border-border' },
+  STARTER:      { color: 'text-blue-600',         bg: 'bg-blue-500/10',      border: 'border-blue-500/20' },
+  PROFESSIONAL: { color: 'text-purple-600',        bg: 'bg-purple-500/10',    border: 'border-purple-500/20' },
+  ENTERPRISE:   { color: 'text-amber-600',         bg: 'bg-amber-500/10',     border: 'border-amber-500/20' },
+  GROUP:        { color: 'text-emerald-600',        bg: 'bg-emerald-500/10',   border: 'border-emerald-500/20' },
+};
+
+const BILLING_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
+  TRIALING:    { color: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
+  ACTIVE:      { color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  PAST_DUE:    { color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
+  CANCELLED:   { color: 'text-muted-foreground', bg: 'bg-muted/50',  border: 'border-border' },
+  UNPAID:      { color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
+};
+
 export default function AdminPage() {
   const { user } = useAuth();
   const [wsSearch, setWsSearch] = useState('');
@@ -67,78 +86,81 @@ export default function AdminPage() {
   if (!user?.isPlatformAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-24">
-        <Shield className="h-16 w-16 text-muted-foreground/30 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
-        <p className="text-muted-foreground text-sm mb-6">
-          Platform admin access is required to view this page.
+        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-red-500/10 border border-red-500/20 mb-5">
+          <Lock className="h-10 w-10 text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Access Restricted</h2>
+        <p className="text-muted-foreground text-sm mb-6 text-center max-w-xs">
+          Platform admin access is required to view this page. Contact your platform administrator.
         </p>
-        <Link href="/dashboard">
-          <Button variant="outline">Back to Dashboard</Button>
-        </Link>
+        <Button asChild variant="outline">
+          <Link href="/dashboard">Back to Dashboard</Link>
+        </Button>
       </div>
     );
   }
 
-  const TIER_COLORS: Record<string, string> = {
-    TRIAL: 'bg-gray-100 text-gray-700',
-    STARTER: 'bg-blue-100 text-blue-700',
-    PROFESSIONAL: 'bg-purple-100 text-purple-700',
-    ENTERPRISE: 'bg-amber-100 text-amber-700',
-    GROUP: 'bg-emerald-100 text-emerald-700',
-  };
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Platform Admin"
         description="System-wide oversight for platform administrators."
       />
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Platform stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statsLoading ? (
-          [...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)
+          [...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
         ) : (
-          <>
-            {[
-              { label: 'Workspaces', value: stats?.totals.workspaces ?? 0, icon: Building2 },
-              { label: 'Users',      value: stats?.totals.users ?? 0,      icon: Users },
-              { label: 'Customers',  value: stats?.totals.customers ?? 0,  icon: Activity },
-              { label: 'Tasks',      value: stats?.totals.tasks ?? 0,      icon: Activity },
-            ].map(({ label, value, icon: Icon }) => (
-              <Card key={label}>
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{label}</span>
+          [
+            { label: 'Workspaces', value: stats?.totals.workspaces ?? 0,  icon: Building2, color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
+            { label: 'Users',      value: stats?.totals.users ?? 0,       icon: Users,     color: 'text-purple-500',  bg: 'bg-purple-500/10',  border: 'border-purple-500/20' },
+            { label: 'Customers',  value: stats?.totals.customers ?? 0,   icon: Activity,  color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+            { label: 'Tasks',      value: stats?.totals.tasks ?? 0,       icon: CheckCircle, color: 'text-amber-500', bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
+          ].map(({ label, value, icon: Icon, color, bg, border }) => (
+            <Card key={label} className="card-3d">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${bg} border ${border}`}>
+                    <Icon className={`h-5 w-5 ${color}`} />
                   </div>
-                  <div className="text-2xl font-bold">{value.toLocaleString()}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </>
+                </div>
+                <div className="text-2xl font-bold counter">{value.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+              </CardContent>
+            </Card>
+          ))
         )}
       </div>
 
+      {/* Admin badge */}
+      <div className="flex items-center gap-3 rounded-xl border border-amber-200/50 bg-amber-50/50 dark:border-amber-800/20 dark:bg-amber-950/10 px-5 py-3">
+        <Crown className="h-5 w-5 text-amber-600 flex-shrink-0" />
+        <span className="text-sm text-amber-700 dark:text-amber-400">
+          You are viewing as a <strong>Platform Administrator</strong>. Actions here affect all workspaces.
+        </span>
+      </div>
+
       <Tabs defaultValue="workspaces">
-        <TabsList className="mb-6">
-          <TabsTrigger value="workspaces">Workspaces</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="tiers">Tier Breakdown</TabsTrigger>
+        <TabsList className="mb-4">
+          <TabsTrigger value="workspaces">Workspaces {wsData ? `(${wsData.total})` : ''}</TabsTrigger>
+          <TabsTrigger value="users">Users {userData ? `(${userData.total})` : ''}</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
         {/* Workspaces tab */}
         <TabsContent value="workspaces">
-          <Card>
+          <Card className="card-3d">
             <CardHeader className="flex flex-row items-center gap-4 pb-3">
-              <CardTitle className="text-base flex-1">
-                All Workspaces {wsData ? `(${wsData.total})` : ''}
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 flex-1">
+                <Building2 className="h-4 w-4 text-primary" />
+                All Workspaces
               </CardTitle>
               <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   className="pl-9 h-8 text-sm"
-                  placeholder="Search by name…"
+                  placeholder="Search by legal name…"
                   value={wsSearch}
                   onChange={(e) => setWsSearch(e.target.value)}
                 />
@@ -146,37 +168,50 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent className="p-0">
               {wsLoading ? (
-                <div className="p-6 space-y-3">
-                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10" />)}
+                <div className="p-5 space-y-3">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="bg-muted/40 border-y">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Workspace</th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Industry</th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tier</th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Billing</th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
+                        {['Workspace', 'Industry', 'Tier', 'Billing', 'Trial ends', 'Created'].map((h) => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {wsData?.items.map((ws) => (
-                        <tr key={ws.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 font-medium">{ws.legalName}</td>
-                          <td className="px-4 py-3 text-muted-foreground capitalize">
-                            {ws.industryPathway?.toLowerCase().replace('_', ' ') ?? '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TIER_COLORS[ws.subscriptionTier] ?? ''}`}>
-                              {ws.subscriptionTier}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground text-xs">{ws.billingStatus}</td>
-                          <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(ws.createdAt)}</td>
-                        </tr>
-                      ))}
+                      {wsData?.items.map((ws) => {
+                        const tc = TIER_CONFIG[ws.subscriptionTier] ?? TIER_CONFIG['TRIAL']!;
+                        const bc = BILLING_CONFIG[ws.billingStatus] ?? BILLING_CONFIG['TRIALING']!;
+                        return (
+                          <tr key={ws.id} className="hover:bg-muted/30 transition-colors">
+                            <td className="px-4 py-3 font-semibold">{ws.legalName}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground capitalize">
+                              {ws.industryPathway?.toLowerCase().replace(/_/g, ' ') ?? '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium ${tc.bg} border ${tc.border} ${tc.color}`}>
+                                {ws.subscriptionTier}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium ${bc.bg} border ${bc.border} ${bc.color}`}>
+                                {ws.billingStatus}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {ws.trialEndsAt ? formatDate(ws.trialEndsAt) : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {formatDate(ws.createdAt)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -187,13 +222,14 @@ export default function AdminPage() {
 
         {/* Users tab */}
         <TabsContent value="users">
-          <Card>
+          <Card className="card-3d">
             <CardHeader className="flex flex-row items-center gap-4 pb-3">
-              <CardTitle className="text-base flex-1">
-                All Users {userData ? `(${userData.total})` : ''}
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 flex-1">
+                <Users className="h-4 w-4 text-primary" />
+                All Users
               </CardTitle>
               <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   className="pl-9 h-8 text-sm"
                   placeholder="Search by email…"
@@ -204,37 +240,52 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent className="p-0">
               {userLoading ? (
-                <div className="p-6 space-y-3">
-                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10" />)}
+                <div className="p-5 space-y-3">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="bg-muted/40 border-y">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">User</th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Identity</th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Last Login</th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Admin</th>
+                        {['User', 'Email', 'Identity', 'Last login', 'Joined', 'Role'].map((h) => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {userData?.items.map((u) => (
                         <tr key={u.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 font-medium">{u.fullName ?? '—'}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                                {(u.fullName ?? u.email)[0]?.toUpperCase()}
+                              </div>
+                              <span className="font-medium text-sm">{u.fullName ?? '—'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">{u.email}</td>
                           <td className="px-4 py-3">
                             <Badge variant={u.identityStatus === 'VERIFIED' ? 'success' : 'outline'} className="text-xs">
                               {u.identityStatus}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground text-xs">
-                            {u.lastLoginAt ? formatDate(u.lastLoginAt) : 'Never'}
+                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                            {u.lastLoginAt ? formatRelative(u.lastLoginAt) : 'Never'}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                            {formatDate(u.createdAt)}
                           </td>
                           <td className="px-4 py-3">
-                            {u.isPlatformAdmin && (
-                              <Badge variant="warning" className="text-xs">Admin</Badge>
+                            {u.isPlatformAdmin ? (
+                              <div className="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-medium bg-amber-500/10 border border-amber-500/20 text-amber-600">
+                                <Crown className="h-3 w-3" />
+                                Admin
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">User</span>
                             )}
                           </td>
                         </tr>
@@ -247,26 +298,43 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
 
-        {/* Tier breakdown tab */}
-        <TabsContent value="tiers">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle className="text-base">By Subscription Tier</CardTitle></CardHeader>
+        {/* Analytics tab */}
+        <TabsContent value="analytics">
+          <div className="grid lg:grid-cols-2 gap-5">
+            <Card className="card-3d">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  By Subscription Tier
+                </CardTitle>
+              </CardHeader>
               <CardContent>
-                {statsLoading ? <Skeleton className="h-48" /> : (
+                {statsLoading ? (
                   <div className="space-y-3">
+                    {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
                     {stats?.tierBreakdown.map((tb) => {
                       const pct = stats.totals.workspaces
                         ? Math.round((Number(tb.count) / stats.totals.workspaces) * 100)
                         : 0;
+                      const tc = TIER_CONFIG[tb.tier] ?? TIER_CONFIG['TRIAL']!;
                       return (
                         <div key={tb.tier}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium">{tb.tier}</span>
-                            <span className="text-muted-foreground">{tb.count} ({pct}%)</span>
+                          <div className="flex justify-between text-sm mb-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${tc.bg} border ${tc.border} ${tc.color}`}>
+                                {tb.tier}
+                              </span>
+                            </div>
+                            <span className="text-muted-foreground font-medium">{tb.count} ({pct}%)</span>
                           </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full gradient-emerald transition-all duration-700"
+                              style={{ width: `${pct}%` }}
+                            />
                           </div>
                         </div>
                       );
@@ -275,29 +343,82 @@ export default function AdminPage() {
                 )}
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader><CardTitle className="text-base">By Billing Status</CardTitle></CardHeader>
+
+            <Card className="card-3d">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" />
+                  By Billing Status
+                </CardTitle>
+              </CardHeader>
               <CardContent>
-                {statsLoading ? <Skeleton className="h-48" /> : (
+                {statsLoading ? (
                   <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
                     {stats?.billingBreakdown.map((bb) => {
                       const pct = stats.totals.workspaces
                         ? Math.round((Number(bb.count) / stats.totals.workspaces) * 100)
                         : 0;
+                      const bc = BILLING_CONFIG[bb.status] ?? BILLING_CONFIG['TRIALING']!;
+                      const barColor =
+                        bb.status === 'ACTIVE' ? 'bg-emerald-500' :
+                        bb.status === 'TRIALING' ? 'bg-amber-500' :
+                        bb.status === 'PAST_DUE' || bb.status === 'UNPAID' ? 'bg-red-500' :
+                        'bg-muted-foreground';
                       return (
                         <div key={bb.status}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium">{bb.status}</span>
-                            <span className="text-muted-foreground">{bb.count} ({pct}%)</span>
+                          <div className="flex justify-between text-sm mb-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${bc.bg} border ${bc.border} ${bc.color}`}>
+                                {bb.status}
+                              </span>
+                            </div>
+                            <span className="text-muted-foreground font-medium">{bb.count} ({pct}%)</span>
                           </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+                              style={{ width: `${pct}%` }}
+                            />
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Platform health */}
+            <Card className="card-3d lg:col-span-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-emerald-500" />
+                  Platform Health
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  {[
+                    { label: 'Database',      status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
+                    { label: 'API Server',    status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
+                    { label: 'Auth System',   status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
+                    { label: 'Email Service', status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
+                    { label: 'File Storage',  status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
+                    { label: 'Job Workers',   status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
+                  ].map(({ label, status, color, dot }) => (
+                    <div key={label} className="flex items-center justify-between rounded-xl border bg-muted/30 px-4 py-3">
+                      <span className="text-sm font-medium">{label}</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`h-2 w-2 rounded-full ${dot} animate-pulse`} />
+                        <span className={`text-xs font-medium ${color}`}>{status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>

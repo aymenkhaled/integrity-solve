@@ -25,7 +25,13 @@ import DocumentsPage    from '@/pages/documents/DocumentsPage';
 import AdminPage        from '@/pages/admin/AdminPage';
 import TrainingPage     from '@/pages/training/TrainingPage';
 import AlertsPage       from '@/pages/alerts/AlertsPage';
-import ReviewsPage      from '@/pages/reviews/ReviewsPage';
+import ReviewsPage          from '@/pages/reviews/ReviewsPage';
+import RiskIntelligencePage from '@/pages/risk/RiskIntelligencePage';
+import AnalyticsPage        from '@/pages/analytics/AnalyticsPage';
+import ProvidersPage        from '@/pages/providers/ProvidersPage';
+import ApiGatewayPage        from '@/pages/gateway/ApiGatewayPage';
+import WhiteLabelPage        from '@/pages/whitelabel/WhiteLabelPage';
+import GroupWorkspacesPage   from '@/pages/groups/GroupWorkspacesPage';
 
 // Landing
 import LandingPage      from '@/pages/LandingPage';
@@ -181,6 +187,36 @@ export default function App() {
       <Route path="/reviews">
         <ProtectedRoute>
           <AppLayout><ReviewsPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/risk">
+        <ProtectedRoute>
+          <AppLayout><RiskIntelligencePage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/analytics">
+        <ProtectedRoute>
+          <AppLayout><AnalyticsPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/providers">
+        <ProtectedRoute>
+          <AppLayout><ProvidersPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/gateway">
+        <ProtectedRoute>
+          <AppLayout><ApiGatewayPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/whitelabel">
+        <ProtectedRoute>
+          <AppLayout><WhiteLabelPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/groups">
+        <ProtectedRoute>
+          <AppLayout><GroupWorkspacesPage /></AppLayout>
         </ProtectedRoute>
       </Route>
 

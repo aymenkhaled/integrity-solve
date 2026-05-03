@@ -1,13 +1,15 @@
 import { cn } from '@/lib/utils';
 
-interface PageHeaderProps {
+export interface PageHeaderProps {
   title: string;
   description?: string;
   actions?: React.ReactNode;
+  action?: React.ReactNode;
   className?: string;
 }
 
-export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
+export function PageHeader({ title, description, actions, action, className }: PageHeaderProps) {
+  const content = actions ?? action;
   return (
     <div className={cn('flex items-start justify-between gap-4 mb-6', className)}>
       <div>
@@ -16,7 +18,7 @@ export function PageHeader({ title, description, actions, className }: PageHeade
           <p className="text-muted-foreground mt-1 text-sm">{description}</p>
         )}
       </div>
-      {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
+      {content && <div className="flex items-center gap-2 flex-shrink-0">{content}</div>}
     </div>
   );
 }

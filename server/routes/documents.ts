@@ -43,19 +43,49 @@ router.post('/generate', requireWorkspace, async (req, res, next) => {
     const workspaceId = getWorkspaceId(req);
     const userId = getUserId(req);
     const { programId, documentType = 'AML_PROGRAM', notes } = req.body as {
-      programId: string;
+      programId?: string;
       documentType?: string;
       notes?: string;
     };
 
-    // Load program
-    const [program] = await db
-      .select()
-      .from(programForms)
-      .where(and(eq(programForms.id, programId), eq(programForms.workspaceId, workspaceId)))
-      .limit(1);
+    // Load program — if no programId supplied, auto-select the latest for this workspace
+    let program: typeof programForms.$inferSelect | undefined;
+    if (programId) {
+      const [found] = await db
+        .select()
+        .from(programForms)
+        .where(and(eq(programForms.id, programId), eq(programForms.workspaceId, workspaceId)))
+        .limit(1);
+      program = found;
+      if (!program) throw new NotFoundError('Program');
+    } else {
+      const { desc: descOrder } = await import('drizzle-orm');
+      const [latest] = await db
+        .select()
+        .from(programForms)
+        .where(eq(programForms.workspaceId, workspaceId))
+        .orderBy(descOrder(programForms.updatedAt))
+        .limit(1);
+      program = latest;
+    }
 
-    if (!program) throw new NotFoundError('Program');
+    // If still no program, create a blank placeholder document
+    if (!program) {
+      program = {
+        id: 'none',
+        workspaceId,
+        title: 'Draft AML/CTF Program',
+        status: 'DRAFT',
+        pathway: null,
+        currentStep: 0,
+        formData: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createdBy: userId,
+        publishedAt: null,
+        publishedBy: null,
+      } as typeof programForms.$inferSelect;
+    }
 
     // Load workspace for letterhead
     const [workspace] = await db

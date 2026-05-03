@@ -15,43 +15,21 @@ import { NotFoundError, ValidationError } from '../lib/errors.js';
 const router = Router();
 
 const CreateReviewSchema = z.object({
-  customerId:  z.string().min(1),
-  dueAt:       z.string().min(1),
-  reviewType:  z.string().default('ANNUAL'),
-  notes:       z.string().optional(),
+  customerId:   z.string().min(1),
+  dueAt:        z.string().min(1),
+  scheduledAt:  z.string().optional(),
+  reviewType:   z.string().default('PERIODIC'),
+  notes:        z.string().optional(),
 });
 
 const CompleteReviewSchema = z.object({
-  newRating:  z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'UNRATED']),
-  findings:   z.array(z.unknown()).default([]),
-  notes:      z.string().min(10, 'Notes must be at least 10 characters'),
-  reason:     z.string().min(10, 'Reason must be at least 10 characters'),
+  newRating: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'UNRATED']),
+  findings:  z.array(z.unknown()).default([]),
+  notes:     z.string().min(10, 'Notes must be at least 10 characters'),
+  reason:    z.string().min(10, 'Reason must be at least 10 characters'),
 });
 
-// GET /api/reviews — list reviews (optionally filter by status, customerId)
-router.get('/', requireWorkspace, async (req, res, next) => {
-  try {
-    const workspaceId = getWorkspaceId(req);
-    const { customerId, status } = req.query as { customerId?: string; status?: string };
-
-    const conditions = [eq(periodicReviews.workspaceId, workspaceId)];
-    if (customerId) conditions.push(eq(periodicReviews.customerId, customerId));
-    if (status)     conditions.push(eq(periodicReviews.status, status as typeof periodicReviews.$inferInsert['status']));
-
-    const reviews = await db
-      .select()
-      .from(periodicReviews)
-      .where(and(...conditions))
-      .orderBy(desc(periodicReviews.dueAt))
-      .limit(200);
-
-    ok(res, reviews);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /api/reviews/overdue — convenience: overdue reviews
+// GET /api/reviews/overdue — MUST come before /:id
 router.get('/overdue', requireWorkspace, async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
@@ -70,20 +48,42 @@ router.get('/overdue', requireWorkspace, async (req, res, next) => {
       .orderBy(periodicReviews.dueAt)
       .limit(100);
 
-    ok(res, overdue);
+    ok(res, { reviews: overdue, total: overdue.length });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/reviews — schedule a periodic review
+// GET /api/reviews
+router.get('/', requireWorkspace, async (req, res, next) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const { customerId, status } = req.query as { customerId?: string; status?: string };
+
+    const conditions = [eq(periodicReviews.workspaceId, workspaceId)];
+    if (customerId) conditions.push(eq(periodicReviews.customerId, customerId));
+    if (status)     conditions.push(eq(periodicReviews.status, status as typeof periodicReviews.$inferInsert['status']));
+
+    const reviews = await db
+      .select()
+      .from(periodicReviews)
+      .where(and(...conditions))
+      .orderBy(desc(periodicReviews.dueAt))
+      .limit(200);
+
+    ok(res, { reviews, total: reviews.length });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/reviews
 router.post('/', requireWorkspace, validateBody(CreateReviewSchema), async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const userId = getUserId(req);
     const body = req.body as typeof CreateReviewSchema._type;
 
-    // Verify customer belongs to workspace
     const [customer] = await db
       .select()
       .from(customers)
@@ -94,10 +94,10 @@ router.post('/', requireWorkspace, validateBody(CreateReviewSchema), async (req,
 
     const [review] = await db.insert(periodicReviews).values({
       workspaceId,
-      customerId:    body.customerId,
-      dueAt:         new Date(body.dueAt),
-      reviewType:    body.reviewType,
-      notes:         body.notes,
+      customerId:     body.customerId,
+      dueAt:          new Date(body.dueAt),
+      reviewType:     body.reviewType,
+      notes:          body.notes,
       previousRating: customer.riskRating,
     }).returning();
 
@@ -131,7 +131,7 @@ router.get('/:id', requireWorkspace, async (req, res, next) => {
   }
 });
 
-// POST /api/reviews/:id/start — mark review as in-progress
+// POST /api/reviews/:id/start
 router.post('/:id/start', requireWorkspace, async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
@@ -166,7 +166,7 @@ router.post('/:id/start', requireWorkspace, async (req, res, next) => {
   }
 });
 
-// POST /api/reviews/:id/complete — complete a review and update customer risk
+// POST /api/reviews/:id/complete
 router.post('/:id/complete', requireWorkspace, validateBody(CompleteReviewSchema), async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
@@ -183,7 +183,6 @@ router.post('/:id/complete', requireWorkspace, validateBody(CompleteReviewSchema
     if (!existing) throw new NotFoundError('Review');
 
     const now = new Date();
-
     const [updated] = await db
       .update(periodicReviews)
       .set({
@@ -197,27 +196,14 @@ router.post('/:id/complete', requireWorkspace, validateBody(CompleteReviewSchema
       .where(eq(periodicReviews.id, id))
       .returning();
 
-    // Update customer's risk rating and last review timestamps
     await db
       .update(customers)
-      .set({
-        riskRating:     body.newRating,
-        lastReviewedAt: now,
-        lastReviewedBy: userId,
-        updatedAt:      now,
-      })
+      .set({ riskRating: body.newRating, lastReviewedAt: now, lastReviewedBy: userId, updatedAt: now })
       .where(eq(customers.id, existing.customerId));
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      {
-        action: 'review.completed',
-        entityType: 'periodic_review',
-        entityId: id,
-        oldValue: existing,
-        newValue: updated,
-        reason: body.reason,
-      },
+      { action: 'review.completed', entityType: 'periodic_review', entityId: id, oldValue: existing, newValue: updated, reason: body.reason },
     );
 
     ok(res, updated);

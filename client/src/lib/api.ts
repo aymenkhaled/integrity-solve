@@ -200,6 +200,52 @@ export const alertApi = {
   falsePositive:(id: string, note: string) => api.post(`/alerts/${id}/false-positive`, { resolutionNote: note }),
 };
 
+// ─── Providers ────────────────────────────────────────────────────────────────
+
+export const providersApi = {
+  list: () => api.get('/providers'),
+};
+
+// ─── Groups (D2) ──────────────────────────────────────────────────────────────
+
+export const groupsApi = {
+  list:   () => api.get('/groups'),
+  link:   (childWorkspaceId: string) => api.post('/groups/link', { childWorkspaceId }),
+  unlink: (childId: string) => api.delete(`/groups/link/${childId}`),
+};
+
+// ─── Gateway (D8) ─────────────────────────────────────────────────────────────
+
+export const gatewayApi = {
+  listKeys:  () => api.get('/gateway/keys'),
+  createKey: (body: { name: string; scopes: string[]; expiresInDays?: number }) =>
+    api.post('/gateway/keys', body),
+  revokeKey: (id: string) => api.delete(`/gateway/keys/${id}`),
+  getUsage:  () => api.get('/gateway/usage'),
+};
+
+// ─── White-label (D5) ─────────────────────────────────────────────────────────
+
+export const whitelabelApi = {
+  get:    () => api.get('/whitelabel'),
+  update: (body: Record<string, unknown>) => api.patch('/whitelabel', body),
+};
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+export const analyticsApi = {
+  smr:      () => api.get('/analytics/smr'),
+  training: () => api.get('/analytics/training'),
+  reviews:  () => api.get('/analytics/reviews'),
+};
+
+// ─── Risk Intelligence ────────────────────────────────────────────────────────
+
+export const riskApi = {
+  analytics: () => api.get('/risk/analytics'),
+  signals:   () => api.get('/risk/signals'),
+};
+
 // ─── Reviews ──────────────────────────────────────────────────────────────────
 
 export const reviewApi = {

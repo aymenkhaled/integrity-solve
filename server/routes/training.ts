@@ -1,5 +1,6 @@
 /**
  * server/routes/training.ts — Training tracker endpoints (Diamond D7).
+ * Accepts flexible input: courseTitle (alias for moduleName), userId optional (defaults to current user).
  */
 import { Router } from 'express';
 import { db } from '../db.js';
@@ -15,20 +16,29 @@ import { NotFoundError } from '../lib/errors.js';
 const router = Router();
 
 const CreateTrainingSchema = z.object({
-  userId:        z.string().min(1),
-  moduleName:    z.string().min(1).max(200),
-  moduleVersion: z.string().default('1.0'),
-  passingScore:  z.number().int().min(0).max(100).default(80),
+  userId:         z.string().optional(),
+  moduleName:     z.string().min(1).max(200).optional(),
+  courseTitle:    z.string().min(1).max(200).optional(),
+  courseCode:     z.string().max(50).optional(),
+  trainingType:   z.string().max(50).optional(),
+  moduleVersion:  z.string().default('1.0'),
+  passingScore:   z.number().int().min(0).max(100).default(80),
+  scheduledAt:    z.string().optional(),
+  dueAt:          z.string().optional(),
+  notes:          z.string().optional(),
+}).refine((d) => d.moduleName || d.courseTitle, {
+  message: 'Either moduleName or courseTitle is required',
 });
 
 const UpdateTrainingSchema = z.object({
-  status:     z.enum(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED', 'FAILED']).optional(),
-  score:      z.number().int().min(0).max(100).optional(),
-  expiresAt:  z.string().optional(),
+  status:         z.enum(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED', 'FAILED']).optional(),
+  score:          z.number().int().min(0).max(100).optional(),
+  expiresAt:      z.string().optional(),
   certificateUrl: z.string().url().optional(),
+  notes:          z.string().optional(),
 });
 
-// GET /api/training — list training records for workspace
+// GET /api/training
 router.get('/', requireWorkspace, async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
@@ -62,7 +72,7 @@ router.get('/', requireWorkspace, async (req, res, next) => {
       .orderBy(desc(trainingRecords.createdAt))
       .limit(200);
 
-    ok(res, records);
+    ok(res, { records, total: records.length });
   } catch (err) {
     next(err);
   }
@@ -75,14 +85,21 @@ router.post('/', requireWorkspace, validateBody(CreateTrainingSchema), async (re
     const actorId = getUserId(req);
     const body = req.body as typeof CreateTrainingSchema._type;
 
+    const resolvedUserId = body.userId ?? actorId;
+    const resolvedModuleName = body.moduleName ?? body.courseTitle ?? 'Unknown Module';
+
     const [record] = await db.insert(trainingRecords).values({
       workspaceId,
-      ...body,
+      userId:        resolvedUserId,
+      moduleName:    resolvedModuleName,
+      moduleVersion: body.moduleVersion,
+      passingScore:  body.passingScore,
+      expiresAt:     body.dueAt ? new Date(body.dueAt) : undefined,
     }).returning();
 
     await writeAudit(
       { workspaceId, actorUserId: actorId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'training.enrolled', entityType: 'training_record', entityId: record!.id, newValue: body },
+      { action: 'training.enrolled', entityType: 'training_record', entityId: record!.id, newValue: { moduleName: resolvedModuleName } },
     );
 
     ok(res, record, 201);
@@ -91,7 +108,7 @@ router.post('/', requireWorkspace, validateBody(CreateTrainingSchema), async (re
   }
 });
 
-// PATCH /api/training/:id — update training record (score, status, etc.)
+// PATCH /api/training/:id
 router.patch('/:id', requireWorkspace, validateBody(UpdateTrainingSchema), async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
@@ -108,11 +125,13 @@ router.patch('/:id', requireWorkspace, validateBody(UpdateTrainingSchema), async
     if (!existing) throw new NotFoundError('Training record');
 
     const updates: Partial<typeof trainingRecords.$inferInsert> = {
-      ...body,
       updatedAt: new Date(),
       attempts:  existing.attempts + 1,
     };
 
+    if (body.status) updates.status = body.status;
+    if (body.score !== undefined) updates.score = body.score;
+    if (body.certificateUrl) updates.certificateUrl = body.certificateUrl;
     if (body.status === 'COMPLETED') updates.completedAt = new Date();
     if (body.expiresAt) updates.expiresAt = new Date(body.expiresAt);
 

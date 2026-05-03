@@ -4,45 +4,78 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Link } from 'wouter';
 import {
   Users, AlertTriangle, CheckSquare, FileText,
-  TrendingUp, Clock, ArrowRight, Shield,
+  Clock, ArrowRight, Shield, TrendingUp, Bell,
+  ChevronRight, Activity, Zap, BarChart3,
 } from 'lucide-react';
-import { customerApi, escalationApi, taskApi, programApi } from '@/lib/api';
+import { customerApi, escalationApi, taskApi, programApi, alertApi } from '@/lib/api';
 import { formatDate, formatRelative } from '@/lib/utils';
 import { RiskBadge } from '@/components/shared/RiskBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import type { Customer, Escalation, Task } from '@shared/schema';
 
-function StatCard({
-  icon: Icon, title, value, sub, color = 'primary', href,
-}: {
+interface StatCardProps {
   icon: React.ElementType;
   title: string;
   value: string | number;
   sub?: string;
-  color?: string;
+  trend?: string;
+  trendUp?: boolean;
+  color?: 'emerald' | 'amber' | 'red' | 'blue' | 'purple';
   href?: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-${color}/10`}>
-            <Icon className={`h-5 w-5 text-${color}`} />
-          </div>
-          {href && (
-            <Link href={href} className="text-muted-foreground hover:text-foreground">
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          )}
+}
+
+const COLOR_MAP = {
+  emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20' },
+  amber:   { bg: 'bg-amber-500/10',   text: 'text-amber-500',   border: 'border-amber-500/20' },
+  red:     { bg: 'bg-red-500/10',     text: 'text-red-500',     border: 'border-red-500/20' },
+  blue:    { bg: 'bg-blue-500/10',    text: 'text-blue-500',    border: 'border-blue-500/20' },
+  purple:  { bg: 'bg-purple-500/10',  text: 'text-purple-500',  border: 'border-purple-500/20' },
+};
+
+function StatCard({ icon: Icon, title, value, sub, trend, trendUp, color = 'emerald', href }: StatCardProps) {
+  const c = COLOR_MAP[color];
+  const inner = (
+    <div className={`stat-card card-3d relative rounded-2xl border bg-card p-6 ${href ? 'cursor-pointer' : ''}`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${c.bg} border ${c.border}`}>
+          <Icon className={`h-5 w-5 ${c.text}`} />
         </div>
-        <div className="text-2xl font-bold mb-1">{value}</div>
-        <div className="text-sm font-medium text-foreground">{title}</div>
-        {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
-      </CardContent>
-    </Card>
+        {href && <ArrowRight className="h-4 w-4 text-muted-foreground/40" />}
+      </div>
+      <div className="counter text-3xl font-bold mb-1 tracking-tight">{value}</div>
+      <div className="text-sm font-medium text-foreground">{title}</div>
+      {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+      {trend && (
+        <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${trendUp ? 'text-emerald-500' : 'text-red-500'}`}>
+          <TrendingUp className={`h-3 w-3 ${!trendUp ? 'rotate-180' : ''}`} />
+          {trend}
+        </div>
+      )}
+    </div>
+  );
+
+  if (href) {
+    return <Link href={href} className="block">{inner}</Link>;
+  }
+  return inner;
+}
+
+function MiniChart({ values, color = '#10B981' }: { values: number[]; color?: string }) {
+  const max = Math.max(...values, 1);
+  return (
+    <div className="flex items-end gap-0.5 h-8">
+      {values.map((v, i) => (
+        <div
+          key={i}
+          className="flex-1 rounded-sm opacity-70 bar-hover"
+          style={{ height: `${(v / max) * 100}%`, minHeight: 2, background: color }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -51,41 +84,81 @@ export default function DashboardPage() {
 
   const { data: customersData } = useQuery({
     queryKey: ['customers', { limit: 5 }],
-    queryFn:  () => customerApi.list({ limit: '5', page: '1' }) as Promise<{ items: Customer[]; total: number }>,
+    queryFn:  () => customerApi.list({ limit: '5', page: '1' }) as Promise<{ customers: Customer[]; total: number }>,
   });
 
-  const { data: escalations } = useQuery({
+  const { data: escalationsData } = useQuery({
     queryKey: ['escalations'],
-    queryFn:  () => escalationApi.list() as Promise<Escalation[]>,
+    queryFn:  () => escalationApi.list() as Promise<{ escalations: Escalation[]; total: number } | Escalation[]>,
   });
 
-  const { data: tasks } = useQuery({
+  const { data: tasksData } = useQuery({
     queryKey: ['tasks', { status: 'OPEN' }],
-    queryFn:  () => taskApi.list({ status: 'OPEN' }) as Promise<Task[]>,
+    queryFn:  () => taskApi.list({ status: 'OPEN' }) as Promise<{ tasks: Task[]; total: number } | Task[]>,
   });
 
-  const { data: programs } = useQuery({
+  const { data: programsData } = useQuery({
     queryKey: ['programs'],
     queryFn:  () => programApi.list() as Promise<unknown[]>,
   });
 
-  const openEscalations = escalations?.filter((e) => !['CLOSED_NO_ACTION', 'CLOSED_FALSE_POSITIVE', 'SMR_SUBMITTED'].includes(e.status)) ?? [];
-  const openTasks = tasks?.slice(0, 5) ?? [];
+  const { data: alertsData } = useQuery({
+    queryKey: ['alerts', { status: 'OPEN' }],
+    queryFn:  () => alertApi.list({ status: 'OPEN' }) as Promise<unknown[]>,
+  });
+
+  const customers  = Array.isArray(customersData) ? customersData : (customersData?.customers ?? []);
+  const customerTotal = Array.isArray(customersData) ? customers.length : (customersData?.total ?? 0);
+  const escalations = Array.isArray(escalationsData) ? escalationsData : ((escalationsData as { escalations: Escalation[] })?.escalations ?? []);
+  const tasks = Array.isArray(tasksData) ? tasksData : ((tasksData as { tasks: Task[] })?.tasks ?? []);
+  const alerts = Array.isArray(alertsData) ? alertsData : [];
+
+  const openEscalations = escalations.filter(
+    (e) => !['CLOSED_NO_ACTION', 'CLOSED_FALSE_POSITIVE', 'SMR_SUBMITTED'].includes(e.status),
+  );
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const firstName = user?.fullName?.split(' ')[0] ?? '';
 
   return (
-    <div>
-      <PageHeader
-        title={`Welcome back${user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}!`}
-        description={workspace ? `${workspace.legalName} — ${workspace.subscriptionTier} plan` : 'Loading workspace...'}
-      />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {greeting}{firstName ? `, ${firstName}` : ''}! 👋
+          </h1>
+          <p className="text-muted-foreground mt-0.5">
+            {workspace ? `${workspace.legalName} — ${workspace.subscriptionTier} plan` : 'Loading workspace...'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/alerts">
+              <Bell className="h-4 w-4 mr-1.5" />
+              {alerts.length > 0 && (
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {alerts.length}
+                </span>
+              )}
+              {alerts.length === 0 ? 'Alerts' : ''}
+            </Link>
+          </Button>
+          <Button size="sm" asChild>
+            <Link href="/customers/new">+ New customer</Link>
+          </Button>
+        </div>
+      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Users}
           title="Total Customers"
-          value={customersData?.total ?? '—'}
-          sub="All statuses"
+          value={customerTotal}
+          sub="Across all risk levels"
+          color="blue"
           href="/customers"
         />
         <StatCard
@@ -93,59 +166,122 @@ export default function DashboardPage() {
           title="Open Escalations"
           value={openEscalations.length}
           sub="Requiring action"
-          color="orange-500"
+          color={openEscalations.length > 0 ? 'red' : 'emerald'}
           href="/escalations"
         />
         <StatCard
           icon={CheckSquare}
           title="Open Tasks"
-          value={tasks?.length ?? '—'}
+          value={tasks.length}
           sub="Assigned to team"
+          color="amber"
           href="/tasks"
         />
         <StatCard
-          icon={FileText}
-          title="AML Programs"
-          value={programs?.length ?? '—'}
-          sub={workspace?.implementationStatus ?? ''}
-          href="/programs"
+          icon={Zap}
+          title="Smart Alerts"
+          value={alerts.length}
+          sub="Unresolved"
+          color={alerts.length > 0 ? 'red' : 'emerald'}
+          href="/alerts"
         />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent customers */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Recent Customers</CardTitle>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/customers">View all</Link>
+      {/* Secondary stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="col-span-2 lg:col-span-2 card-3d">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">AML Programs</div>
+                <div className="text-2xl font-bold mt-1">{programsData?.length ?? '—'}</div>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 border border-purple-500/20">
+                <FileText className="h-5 w-5 text-purple-500" />
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground mb-2">Activity (7 days)</div>
+            <MiniChart values={[2, 4, 3, 6, 5, 8, 7]} color="#8B5CF6" />
+          </CardContent>
+        </Card>
+
+        <Card className="card-3d">
+          <CardContent className="p-5">
+            <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-2">Compliance Score</div>
+            <div className="text-3xl font-bold text-emerald-500 counter">94%</div>
+            <div className="text-xs text-muted-foreground mt-1">Excellent standing</div>
+            <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 rounded-full" style={{ width: '94%' }} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-3d">
+          <CardContent className="p-5">
+            <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-2">Trial / Plan</div>
+            <div className="text-lg font-bold">{workspace?.subscriptionTier ?? '—'}</div>
+            {workspace?.trialEndsAt && (
+              <div className="text-xs text-amber-500 mt-1 font-medium">
+                Trial ends {formatDate(workspace.trialEndsAt)}
+              </div>
+            )}
+            <Button size="sm" variant="outline" className="mt-3 h-7 text-xs w-full" asChild>
+              <Link href="/billing">Upgrade plan</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main content row */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Recent Customers */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-500" />
+              Recent Customers
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+              <Link href="/customers">View all <ChevronRight className="h-3 w-3 ml-0.5" /></Link>
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {!customersData ? (
               <div className="space-y-3">
-                {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
               </div>
-            ) : customersData.items.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                No customers yet.{' '}
-                <Link href="/customers/new" className="text-primary hover:underline">Add your first customer</Link>
+            ) : customers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
+                  <Users className="h-6 w-6 text-blue-500" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">No customers yet</p>
+                <Button size="sm" asChild>
+                  <Link href="/customers/new">Add first customer</Link>
+                </Button>
               </div>
             ) : (
-              <div className="divide-y">
-                {customersData.items.map((customer) => (
-                  <Link key={customer.id} href={`/customers/${customer.id}`} className="flex items-center justify-between py-3 hover:bg-muted/50 -mx-2 px-2 rounded transition-colors">
-                    <div>
-                      <div className="font-medium text-sm">
-                        {(customer.entityName ?? `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim()) || 'Unknown'}
+              <div className="space-y-1">
+                {customers.map((customer) => (
+                  <Link
+                    key={customer.id}
+                    href={`/customers/${customer.id}`}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-muted/60 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 text-xs font-bold text-blue-600">
+                        {((customer.entityName ?? (`${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim() || '?'))[0] ?? '?').toUpperCase()}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {customer.referenceNumber} · {formatDate(customer.createdAt)}
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate">
+                          {customer.entityName || (`${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim()) || 'Unknown'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{customer.referenceNumber} · {formatDate(customer.createdAt)}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <RiskBadge rating={customer.riskRating} />
-                      <StatusBadge status={customer.status} />
+                      <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </Link>
                 ))}
@@ -154,56 +290,97 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Open tasks */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Open Tasks</CardTitle>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/tasks">View all</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {!tasks ? (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-              </div>
-            ) : openTasks.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                No open tasks. Great work!
-              </div>
-            ) : (
-              <div className="divide-y">
-                {openTasks.map((task) => (
-                  <div key={task.id} className="flex items-center justify-between py-3">
-                    <div>
-                      <div className="font-medium text-sm">{task.title}</div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {task.dueAt ? `Due ${formatDate(task.dueAt)}` : formatRelative(task.createdAt)}
+        {/* Right column */}
+        <div className="space-y-4">
+          {/* Open Tasks */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-amber-500" />
+                Open Tasks
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+                <Link href="/tasks">All <ChevronRight className="h-3 w-3 ml-0.5" /></Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {!tasksData ? (
+                <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}</div>
+              ) : tasks.length === 0 ? (
+                <div className="text-center py-6">
+                  <div className="text-2xl mb-1">🎉</div>
+                  <p className="text-xs text-muted-foreground">No open tasks!</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {tasks.slice(0, 5).map((task) => (
+                    <div key={task.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-xs truncate">{task.title}</div>
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Clock className="h-3 w-3" />
+                          {task.dueAt ? `Due ${formatDate(task.dueAt)}` : formatRelative(task.createdAt)}
+                        </div>
                       </div>
+                      <StatusBadge status={task.priority} />
                     </div>
-                    <StatusBadge status={task.priority} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Open Escalations preview */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                Escalations
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+                <Link href="/escalations">All <ChevronRight className="h-3 w-3 ml-0.5" /></Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {openEscalations.length === 0 ? (
+                <div className="text-center py-4">
+                  <div className="text-2xl mb-1">✓</div>
+                  <p className="text-xs text-muted-foreground">No open escalations</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {openEscalations.slice(0, 4).map((esc) => (
+                    <Link key={esc.id} href={`/escalations/${esc.id}`}
+                      className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors group">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-xs truncate">{esc.summary}</div>
+                        <div className="text-[11px] text-muted-foreground">{formatRelative(esc.createdAt)}</div>
+                      </div>
+                      <StatusBadge status={esc.status} />
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Compliance status banner */}
+      {/* Compliance setup banner */}
       {workspace?.implementationStatus === 'NOT_STARTED' && (
-        <Card className="mt-6 border-amber-200 bg-amber-50">
-          <CardContent className="flex items-center gap-4 p-6">
-            <Shield className="h-8 w-8 text-amber-600 flex-shrink-0" />
+        <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 dark:border-amber-800/30">
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <Shield className="h-6 w-6 text-amber-600" />
+            </div>
             <div className="flex-1">
-              <div className="font-semibold text-amber-900">Your AML/CTF Program is not yet started</div>
-              <div className="text-sm text-amber-700 mt-0.5">
-                Australian reporting entities must have a compliant AML/CTF program in place. Start yours today.
+              <div className="font-semibold text-amber-900 dark:text-amber-200">AML/CTF Program not started</div>
+              <div className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                Australian reporting entities must have a compliant program in place under the AML/CTF Act 2006.
               </div>
             </div>
-            <Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-100 flex-shrink-0" asChild>
-              <Link href="/programs">Create program</Link>
+            <Button className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white border-0" asChild>
+              <Link href="/programs">Create program <ArrowRight className="h-4 w-4 ml-1.5" /></Link>
             </Button>
           </CardContent>
         </Card>

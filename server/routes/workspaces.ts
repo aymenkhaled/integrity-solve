@@ -72,7 +72,30 @@ router.patch('/current', requireWorkspace, validateBody(UpdateWorkspaceSchema), 
   }
 });
 
-// ─── GET /api/workspaces/members ─────────────────────────────────────────────
+// ─── GET /api/workspaces/current/members (alias) + /api/workspaces/members ───
+
+router.get('/current/members', requireWorkspace, async (req, res, next) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const members = await db
+      .select({
+        userId:      workspaceMemberships.userId,
+        role:        workspaceMemberships.role,
+        status:      workspaceMemberships.status,
+        joinedAt:    workspaceMemberships.joinedAt,
+        email:       users.email,
+        fullName:    users.fullName,
+        avatarUrl:   users.avatarUrl,
+        lastLoginAt: users.lastLoginAt,
+      })
+      .from(workspaceMemberships)
+      .innerJoin(users, eq(users.id, workspaceMemberships.userId))
+      .where(eq(workspaceMemberships.workspaceId, workspaceId));
+    ok(res, members);
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/members', requireWorkspace, async (req, res, next) => {
   try {

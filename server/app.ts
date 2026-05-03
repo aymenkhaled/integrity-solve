@@ -31,6 +31,12 @@ import adminRoutes        from './routes/admin.js';
 import trainingRoutes     from './routes/training.js';
 import alertRoutes        from './routes/alerts.js';
 import reviewRoutes       from './routes/reviews.js';
+import riskRoutes         from './routes/risk.js';
+import analyticsRoutes    from './routes/analytics.js';
+import providerRoutes     from './routes/providers.js';
+import gatewayRoutes     from './routes/gateway.js';
+import whitelabelRoutes  from './routes/whitelabel.js';
+import groupRoutes       from './routes/groups.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -111,6 +117,12 @@ export function createApp() {
   app.use('/api/training',       trainingRoutes);
   app.use('/api/alerts',         alertRoutes);
   app.use('/api/reviews',        reviewRoutes);
+  app.use('/api/risk',           riskRoutes);
+  app.use('/api/analytics',     analyticsRoutes);
+  app.use('/api/providers',     providerRoutes);
+  app.use('/api/gateway',      gatewayRoutes);
+  app.use('/api/whitelabel',   whitelabelRoutes);
+  app.use('/api/groups',       groupRoutes);
 
   // ─── Static files (production) ────────────────────────────────────────────
   if (!isDev) {
