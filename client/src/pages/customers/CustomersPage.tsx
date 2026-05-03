@@ -18,7 +18,7 @@ import type { Customer } from '@shared/schema';
 
 const RISK_STATS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 const RISK_COLORS = {
-  LOW:      { color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: Shield },
+  LOW:      { color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', icon: Shield },
   MEDIUM:   { color: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   icon: TrendingUp },
   HIGH:     { color: 'text-orange-600',  bg: 'bg-orange-500/10',  border: 'border-orange-500/20',  icon: AlertTriangle },
   CRITICAL: { color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20',     icon: AlertTriangle },
@@ -53,7 +53,7 @@ export default function CustomersPage() {
         action={
           <Button
             asChild
-            className="gradient-emerald text-white border-0 hover:opacity-90"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
           >
             <Link href="/customers/new">
               <Plus className="h-4 w-4 mr-2" />
@@ -142,7 +142,7 @@ export default function CustomersPage() {
               {!search && !riskFilter && (
                 <Button
                   asChild
-                  className="gradient-emerald text-white border-0"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                 >
                   <Link href="/customers/new">
                     <Plus className="h-4 w-4 mr-2" />

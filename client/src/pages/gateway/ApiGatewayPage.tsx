@@ -53,7 +53,7 @@ function CopyButton({ value }: { value: string }) {
   };
   return (
     <Button size="icon" variant="ghost" className="h-7 w-7 flex-shrink-0" onClick={copy}>
-      {copied ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? <CheckCircle className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
     </Button>
   );
 }
@@ -117,7 +117,7 @@ export default function ApiGatewayPage() {
         title="API Gateway"
         description="Manage workspace API keys for programmatic access to the Integrity Solve platform."
         actions={
-          <Button className="gradient-emerald text-white border-0 gap-2" onClick={() => { setShowCreate(true); setGeneratedKey(null); setNewKeyName(''); setSelectedScopes(['customers:read', 'checks:read']); }}>
+          <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-2" onClick={() => { setShowCreate(true); setGeneratedKey(null); setNewKeyName(''); setSelectedScopes(['customers:read', 'checks:read']); }}>
             <Plus className="h-4 w-4" />
             Generate API Key
           </Button>
@@ -128,7 +128,7 @@ export default function ApiGatewayPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Active Keys',      value: usageLoading ? '—' : usage?.activeKeys ?? 0,      icon: Key,       color: 'text-primary',     bg: 'bg-primary/10',     border: 'border-primary/20' },
-          { label: 'Checks (30d)',     value: usageLoading ? '—' : usage?.totalChecks ?? 0,     icon: Shield,    color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'Checks (30d)',     value: usageLoading ? '—' : usage?.totalChecks ?? 0,     icon: Shield,    color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
           { label: 'Customers',        value: usageLoading ? '—' : usage?.totalCustomers ?? 0,  icon: Activity,  color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
           { label: 'Rate Limit (RPM)', value: usageLoading ? '—' : usage?.rateLimit.rpm ?? 60,  icon: Zap,       color: 'text-amber-500',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
@@ -306,10 +306,10 @@ export default function ApiGatewayPage() {
 
           {generatedKey ? (
             <div className="space-y-4">
-              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4">
+              <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-4">
                 <div className="flex items-start gap-2 mb-3">
-                  <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm font-semibold text-emerald-600">Key generated successfully</p>
+                  <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm font-semibold text-green-400">Key generated successfully</p>
                 </div>
                 <p className="text-xs text-muted-foreground mb-3">Copy this key now. It will not be shown again.</p>
                 <div className="flex items-center gap-2 bg-background rounded-lg border p-2">
@@ -325,7 +325,7 @@ export default function ApiGatewayPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button className="w-full gradient-emerald text-white border-0" onClick={() => { setShowCreate(false); setGeneratedKey(null); }}>
+                <Button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white border-0" onClick={() => { setShowCreate(false); setGeneratedKey(null); }}>
                   Done — I've saved the key
                 </Button>
               </DialogFooter>
@@ -360,7 +360,7 @@ export default function ApiGatewayPage() {
               </div>
               <DialogFooter className="gap-2">
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-                <Button className="gradient-emerald text-white border-0" onClick={handleCreate} disabled={createMutation.isPending}>
+                <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0" onClick={handleCreate} disabled={createMutation.isPending}>
                   {createMutation.isPending ? 'Generating…' : 'Generate Key'}
                 </Button>
               </DialogFooter>

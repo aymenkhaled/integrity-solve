@@ -45,7 +45,7 @@ const CATEGORY_META: Record<string, { icon: React.ElementType; color: string; bg
 };
 
 const RESULT_META: Record<string, { color: string; bg: string }> = {
-  PASS:          { color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
+  PASS:          { color: 'text-green-400', bg: 'bg-green-500/10' },
   FAIL:          { color: 'text-red-600',     bg: 'bg-red-500/10' },
   MANUAL_REVIEW: { color: 'text-amber-600',   bg: 'bg-amber-500/10' },
 };
@@ -73,8 +73,8 @@ function ProviderCard({ provider }: { provider: Provider }) {
           </div>
           <div className="flex-shrink-0">
             {provider.configured ? (
-              <div className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold bg-green-500/10 border border-green-500/20 text-green-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                 Connected
               </div>
             ) : provider.envKey == null ? (
@@ -124,7 +124,7 @@ function ProviderCard({ provider }: { provider: Provider }) {
           <div className="flex flex-wrap gap-1.5">
             {provider.features.map((f) => (
               <span key={f} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                <CheckCircle className="h-2.5 w-2.5 text-emerald-500 flex-shrink-0" />
+                <CheckCircle className="h-2.5 w-2.5 text-green-400 flex-shrink-0" />
                 {f}
               </span>
             ))}
@@ -141,7 +141,7 @@ function ProviderCard({ provider }: { provider: Provider }) {
                 <div className="text-[10px] text-muted-foreground">Checks</div>
               </div>
               <div>
-                <div className="text-base font-black text-emerald-600">{passRate}%</div>
+                <div className="text-base font-black text-green-400">{passRate}%</div>
                 <div className="text-[10px] text-muted-foreground">Pass rate</div>
               </div>
               <div>
@@ -159,7 +159,7 @@ function ProviderCard({ provider }: { provider: Provider }) {
         {/* Actions */}
         <div className="flex gap-2 mt-auto">
           {provider.envKey != null && !provider.configured ? (
-            <Button size="sm" className="flex-1 gradient-emerald text-white border-0 text-xs" disabled>
+            <Button size="sm" className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white border-0 text-xs" disabled>
               Configure API Key
             </Button>
           ) : (
@@ -203,7 +203,7 @@ export default function ProvidersPage() {
         ) : (
           [
             { label: 'Total Providers',   value: data?.summary.total ?? 0,       icon: ShoppingBag, color: 'text-primary',    bg: 'bg-primary/10',    border: 'border-primary/20' },
-            { label: 'Connected',         value: data?.summary.configured ?? 0,  icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+            { label: 'Connected',         value: data?.summary.configured ?? 0,  icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
             { label: 'Total Checks Run',  value: data?.summary.totalChecks ?? 0, icon: Activity,    color: 'text-blue-500',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
             { label: 'Not Configured',    value: (data?.providers.filter((p) => !p.configured && p.envKey != null).length) ?? 0, icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
           ].map(({ label, value, icon: Icon, color, bg, border }) => (

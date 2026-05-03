@@ -41,9 +41,9 @@ const DOC_TYPE_CONFIG: Record<string, {
   AML_PROGRAM: {
     label: 'AML/CTF Program',
     icon: Shield,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/20',
+    color: 'text-green-400',
+    bg: 'bg-green-500/10',
+    border: 'border-green-500/20',
     description: 'Complete AML/CTF program document aligned to AUSTRAC requirements.',
   },
   CDD_POLICY: {
@@ -152,7 +152,7 @@ export default function DocumentsPage() {
         action={
           <Button
             onClick={() => setGenerateOpen(true)}
-            className="gradient-emerald text-white border-0 hover:opacity-90"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
           >
             <Plus className="h-4 w-4 mr-2" />
             Generate Document
@@ -212,7 +212,7 @@ export default function DocumentsPage() {
               </p>
               <Button
                 onClick={() => setGenerateOpen(true)}
-                className="gradient-emerald text-white border-0"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Generate Document
@@ -317,7 +317,7 @@ export default function DocumentsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setGenerateOpen(false)}>Cancel</Button>
             <Button
-              className="gradient-emerald text-white border-0 hover:opacity-90"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               onClick={() => generate.mutate()}
               disabled={generate.isPending}
             >

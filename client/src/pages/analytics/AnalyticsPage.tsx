@@ -53,28 +53,28 @@ const STATUS_COLORS: Record<string, { color: string; bg: string; border: string 
   DRAFT:                { color: 'text-muted-foreground', bg: 'bg-muted/50',          border: 'border-border' },
   UNDER_REVIEW:         { color: 'text-blue-600',         bg: 'bg-blue-500/10',       border: 'border-blue-500/20' },
   ESCALATED_TO_SMR:     { color: 'text-amber-600',        bg: 'bg-amber-500/10',      border: 'border-amber-500/20' },
-  SMR_SUBMITTED:        { color: 'text-emerald-600',      bg: 'bg-emerald-500/10',    border: 'border-emerald-500/20' },
+  SMR_SUBMITTED:        { color: 'text-green-400',      bg: 'bg-green-500/10',    border: 'border-green-500/20' },
   CLOSED_NO_ACTION:     { color: 'text-muted-foreground', bg: 'bg-muted/50',          border: 'border-border' },
   CLOSED_FALSE_POSITIVE:{ color: 'text-muted-foreground', bg: 'bg-muted/50',          border: 'border-border' },
-  SUBMITTED:            { color: 'text-emerald-600',      bg: 'bg-emerald-500/10',    border: 'border-emerald-500/20' },
-  APPROVED:             { color: 'text-emerald-600',      bg: 'bg-emerald-500/10',    border: 'border-emerald-500/20' },
+  SUBMITTED:            { color: 'text-green-400',      bg: 'bg-green-500/10',    border: 'border-green-500/20' },
+  APPROVED:             { color: 'text-green-400',      bg: 'bg-green-500/10',    border: 'border-green-500/20' },
   REJECTED:             { color: 'text-red-600',          bg: 'bg-red-500/10',        border: 'border-red-500/20' },
   NOT_STARTED:          { color: 'text-muted-foreground', bg: 'bg-muted/50',          border: 'border-border' },
   IN_PROGRESS:          { color: 'text-blue-600',         bg: 'bg-blue-500/10',       border: 'border-blue-500/20' },
-  COMPLETED:            { color: 'text-emerald-600',      bg: 'bg-emerald-500/10',    border: 'border-emerald-500/20' },
-  PASSED:               { color: 'text-emerald-600',      bg: 'bg-emerald-500/10',    border: 'border-emerald-500/20' },
+  COMPLETED:            { color: 'text-green-400',      bg: 'bg-green-500/10',    border: 'border-green-500/20' },
+  PASSED:               { color: 'text-green-400',      bg: 'bg-green-500/10',    border: 'border-green-500/20' },
   FAILED:               { color: 'text-red-600',          bg: 'bg-red-500/10',        border: 'border-red-500/20' },
   EXPIRED:              { color: 'text-red-600',          bg: 'bg-red-500/10',        border: 'border-red-500/20' },
   SCHEDULED:            { color: 'text-blue-600',         bg: 'bg-blue-500/10',       border: 'border-blue-500/20' },
-  COMPLETE:             { color: 'text-emerald-600',      bg: 'bg-emerald-500/10',    border: 'border-emerald-500/20' },
+  COMPLETE:             { color: 'text-green-400',      bg: 'bg-green-500/10',    border: 'border-green-500/20' },
   CANCELLED:            { color: 'text-muted-foreground', bg: 'bg-muted/50',          border: 'border-border' },
   TODO:                 { color: 'text-muted-foreground', bg: 'bg-muted/50',          border: 'border-border' },
   IN_REVIEW:            { color: 'text-amber-600',        bg: 'bg-amber-500/10',      border: 'border-amber-500/20' },
-  DONE:                 { color: 'text-emerald-600',      bg: 'bg-emerald-500/10',    border: 'border-emerald-500/20' },
+  DONE:                 { color: 'text-green-400',      bg: 'bg-green-500/10',    border: 'border-green-500/20' },
 };
 
 const RISK_COLORS: Record<string, { color: string; bg: string; border: string; bar: string }> = {
-  LOW:      { color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', bar: 'bg-emerald-500' },
+  LOW:      { color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', bar: 'bg-green-500' },
   MEDIUM:   { color: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   bar: 'bg-amber-500' },
   HIGH:     { color: 'text-orange-600',  bg: 'bg-orange-500/10',  border: 'border-orange-500/20',  bar: 'bg-orange-500' },
   CRITICAL: { color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20',     bar: 'bg-red-500' },
@@ -159,7 +159,7 @@ export default function AnalyticsPage() {
               <>
                 <StatCard label="Total Escalations" value={smr?.totals.escalations ?? 0} icon={FileWarning} color="text-amber-500" bg="bg-amber-500/10" border="border-amber-500/20" sub="All time" />
                 <StatCard label="SMR Drafts" value={smr?.totals.smrDrafts ?? 0} icon={BarChart2} color="text-blue-500" bg="bg-blue-500/10" border="border-blue-500/20" sub="Created" />
-                <StatCard label="SMRs Submitted" value={smr?.totals.smrSubmitted ?? 0} icon={CheckCircle} color="text-emerald-500" bg="bg-emerald-500/10" border="border-emerald-500/20" sub="To AUSTRAC" />
+                <StatCard label="SMRs Submitted" value={smr?.totals.smrSubmitted ?? 0} icon={CheckCircle} color="text-green-400" bg="bg-green-500/10" border="border-green-500/20" sub="To AUSTRAC" />
                 <StatCard label="Submission Rate" value={`${smr?.totals.submissionRate ?? 0}%`} icon={TrendingUp} color="text-purple-500" bg="bg-purple-500/10" border="border-purple-500/20" sub="SMR conversion" />
               </>
             )}
@@ -192,7 +192,7 @@ export default function AnalyticsPage() {
                             <span className="text-xs text-muted-foreground">{r.count} ({pct}%)</span>
                           </div>
                           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full gradient-emerald rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                            <div className="h-full bg-indigo-600 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                       );
@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
                       return (
                         <div key={t.month} className="flex flex-col items-center gap-1 flex-1 min-w-0">
                           <span className="text-[10px] font-bold text-primary">{t.count}</span>
-                          <div className="w-full rounded-t-md gradient-emerald transition-all duration-700" style={{ height: `${Math.max(pct, 4)}%` }} />
+                          <div className="w-full rounded-t-md bg-indigo-600 transition-all duration-700" style={{ height: `${Math.max(pct, 4)}%` }} />
                           <span className="text-[9px] text-muted-foreground truncate w-full text-center">{t.month}</span>
                         </div>
                       );
@@ -325,7 +325,7 @@ export default function AnalyticsPage() {
             ) : (
               <>
                 <StatCard label="Total Enrolments" value={training?.totals.total ?? 0} icon={BookOpen} color="text-blue-500" bg="bg-blue-500/10" border="border-blue-500/20" />
-                <StatCard label="Completion Rate" value={`${training?.totals.completionRate ?? 0}%`} icon={TrendingUp} color="text-emerald-500" bg="bg-emerald-500/10" border="border-emerald-500/20" sub="Completed + Passed" />
+                <StatCard label="Completion Rate" value={`${training?.totals.completionRate ?? 0}%`} icon={TrendingUp} color="text-green-400" bg="bg-green-500/10" border="border-green-500/20" sub="Completed + Passed" />
                 <StatCard label="Avg Score" value={training?.totals.avgScore != null ? `${training.totals.avgScore}%` : '—'} icon={Award} color="text-purple-500" bg="bg-purple-500/10" border="border-purple-500/20" />
                 <StatCard label="Expiring Soon" value={training?.totals.expiringSoon ?? 0} icon={Clock} color="text-amber-500" bg="bg-amber-500/10" border="border-amber-500/20" sub="Within 30 days" />
               </>
@@ -359,7 +359,7 @@ export default function AnalyticsPage() {
                             <span className="text-xs text-muted-foreground">{r.count} ({pct}%)</span>
                           </div>
                           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full gradient-emerald rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                            <div className="h-full bg-indigo-600 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                       );
@@ -395,7 +395,7 @@ export default function AnalyticsPage() {
                             <span className="text-xs font-medium truncate max-w-[60%]">{m.moduleName}</span>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               {m.avgScore != null && (
-                                <span className="text-emerald-600 font-semibold">{m.avgScore}%</span>
+                                <span className="text-green-400 font-semibold">{m.avgScore}%</span>
                               )}
                               <span>{m.count} enrolments</span>
                             </div>
@@ -422,7 +422,7 @@ export default function AnalyticsPage() {
               <>
                 <StatCard label="Total Reviews" value={reviews?.reviews.total ?? 0} icon={CalendarCheck} color="text-blue-500" bg="bg-blue-500/10" border="border-blue-500/20" />
                 <StatCard label="Overdue" value={reviews?.reviews.overdue ?? 0} icon={Clock} color="text-red-500" bg="bg-red-500/10" border="border-red-500/20" sub="Past due date" />
-                <StatCard label="Total Tasks" value={taskTotal} icon={CheckCircle} color="text-emerald-500" bg="bg-emerald-500/10" border="border-emerald-500/20" />
+                <StatCard label="Total Tasks" value={taskTotal} icon={CheckCircle} color="text-green-400" bg="bg-green-500/10" border="border-green-500/20" />
                 <StatCard
                   label="Tasks Done"
                   value={reviews?.tasks.byStatus.find((t) => t.status === 'DONE')?.count ?? 0}
@@ -461,7 +461,7 @@ export default function AnalyticsPage() {
                             <span className="text-xs text-muted-foreground">{r.count} ({pct}%)</span>
                           </div>
                           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full gradient-emerald rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                            <div className="h-full bg-indigo-600 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                       );

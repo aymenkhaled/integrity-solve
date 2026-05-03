@@ -102,7 +102,7 @@ export default function TasksPage() {
         action={
           <Button
             onClick={() => setOpen(true)}
-            className="gradient-emerald text-white border-0 hover:opacity-90"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
           >
             <Plus className="h-4 w-4 mr-2" />
             New Task
@@ -116,7 +116,7 @@ export default function TasksPage() {
           { label: 'Open tasks',     value: openCount,     icon: Circle,       color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
           { label: 'Urgent',         value: urgentCount,   icon: Flag,         color: 'text-red-500',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
           { label: 'Overdue',        value: overdueCount,  icon: Clock,        color: 'text-orange-500',  bg: 'bg-orange-500/10',  border: 'border-orange-500/20' },
-          { label: 'Completed',      value: completedCount, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'Completed',      value: completedCount, icon: CheckCircle2, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
           <Card key={label} className="card-3d">
             <CardContent className="p-5">
@@ -141,7 +141,7 @@ export default function TasksPage() {
               key={value}
               size="sm"
               variant={statusFilter === value ? 'default' : 'outline'}
-              className={`h-7 text-xs ${statusFilter === value ? 'gradient-emerald text-white border-0' : ''}`}
+              className={`h-7 text-xs ${statusFilter === value ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-0' : ''}`}
               onClick={() => setStatusFilter(value)}
             >
               {label}
@@ -169,7 +169,7 @@ export default function TasksPage() {
             </p>
             <Button
               onClick={() => setOpen(true)}
-              className="gradient-emerald text-white border-0"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create task
@@ -189,7 +189,7 @@ export default function TasksPage() {
                   <button
                     className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all flex-shrink-0 ${
                       isDone
-                        ? 'border-emerald-500 bg-emerald-500'
+                        ? 'border-indigo-500 bg-indigo-500'
                         : 'border-muted-foreground/30 hover:border-primary'
                     }`}
                     onClick={() => {
@@ -239,7 +239,7 @@ export default function TasksPage() {
                     {task.status === 'IN_PROGRESS' && (
                       <Button
                         size="sm"
-                        className="h-7 text-xs gradient-emerald text-white border-0 hover:opacity-90"
+                        className="h-7 text-xs bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                         onClick={() => completeMutation.mutate(task.id)}
                         disabled={completeMutation.isPending}
                       >
@@ -295,7 +295,7 @@ export default function TasksPage() {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button
                 type="submit"
-                className="gradient-emerald text-white border-0 hover:opacity-90"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                 disabled={createMutation.isPending}
               >
                 {createMutation.isPending

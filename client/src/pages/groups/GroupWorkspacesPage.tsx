@@ -26,7 +26,7 @@ const TIER_COLORS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   NOT_STARTED: 'text-muted-foreground',
   IN_PROGRESS: 'text-blue-600',
-  COMPLETED:   'text-emerald-600',
+  COMPLETED:   'text-green-400',
 };
 
 interface ChildWorkspace {
@@ -98,7 +98,7 @@ export default function GroupWorkspacesPage() {
         title="Group Workspaces"
         description="Manage your enterprise workspace group — link subsidiary or branch workspaces for consolidated oversight."
         actions={
-          <Button className="gradient-emerald text-white border-0 gap-2" onClick={() => setShowLink(true)}>
+          <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-2" onClick={() => setShowLink(true)}>
             <Link2 className="h-4 w-4" />
             Link Workspace
           </Button>
@@ -127,7 +127,7 @@ export default function GroupWorkspacesPage() {
           [
             { label: 'Child Workspaces', value: agg?.totalChildren ?? 0,   icon: Building2, color: 'text-primary',     bg: 'bg-primary/10',     border: 'border-primary/20' },
             { label: 'Total Members',    value: agg?.totalMembers ?? 0,    icon: Users,     color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
-            { label: 'Total Customers',  value: agg?.totalCustomers ?? 0,  icon: Globe,     color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+            { label: 'Total Customers',  value: agg?.totalCustomers ?? 0,  icon: Globe,     color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
             { label: 'Total Checks',     value: agg?.totalChecks ?? 0,     icon: Shield,    color: 'text-purple-500',  bg: 'bg-purple-500/10',  border: 'border-purple-500/20' },
             { label: 'Escalations',      value: agg?.totalEscalations ?? 0,icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-500/10',     border: 'border-red-500/20' },
           ].map(({ label, value, icon: Icon, color, bg, border }) => (
@@ -163,7 +163,7 @@ export default function GroupWorkspacesPage() {
               <div className="text-sm text-muted-foreground mb-5">
                 Link subsidiary or branch workspaces to this group for consolidated compliance oversight.
               </div>
-              <Button className="gradient-emerald text-white border-0 gap-2" onClick={() => setShowLink(true)}>
+              <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-2" onClick={() => setShowLink(true)}>
                 <Link2 className="h-4 w-4" />
                 Link first workspace
               </Button>
@@ -209,7 +209,7 @@ export default function GroupWorkspacesPage() {
                   {/* Stats grid */}
                   <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-3 mb-4">
                     <StatPill icon={Users}         value={child.stats.members}     label="members"     color="text-blue-500" />
-                    <StatPill icon={Globe}          value={child.stats.customers}   label="customers"   color="text-emerald-500" />
+                    <StatPill icon={Globe}          value={child.stats.customers}   label="customers"   color="text-green-400" />
                     <StatPill icon={Shield}         value={child.stats.checks}      label="checks"      color="text-purple-500" />
                     <StatPill icon={AlertTriangle}  value={child.stats.escalations} label="escalations" color="text-red-500" />
                   </div>
@@ -322,7 +322,7 @@ export default function GroupWorkspacesPage() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowLink(false)}>Cancel</Button>
             <Button
-              className="gradient-emerald text-white border-0"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               onClick={() => linkMutation.mutate(childId)}
               disabled={!childId.trim() || linkMutation.isPending}
             >

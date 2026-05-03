@@ -101,7 +101,7 @@ router.get('/analytics', requireWorkspace, async (req, res, next) => {
     // Check results pass/fail ratio (last 90 days)
     const since90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     const checkPassFail = await db
-      .select({ result: checkResults.result, count: count() })
+      .select({ result: checkResults.outcome, count: count() })
       .from(checkResults)
       .where(
         and(
@@ -109,7 +109,7 @@ router.get('/analytics', requireWorkspace, async (req, res, next) => {
           gte(checkResults.createdAt, since90),
         ),
       )
-      .groupBy(checkResults.result);
+      .groupBy(checkResults.outcome);
 
     // Recent risk upgrades (customers whose riskRating changed to HIGH/CRITICAL in last 30 days)
     const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -144,7 +144,7 @@ router.get('/analytics', requireWorkspace, async (req, res, next) => {
       highRiskCustomers,
       alertsBySeverity:  alertsBySeverity.map((a) => ({ severity: a.severity, count: Number(a.count) })),
       alertsByType:      alertsByType.map((a) => ({ alertType: a.alertType, count: Number(a.count) })),
-      checkPassFail:     checkPassFail.map((c) => ({ result: c.result, count: Number(c.count) })),
+      checkPassFail:     checkPassFail.map((c) => ({ result: c.result ?? c.result, count: Number(c.count) })),
     });
   } catch (err) {
     next(err);
@@ -180,8 +180,9 @@ router.get('/signals', requireWorkspace, async (req, res, next) => {
         sql`CASE ${smartAlerts.severity}
               WHEN 'CRITICAL' THEN 1
               WHEN 'HIGH'     THEN 2
-              WHEN 'MEDIUM'   THEN 3
-              ELSE 4
+              WHEN 'WARNING'  THEN 3
+              WHEN 'INFO'     THEN 4
+              ELSE 5
             END`,
         desc(smartAlerts.createdAt),
       )

@@ -47,14 +47,14 @@ router.get('/', requireWorkspace, async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const [ws] = await db
-      .select({ settings: workspaces.settings, name: workspaces.name })
+      .select({ settings: workspaces.settings, legalName: workspaces.legalName })
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId));
 
     const savedBranding = (ws?.settings as Record<string, unknown>)?.branding ?? {};
     const branding      = { ...DEFAULT_BRANDING, ...savedBranding };
 
-    return ok(res, { branding, workspaceName: ws?.name ?? '' });
+    return ok(res, { branding, workspaceName: ws?.legalName ?? '' });
   } catch (err) {
     next(err);
   }

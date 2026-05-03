@@ -33,7 +33,7 @@ const ROLE_CONFIG: Record<string, {
   description: string;
 }> = {
   WORKSPACE_ADMIN:     { label: 'Workspace Admin',    icon: Crown,        color: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   description: 'Full control over all workspace settings and members' },
-  COMPLIANCE_OFFICER:  { label: 'Compliance Officer', icon: Shield,       color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', description: 'Manage AML program, SMRs, reviews, and escalations' },
+  COMPLIANCE_OFFICER:  { label: 'Compliance Officer', icon: Shield,       color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', description: 'Manage AML program, SMRs, reviews, and escalations' },
   PROGRAM_CONTRIBUTOR: { label: 'Program Contributor', icon: CheckCircle2, color: 'text-blue-600',   bg: 'bg-blue-500/10',    border: 'border-blue-500/20',    description: 'Contribute to program drafts and reviews' },
   ONBOARDING_USER:     { label: 'Onboarding User',   icon: Users2,       color: 'text-purple-600',  bg: 'bg-purple-500/10',  border: 'border-purple-500/20',  description: 'Onboard customers and collect CDD documents' },
   REVIEWER:            { label: 'Reviewer',           icon: CheckCircle2, color: 'text-cyan-600',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/20',    description: 'Review and approve program content and decisions' },
@@ -96,7 +96,7 @@ export default function MembersPage() {
         action={
           <Button
             onClick={() => setOpen(true)}
-            className="gradient-emerald text-white border-0 hover:opacity-90"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
           >
             <Plus className="h-4 w-4 mr-2" />
             Invite Member
@@ -108,7 +108,7 @@ export default function MembersPage() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Total members',   value: members.length, icon: Users2,       color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
-          { label: 'Active',          value: activeCount,    icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'Active',          value: activeCount,    icon: CheckCircle2, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
           { label: 'Pending invite',  value: pendingCount,   icon: Mail,         color: 'text-amber-500',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
           <Card key={label} className="card-3d">
@@ -143,7 +143,7 @@ export default function MembersPage() {
               </p>
               <Button
                 onClick={() => setOpen(true)}
-                className="gradient-emerald text-white border-0"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Invite member
@@ -162,7 +162,7 @@ export default function MembersPage() {
                         {initials(m.fullName)}
                       </div>
                       <div
-                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background ${isActive ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background ${isActive ? 'bg-green-500' : 'bg-amber-400'}`}
                         title={isActive ? 'Active' : m.status}
                       />
                     </div>
@@ -242,7 +242,7 @@ export default function MembersPage() {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button
                 type="submit"
-                className="gradient-emerald text-white border-0 hover:opacity-90"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                 disabled={inviteMutation.isPending}
               >
                 {inviteMutation.isPending

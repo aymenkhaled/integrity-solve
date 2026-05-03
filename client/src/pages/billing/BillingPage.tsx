@@ -54,7 +54,7 @@ const PLAN_COLORS: Record<string, { icon: React.ElementType; color: string; bg: 
   TRIAL:        { icon: Clock,   color: 'text-amber-500',  bg: 'bg-amber-500/10',  border: 'border-amber-500/20' },
   STARTER:      { icon: Zap,    color: 'text-blue-500',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
   PROFESSIONAL: { icon: Star,   color: 'text-purple-500', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
-  ENTERPRISE:   { icon: Shield, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  ENTERPRISE:   { icon: Shield, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
 };
 
 export default function BillingPage() {
@@ -105,7 +105,7 @@ export default function BillingPage() {
 
       {/* Current plan card */}
       <Card className="card-3d overflow-hidden">
-        <div className="h-1 w-full gradient-emerald" />
+        <div className="h-1 w-full bg-indigo-600" />
         <CardContent className="p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -144,7 +144,7 @@ export default function BillingPage() {
               {currentTier !== 'ENTERPRISE' && (
                 <Button
                   size="sm"
-                  className="gradient-emerald text-white border-0 hover:opacity-90"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                   onClick={() => checkout.mutate('PROFESSIONAL')}
                   disabled={checkout.isPending}
                 >
@@ -174,7 +174,7 @@ export default function BillingPage() {
             { key: 'identity_check',    label: 'Identity Checks',     icon: Shield,   max: 500,  color: 'text-blue-500',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
             { key: 'sanctions_check',   label: 'Sanctions Checks',    icon: AlertCircle, max: 500, color: 'text-red-500',  bg: 'bg-red-500/10',    border: 'border-red-500/20' },
             { key: 'smr_submission',    label: 'SMR Submissions',     icon: TrendingUp, max: 50, color: 'text-amber-500', bg: 'bg-amber-500/10',  border: 'border-amber-500/20' },
-            { key: 'customer_created',  label: 'Customers Onboarded', icon: Users,   max: 100,  color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+            { key: 'customer_created',  label: 'Customers Onboarded', icon: Users,   max: 100,  color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
           ].map(({ key, label, icon: Icon, max, color, bg, border }) => {
             const used = usageMap[key] ?? 0;
             const pct = Math.min(100, Math.round((used / max) * 100));
@@ -190,7 +190,7 @@ export default function BillingPage() {
                   <div className="text-xs font-medium text-muted-foreground mb-1">{label}</div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${pct > 80 ? 'bg-red-500' : pct > 60 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      className={`h-full rounded-full transition-all ${pct > 80 ? 'bg-red-500' : pct > 60 ? 'bg-amber-500' : 'bg-green-500'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -223,18 +223,18 @@ export default function BillingPage() {
                     tier === 'PROFESSIONAL'
                       ? 'border-primary ring-1 ring-primary/20 shadow-lg'
                       : ''
-                  } ${isCurrent ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`}
+                  } ${isCurrent ? 'border-indigo-500/50 bg-green-500/5' : ''}`}
                 >
                   {tier === 'PROFESSIONAL' && !isCurrent && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <div className="rounded-full gradient-emerald px-3 py-1 text-xs font-semibold text-white">
+                      <div className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white">
                         Most popular
                       </div>
                     </div>
                   )}
                   {isCurrent && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <div className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
+                      <div className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white">
                         Current plan
                       </div>
                     </div>
@@ -248,7 +248,7 @@ export default function BillingPage() {
                     <ul className="space-y-2 mb-6">
                       {features.map((f) => (
                         <li key={f} className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                          <CheckCircle className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
                           {f}
                         </li>
                       ))}
@@ -256,9 +256,9 @@ export default function BillingPage() {
                     <Button
                       className={`w-full ${
                         isCurrent
-                          ? 'bg-emerald-600/20 text-emerald-600 border-emerald-600/30 hover:bg-emerald-600/30'
+                          ? 'bg-indigo-600/20 text-green-400 border-green-500/20 hover:bg-indigo-600/30'
                           : tier === 'PROFESSIONAL'
-                          ? 'gradient-emerald text-white border-0 hover:opacity-90'
+                          ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-0'
                           : ''
                       }`}
                       variant={isCurrent ? 'outline' : tier === 'PROFESSIONAL' ? 'default' : 'outline'}
@@ -277,7 +277,7 @@ export default function BillingPage() {
 
       {/* Payment security note */}
       <div className="flex items-center gap-3 rounded-xl border bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-        <Shield className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+        <Shield className="h-5 w-5 text-green-400 flex-shrink-0" />
         <span>
           Payments are processed securely by Stripe. Integrity Solve never stores your card details.
           All plans include 14-day free trial. Cancel anytime with no lock-in.

@@ -53,7 +53,7 @@ const STATUS_CONFIG: Record<string, {
 }> = {
   SCHEDULED:   { label: 'Scheduled',   icon: Clock,         color: 'text-blue-600',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
   IN_PROGRESS: { label: 'In Progress', icon: RotateCcw,     color: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
-  COMPLETE:    { label: 'Complete',    icon: CheckCircle,   color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  COMPLETE:    { label: 'Complete',    icon: CheckCircle,   color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
   OVERDUE:     { label: 'Overdue',     icon: AlertCircle,   color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
   CANCELLED:   { label: 'Cancelled',   icon: Clock,         color: 'text-muted-foreground', bg: 'bg-muted/50', border: 'border-border' },
 };
@@ -148,7 +148,7 @@ export default function ReviewsPage() {
         action={
           <Button
             onClick={() => setScheduleOpen(true)}
-            className="gradient-emerald text-white border-0 hover:opacity-90"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
           >
             <Plus className="h-4 w-4 mr-2" />
             Schedule Review
@@ -162,7 +162,7 @@ export default function ReviewsPage() {
           { label: 'Total',       value: reviews.length,   icon: CalendarCheck, color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
           { label: 'Scheduled',   value: scheduledCount,   icon: Clock,         color: 'text-amber-500',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
           { label: 'Overdue',     value: overdueCount,     icon: AlertCircle,   color: 'text-red-500',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
-          { label: 'Completed',   value: completedCount,   icon: CheckCircle,   color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'Completed',   value: completedCount,   icon: CheckCircle,   color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
           <Card key={label} className="card-3d">
             <CardContent className="p-5">
@@ -211,7 +211,7 @@ export default function ReviewsPage() {
               size="sm"
               variant={statusFilter === value ? 'default' : 'outline'}
               onClick={() => setStatusFilter(value)}
-              className={`h-7 text-xs ${statusFilter === value ? 'gradient-emerald text-white border-0' : ''}`}
+              className={`h-7 text-xs ${statusFilter === value ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-0' : ''}`}
             >
               {label}
             </Button>
@@ -238,7 +238,7 @@ export default function ReviewsPage() {
             </p>
             <Button
               onClick={() => setScheduleOpen(true)}
-              className="gradient-emerald text-white border-0"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
             >
               <Plus className="h-4 w-4 mr-2" />
               Schedule First Review
@@ -303,7 +303,7 @@ export default function ReviewsPage() {
                     {review.status === 'IN_PROGRESS' && (
                       <Button
                         size="sm"
-                        className="h-7 text-xs gradient-emerald text-white border-0 hover:opacity-90"
+                        className="h-7 text-xs bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                         onClick={() => setCompleteId(review.id)}
                       >
                         Complete
@@ -363,7 +363,7 @@ export default function ReviewsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setScheduleOpen(false)}>Cancel</Button>
             <Button
-              className="gradient-emerald text-white border-0 hover:opacity-90"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               onClick={() => schedule.mutate(form)}
               disabled={!form.customerId || !form.dueAt || schedule.isPending}
             >
@@ -380,7 +380,7 @@ export default function ReviewsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-emerald-500" />
+              <CheckCircle className="h-5 w-5 text-green-400" />
               Complete Review
             </DialogTitle>
           </DialogHeader>
@@ -424,7 +424,7 @@ export default function ReviewsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCompleteId(null)}>Cancel</Button>
             <Button
-              className="gradient-emerald text-white border-0 hover:opacity-90"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               onClick={() => complete.mutate({ id: completeId!, data: completeForm })}
               disabled={
                 completeForm.notes.length < 10 ||

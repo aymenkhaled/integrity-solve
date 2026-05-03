@@ -52,12 +52,12 @@ const TIER_CONFIG: Record<string, { color: string; bg: string; border: string }>
   STARTER:      { color: 'text-blue-600',         bg: 'bg-blue-500/10',      border: 'border-blue-500/20' },
   PROFESSIONAL: { color: 'text-purple-600',        bg: 'bg-purple-500/10',    border: 'border-purple-500/20' },
   ENTERPRISE:   { color: 'text-amber-600',         bg: 'bg-amber-500/10',     border: 'border-amber-500/20' },
-  GROUP:        { color: 'text-emerald-600',        bg: 'bg-emerald-500/10',   border: 'border-emerald-500/20' },
+  GROUP:        { color: 'text-green-400',        bg: 'bg-green-500/10',   border: 'border-green-500/20' },
 };
 
 const BILLING_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
   TRIALING:    { color: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
-  ACTIVE:      { color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  ACTIVE:      { color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
   PAST_DUE:    { color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
   CANCELLED:   { color: 'text-muted-foreground', bg: 'bg-muted/50',  border: 'border-border' },
   UNPAID:      { color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
@@ -115,7 +115,7 @@ export default function AdminPage() {
           [
             { label: 'Workspaces', value: stats?.totals.workspaces ?? 0,  icon: Building2, color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
             { label: 'Users',      value: stats?.totals.users ?? 0,       icon: Users,     color: 'text-purple-500',  bg: 'bg-purple-500/10',  border: 'border-purple-500/20' },
-            { label: 'Customers',  value: stats?.totals.customers ?? 0,   icon: Activity,  color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+            { label: 'Customers',  value: stats?.totals.customers ?? 0,   icon: Activity,  color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
             { label: 'Tasks',      value: stats?.totals.tasks ?? 0,       icon: CheckCircle, color: 'text-amber-500', bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
           ].map(({ label, value, icon: Icon, color, bg, border }) => (
             <Card key={label} className="card-3d">
@@ -332,7 +332,7 @@ export default function AdminPage() {
                           </div>
                           <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                             <div
-                              className="h-full rounded-full gradient-emerald transition-all duration-700"
+                              className="h-full rounded-full bg-indigo-600 transition-all duration-700"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
@@ -364,7 +364,7 @@ export default function AdminPage() {
                         : 0;
                       const bc = BILLING_CONFIG[bb.status] ?? BILLING_CONFIG['TRIALING']!;
                       const barColor =
-                        bb.status === 'ACTIVE' ? 'bg-emerald-500' :
+                        bb.status === 'ACTIVE' ? 'bg-green-500' :
                         bb.status === 'TRIALING' ? 'bg-amber-500' :
                         bb.status === 'PAST_DUE' || bb.status === 'UNPAID' ? 'bg-red-500' :
                         'bg-muted-foreground';
@@ -396,19 +396,19 @@ export default function AdminPage() {
             <Card className="card-3d lg:col-span-2">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-emerald-500" />
+                  <Shield className="h-4 w-4 text-green-400" />
                   Platform Health
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid sm:grid-cols-3 gap-4">
                   {[
-                    { label: 'Database',      status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
-                    { label: 'API Server',    status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
-                    { label: 'Auth System',   status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
-                    { label: 'Email Service', status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
-                    { label: 'File Storage',  status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
-                    { label: 'Job Workers',   status: 'Healthy',   color: 'text-emerald-500', dot: 'bg-emerald-500' },
+                    { label: 'Database',      status: 'Healthy',   color: 'text-green-400', dot: 'bg-green-500' },
+                    { label: 'API Server',    status: 'Healthy',   color: 'text-green-400', dot: 'bg-green-500' },
+                    { label: 'Auth System',   status: 'Healthy',   color: 'text-green-400', dot: 'bg-green-500' },
+                    { label: 'Email Service', status: 'Healthy',   color: 'text-green-400', dot: 'bg-green-500' },
+                    { label: 'File Storage',  status: 'Healthy',   color: 'text-green-400', dot: 'bg-green-500' },
+                    { label: 'Job Workers',   status: 'Healthy',   color: 'text-green-400', dot: 'bg-green-500' },
                   ].map(({ label, status, color, dot }) => (
                     <div key={label} className="flex items-center justify-between rounded-xl border bg-muted/30 px-4 py-3">
                       <span className="text-sm font-medium">{label}</span>

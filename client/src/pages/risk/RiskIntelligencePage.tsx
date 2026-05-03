@@ -42,23 +42,23 @@ interface SignalResponse {
 }
 
 const RISK_META: Record<string, { color: string; bg: string; border: string; barColor: string }> = {
-  LOW:      { color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', barColor: 'bg-emerald-500' },
+  LOW:      { color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', barColor: 'bg-green-500' },
   MEDIUM:   { color: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   barColor: 'bg-amber-500' },
   HIGH:     { color: 'text-orange-600',  bg: 'bg-orange-500/10',  border: 'border-orange-500/20',  barColor: 'bg-orange-500' },
   CRITICAL: { color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20',     barColor: 'bg-red-500' },
 };
 
 const SEV_META: Record<string, { color: string; bg: string; border: string }> = {
-  LOW:      { color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  LOW:      { color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
   MEDIUM:   { color: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
   HIGH:     { color: 'text-orange-600',  bg: 'bg-orange-500/10',  border: 'border-orange-500/20' },
   CRITICAL: { color: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
 };
 
 function RiskScoreGauge({ score }: { score: number }) {
-  const color = score >= 70 ? 'text-red-500' : score >= 40 ? 'text-amber-500' : 'text-emerald-500';
+  const color = score >= 70 ? 'text-red-500' : score >= 40 ? 'text-amber-500' : 'text-green-400';
   const label = score >= 70 ? 'High Risk' : score >= 40 ? 'Moderate' : 'Low Risk';
-  const ring  = score >= 70 ? 'stroke-red-500' : score >= 40 ? 'stroke-amber-500' : 'stroke-emerald-500';
+  const ring  = score >= 70 ? 'stroke-red-500' : score >= 40 ? 'stroke-amber-500' : 'stroke-green-500';
 
   const r = 52;
   const circ = 2 * Math.PI * r;
@@ -119,7 +119,7 @@ export default function RiskIntelligencePage() {
         title="Risk Intelligence"
         description="Real-time risk signals, composite scoring, and exposure analysis across your customer portfolio."
         actions={
-          <Button asChild className="gradient-emerald text-white border-0 glow-emerald">
+          <Button asChild className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 glow-indigo">
             <Link href="/alerts">
               <Zap className="h-4 w-4 mr-2" />
               View Alerts
@@ -168,9 +168,9 @@ export default function RiskIntelligencePage() {
               label: 'Check Pass Rate',
               value: `${passPct}%`,
               icon: Shield,
-              color: 'text-emerald-500',
-              bg: 'bg-emerald-500/10',
-              border: 'border-emerald-500/20',
+              color: 'text-green-400',
+              bg: 'bg-green-500/10',
+              border: 'border-green-500/20',
               sub: 'Last 90 days',
             },
           ].map(({ label, value, icon: Icon, color, bg, border, sub }) => (
@@ -281,8 +281,8 @@ export default function RiskIntelligencePage() {
               <div className="space-y-3 mt-2">
                 {analytics?.alertsBySeverity.length === 0 ? (
                   <div className="flex flex-col items-center py-8 text-center">
-                    <Shield className="h-8 w-8 text-emerald-500 mb-2" />
-                    <div className="text-sm font-medium text-emerald-600">No open alerts</div>
+                    <Shield className="h-8 w-8 text-green-400 mb-2" />
+                    <div className="text-sm font-medium text-green-400">No open alerts</div>
                     <div className="text-xs text-muted-foreground">Portfolio looks clean</div>
                   </div>
                 ) : (
@@ -306,7 +306,7 @@ export default function RiskIntelligencePage() {
                               sev === 'CRITICAL' ? 'bg-red-500' :
                               sev === 'HIGH' ? 'bg-orange-500' :
                               sev === 'MEDIUM' ? 'bg-amber-500' :
-                              'bg-emerald-500'
+                              'bg-green-500'
                             }`}
                             style={{ width: `${pct}%` }}
                           />
@@ -347,8 +347,8 @@ export default function RiskIntelligencePage() {
               </div>
             ) : signalData?.signals.length === 0 ? (
               <div className="flex flex-col items-center py-10 text-center px-5">
-                <Shield className="h-10 w-10 text-emerald-500 mb-3 opacity-80" />
-                <div className="text-sm font-semibold text-emerald-600">All clear</div>
+                <Shield className="h-10 w-10 text-green-400 mb-3 opacity-80" />
+                <div className="text-sm font-semibold text-green-400">All clear</div>
                 <div className="text-xs text-muted-foreground mt-1">No active risk signals detected</div>
               </div>
             ) : (
@@ -399,8 +399,8 @@ export default function RiskIntelligencePage() {
               </div>
             ) : analytics?.highRiskCustomers.length === 0 ? (
               <div className="flex flex-col items-center py-10 text-center px-5">
-                <Shield className="h-10 w-10 text-emerald-500 mb-3 opacity-80" />
-                <div className="text-sm font-semibold text-emerald-600">No high risk customers</div>
+                <Shield className="h-10 w-10 text-green-400 mb-3 opacity-80" />
+                <div className="text-sm font-semibold text-green-400">No high risk customers</div>
                 <div className="text-xs text-muted-foreground mt-1">Portfolio exposure looks healthy</div>
               </div>
             ) : (
@@ -480,7 +480,7 @@ export default function RiskIntelligencePage() {
           <Card className="card-3d">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-500" />
+                <TrendingUp className="h-4 w-4 text-green-400" />
                 Check Engine Results (90d)
               </CardTitle>
             </CardHeader>
@@ -493,8 +493,8 @@ export default function RiskIntelligencePage() {
                     const pct = checkTotal ? Math.round((c.count / checkTotal) * 100) : 0;
                     const isPass = c.result === 'PASS';
                     return (
-                      <div key={c.result} className={`flex-1 rounded-xl p-3 text-center border ${isPass ? 'bg-emerald-500/10 border-emerald-500/20' : c.result === 'FAIL' ? 'bg-red-500/10 border-red-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
-                        <div className={`text-xl font-black ${isPass ? 'text-emerald-600' : c.result === 'FAIL' ? 'text-red-600' : 'text-amber-600'}`}>
+                      <div key={c.result} className={`flex-1 rounded-xl p-3 text-center border ${isPass ? 'bg-green-500/10 border-green-500/20' : c.result === 'FAIL' ? 'bg-red-500/10 border-red-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                        <div className={`text-xl font-black ${isPass ? 'text-green-400' : c.result === 'FAIL' ? 'text-red-600' : 'text-amber-600'}`}>
                           {c.count}
                         </div>
                         <div className="text-[10px] font-semibold text-muted-foreground mt-0.5">{c.result} ({pct}%)</div>
@@ -529,7 +529,7 @@ export default function RiskIntelligencePage() {
                           {t.type?.replace(/_/g, ' ') ?? 'Unknown'}
                         </span>
                         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full gradient-emerald rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                          <div className="h-full bg-indigo-600 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground w-12 text-right flex-shrink-0">{t.count} ({pct}%)</span>
                       </div>

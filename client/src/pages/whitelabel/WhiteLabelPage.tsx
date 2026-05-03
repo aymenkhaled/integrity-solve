@@ -112,7 +112,7 @@ export default function WhiteLabelPage() {
         description="Customise your workspace branding, domain, and appearance for a fully white-labelled experience."
         actions={
           <Button
-            className={dirty ? 'gradient-emerald text-white border-0 gap-2' : ''}
+            className={dirty ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-2' : ''}
             variant={dirty ? 'default' : 'outline'}
             onClick={save}
             disabled={!dirty || updateMutation.isPending}
@@ -311,12 +311,12 @@ export default function WhiteLabelPage() {
               { label: 'Email footer set',    done: !!form.emailFooter,               icon: Mail },
               { label: 'Branding hidden',     done: form.hideIntegritySolveBranding,  icon: Monitor },
             ].map(({ label, done, icon: Icon }) => (
-              <div key={label} className={`flex items-center gap-2 rounded-xl border p-3 ${done ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-muted/30'}`}>
+              <div key={label} className={`flex items-center gap-2 rounded-xl border p-3 ${done ? 'bg-green-500/10 border-green-500/20' : 'bg-muted/30'}`}>
                 {done
-                  ? <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                  ? <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
                   : <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0 opacity-40" />
                 }
-                <span className={`text-xs font-medium ${done ? 'text-emerald-600' : 'text-muted-foreground'}`}>{label}</span>
+                <span className={`text-xs font-medium ${done ? 'text-green-400' : 'text-muted-foreground'}`}>{label}</span>
               </div>
             ))}
           </div>

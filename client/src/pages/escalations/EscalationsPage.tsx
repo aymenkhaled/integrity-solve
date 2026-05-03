@@ -34,7 +34,7 @@ type FormData = z.infer<typeof schema>;
 const STATUS_CLOSED = ['CLOSED_NO_ACTION', 'CLOSED_FALSE_POSITIVE', 'SMR_SUBMITTED'];
 
 const RISK_COLORS = {
-  LOW:      { text: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  LOW:      { text: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
   MEDIUM:   { text: 'text-amber-600',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
   HIGH:     { text: 'text-orange-600',  bg: 'bg-orange-500/10',  border: 'border-orange-500/20' },
   CRITICAL: { text: 'text-red-600',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
@@ -89,7 +89,7 @@ export default function EscalationsPage() {
         action={
           <Button
             onClick={() => setOpen(true)}
-            className="gradient-emerald text-white border-0 hover:opacity-90"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
           >
             <Plus className="h-4 w-4 mr-2" />
             New Escalation
@@ -102,7 +102,7 @@ export default function EscalationsPage() {
         {[
           { label: 'Open',     value: openCount,    color: 'text-red-500',    bg: 'bg-red-500/10',    border: 'border-red-500/20',    icon: AlertTriangle },
           { label: 'Critical', value: criticalCount, color: 'text-red-600',   bg: 'bg-red-600/10',    border: 'border-red-600/20',    icon: AlertTriangle },
-          { label: 'Closed',   value: closedCount,  color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: Shield },
+          { label: 'Closed',   value: closedCount,  color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', icon: Shield },
           { label: 'SMR Submitted', value: smrCount, color: 'text-blue-500',  bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   icon: Shield },
         ].map(({ label, value, color, bg, border, icon: Icon }) => (
           <Card key={label} className="card-3d">
@@ -134,7 +134,7 @@ export default function EscalationsPage() {
               key={value || 'all'}
               size="sm"
               variant={riskFilter === value ? 'default' : 'outline'}
-              className={`h-7 text-xs ${riskFilter === value ? 'gradient-emerald text-white border-0' : ''}`}
+              className={`h-7 text-xs ${riskFilter === value ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-0' : ''}`}
               onClick={() => setRiskFilter(value)}
             >
               {label}
@@ -162,7 +162,7 @@ export default function EscalationsPage() {
             </p>
             <Button
               onClick={() => setOpen(true)}
-              className="gradient-emerald text-white border-0"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create escalation
@@ -268,7 +268,7 @@ export default function EscalationsPage() {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button
                 type="submit"
-                className="gradient-emerald text-white border-0 hover:opacity-90"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                 disabled={createMutation.isPending}
               >
                 {createMutation.isPending

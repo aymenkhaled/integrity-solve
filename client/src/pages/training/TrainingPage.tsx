@@ -46,7 +46,7 @@ const STATUS_CONFIG: Record<string, {
 }> = {
   NOT_STARTED: { label: 'Not Started',  icon: Clock,        color: 'text-muted-foreground', bg: 'bg-muted/50',         border: 'border-border' },
   IN_PROGRESS: { label: 'In Progress',  icon: BookOpen,     color: 'text-amber-600',        bg: 'bg-amber-500/10',     border: 'border-amber-500/20' },
-  COMPLETED:   { label: 'Completed',    icon: CheckCircle,  color: 'text-emerald-600',      bg: 'bg-emerald-500/10',   border: 'border-emerald-500/20' },
+  COMPLETED:   { label: 'Completed',    icon: CheckCircle,  color: 'text-green-400',      bg: 'bg-green-500/10',   border: 'border-green-500/20' },
   EXPIRED:     { label: 'Expired',      icon: AlertCircle,  color: 'text-orange-600',       bg: 'bg-orange-500/10',    border: 'border-orange-500/20' },
   FAILED:      { label: 'Failed',       icon: XCircle,      color: 'text-red-600',          bg: 'bg-red-500/10',       border: 'border-red-500/20' },
 };
@@ -113,7 +113,7 @@ export default function TrainingPage() {
         title="Training Tracker"
         description="Monitor and manage AML/CTF training compliance for your team."
         action={
-          <Button onClick={() => setEnrollOpen(true)} className="gradient-emerald text-white border-0 hover:opacity-90">
+          <Button onClick={() => setEnrollOpen(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white border-0">
             <Plus className="h-4 w-4 mr-2" />
             Enrol in Module
           </Button>
@@ -124,7 +124,7 @@ export default function TrainingPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Enrolments', value: totalCount,      icon: BookOpen,     color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
-          { label: 'Completed',        value: completedCount,  icon: Trophy,       color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'Completed',        value: completedCount,  icon: Trophy,       color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
           { label: 'In Progress',      value: inProgressCount, icon: BookOpen,     color: 'text-amber-500',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
           { label: 'Expired',          value: expiredCount,    icon: AlertCircle,  color: 'text-red-500',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
@@ -150,12 +150,12 @@ export default function TrainingPage() {
               <Target className="h-4 w-4 text-primary" />
               <span className="font-semibold text-sm">Team Completion Rate</span>
             </div>
-            <span className="text-2xl font-bold counter text-emerald-500">{completionPct}%</span>
+            <span className="text-2xl font-bold counter text-green-400">{completionPct}%</span>
           </div>
           <div className="h-3 bg-muted rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${
-                completionPct >= 80 ? 'bg-emerald-500' : completionPct >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                completionPct >= 80 ? 'bg-green-500' : completionPct >= 50 ? 'bg-amber-500' : 'bg-red-500'
               }`}
               style={{ width: `${completionPct}%` }}
             />
@@ -182,7 +182,7 @@ export default function TrainingPage() {
             <p className="text-sm text-muted-foreground mb-5">
               Enrol team members in AML/CTF training modules to track compliance.
             </p>
-            <Button onClick={() => setEnrollOpen(true)} className="gradient-emerald text-white border-0">
+            <Button onClick={() => setEnrollOpen(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white border-0">
               <Plus className="h-4 w-4 mr-2" />
               Enrol in First Module
             </Button>
@@ -239,7 +239,7 @@ export default function TrainingPage() {
                         </td>
                         <td className="px-4 py-3">
                           {r.score !== null ? (
-                            <span className={`font-bold text-sm ${passed ? 'text-emerald-500' : 'text-red-500'}`}>
+                            <span className={`font-bold text-sm ${passed ? 'text-green-400' : 'text-red-500'}`}>
                               {r.score}%
                               <span className="text-xs text-muted-foreground font-normal ml-1">/{r.passingScore}% pass</span>
                             </span>
@@ -304,7 +304,7 @@ export default function TrainingPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEnrollOpen(false)}>Cancel</Button>
             <Button
-              className="gradient-emerald text-white border-0 hover:opacity-90"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               onClick={() => enroll.mutate()}
               disabled={enroll.isPending}
             >

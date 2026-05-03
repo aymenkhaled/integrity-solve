@@ -112,9 +112,14 @@ client/src/
     utils.ts       — cn, initials, formatDate, formatRelative, formatDateTime
 ```
 
-## Brand / Design System
-- Navy: `#0B1A33`, Emerald: `#10B981`, Amber: `#F59E0B`
-- CSS utilities: `.glass`, `.card-3d`, `.stat-card`, `.gradient-brand`, `.gradient-emerald`, `.gradient-mesh`, `.glow-emerald`, `.gradient-text`, `.float`, `.auth-bg`, `.orb-*`, `.nav-active`, `.counter`, `.bar-hover`
+## Brand / Design System — LeadPilot 2.0 (Updated)
+- **Background**: `#0a0a0f` (forced dark via `html { @apply dark; }`)
+- **Primary accent**: Indigo-600 `#6366f1`, Secondary: Violet-500 `#8b5cf6`
+- **Semantic success/green**: `text-green-400 bg-green-500/10 border-green-500/20`
+- **CSS utilities**: `.glass`, `.glow-indigo`, `.glow-violet`, `.gradient-text` (indigo→violet), `.noise`, `.spin-slow`, `.nav-active`, `.orb-indigo`, `.orb-violet`, `.float`, `.counter`
+- **3D Hero**: `client/src/components/hero/HeroScene.tsx` (R3F Canvas with Float+Sphere+MeshDistortMaterial+Stars). Falls back to CSS `FallbackOrb` via `ErrorBoundary` when WebGL unavailable.
+- **New files**: `client/src/components/hero/HeroScene.tsx`, `client/src/components/ErrorBoundary.tsx`
+- **button.tsx** outline variant: `bg-transparent` (not `bg-background`) for dark mode compatibility
 
 ## Navigation Groups (sidebar)
 - **Core**: Dashboard, Customers, AML Program
@@ -199,6 +204,16 @@ PATCH /api/whitelabel
 
 ## shadcn/ui Components Available
 badge, button, card, checkbox, dialog, dropdown-menu, input, label, select, separator, skeleton, switch, tabs, textarea
+
+## API Health — ALL 28 ENDPOINTS PASSING ✅
+All GET endpoints return 200. Auth, customers, escalations, alerts, tasks, documents, reviews, training, programs, audit, billing, analytics (SMR/training/reviews), risk (analytics/signals), providers, groups, gateway, whitelabel, notifications, checks — all verified.
+
+### Server Bug Fixes Applied
+- `analytics/training`: replaced invalid `sql\`status = 'PASSED'\`` with `eq(trainingRecords.status, 'COMPLETED')` — `PASSED` not in `training_status` enum
+- `risk/analytics`: fixed `checkResults.result` → `checkResults.outcome` (column is `outcome`, not `result`)
+- `risk/signals`: fixed CASE severity ordering — `alert_severity` enum uses `WARNING` not `MEDIUM`
+- `providers`: fixed `checkResults.result` → `checkResults.outcome`; fixed FILTER clause to use `checkRequests.status::text` for pass/fail stats
+- `whitelabel`: fixed `workspaces.name` → `workspaces.legalName` (workspace table has no `name` column)
 
 ## Feature Completion Status — ALL COMPLETE ✅
 - ✅ T001: Phase 0 Bootstrap

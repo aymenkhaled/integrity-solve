@@ -49,7 +49,7 @@ const SEVERITY_CONFIG: Record<string, {
 const STATUS_COLORS: Record<string, string> = {
   OPEN:           'text-red-600 bg-red-500/10 border-red-500/20',
   ACKNOWLEDGED:   'text-amber-600 bg-amber-500/10 border-amber-500/20',
-  RESOLVED:       'text-emerald-600 bg-emerald-500/10 border-emerald-500/20',
+  RESOLVED:       'text-green-400 bg-green-500/10 border-green-500/20',
   FALSE_POSITIVE: 'text-muted-foreground bg-muted/50 border-border',
 };
 
@@ -126,7 +126,7 @@ export default function AlertsPage() {
         action={
           <Button
             onClick={() => setCreateOpen(true)}
-            className="gradient-emerald text-white border-0 hover:opacity-90"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
           >
             <Plus className="h-4 w-4 mr-2" />
             New Alert
@@ -140,7 +140,7 @@ export default function AlertsPage() {
           { label: 'Open',         value: openCount,     icon: AlertTriangle, color: 'text-red-500',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
           { label: 'Critical',     value: criticalCount, icon: AlertTriangle, color: 'text-red-700',     bg: 'bg-red-700/10',     border: 'border-red-700/20' },
           { label: 'Acknowledged', value: ackCount,      icon: Bell,          color: 'text-amber-500',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
-          { label: 'Resolved',     value: resolvedCount, icon: CheckCircle,   color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'Resolved',     value: resolvedCount, icon: CheckCircle,   color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
           <Card key={label} className="card-3d">
             <CardContent className="p-5">
@@ -165,7 +165,7 @@ export default function AlertsPage() {
               key={s || 'all'}
               size="sm"
               variant={statusFilter === s ? 'default' : 'outline'}
-              className={`h-7 text-xs ${statusFilter === s ? 'gradient-emerald text-white border-0' : ''}`}
+              className={`h-7 text-xs ${statusFilter === s ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-0' : ''}`}
               onClick={() => setStatusFilter(s)}
             >
               {FILTER_LABELS[s] ?? s}
@@ -182,8 +182,8 @@ export default function AlertsPage() {
       ) : alerts.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-4">
-              <Shield className="h-8 w-8 text-emerald-500" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/10 border border-green-500/20 mb-4">
+              <Shield className="h-8 w-8 text-green-400" />
             </div>
             <p className="font-semibold text-base mb-1">
               {statusFilter === 'OPEN' ? 'All clear — no open alerts' : `No ${FILTER_LABELS[statusFilter] ?? statusFilter} alerts`}
@@ -250,7 +250,7 @@ export default function AlertsPage() {
                       <>
                         <Button
                           size="sm"
-                          className="h-7 text-xs gradient-emerald text-white border-0 hover:opacity-90"
+                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                           onClick={() => { setResolveId(alert.id); setResolveFP(false); }}
                         >
                           Resolve
@@ -280,7 +280,7 @@ export default function AlertsPage() {
             <DialogTitle className="flex items-center gap-2">
               {resolveFP
                 ? <><X className="h-5 w-5 text-muted-foreground" />Mark as False Positive</>
-                : <><CheckCircle className="h-5 w-5 text-emerald-500" />Resolve Alert</>}
+                : <><CheckCircle className="h-5 w-5 text-green-400" />Resolve Alert</>}
             </DialogTitle>
           </DialogHeader>
           <div className="py-2">
@@ -301,7 +301,7 @@ export default function AlertsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setResolveId(null)}>Cancel</Button>
             <Button
-              className="gradient-emerald text-white border-0 hover:opacity-90"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               onClick={() => resolve.mutate({ id: resolveId!, note: resolveNote, fp: resolveFP })}
               disabled={resolveNote.length < 10 || resolve.isPending}
             >
@@ -366,7 +366,7 @@ export default function AlertsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button
-              className="gradient-emerald text-white border-0 hover:opacity-90"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               onClick={() => create.mutate(newAlert)}
               disabled={!newAlert.title || !newAlert.description || create.isPending}
             >

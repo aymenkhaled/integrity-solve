@@ -64,7 +64,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">Email verification:</span>
               {user?.emailVerifiedAt ? (
-                <div className="flex items-center gap-1.5 text-sm text-emerald-600">
+                <div className="flex items-center gap-1.5 text-sm text-green-400">
                   <CheckCircle className="h-4 w-4" />
                   <span className="font-medium">Verified</span>
                   <span className="text-muted-foreground text-xs">({formatDate(user.emailVerifiedAt)})</span>
@@ -79,7 +79,7 @@ export default function SettingsPage() {
             </div>
             <Button
               size="sm"
-              className="gradient-emerald text-white border-0 hover:opacity-90 gap-1.5"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1.5"
               onClick={() => toast.success('Profile saved')}
             >
               <Save className="h-3.5 w-3.5" />
@@ -118,7 +118,7 @@ export default function SettingsPage() {
                 <div key={label} className="flex items-center justify-between px-4 py-3">
                   <span className="text-sm text-muted-foreground">{label}</span>
                   {badge
-                    ? <Badge className="gradient-emerald text-white border-0 text-xs">{value}</Badge>
+                    ? <Badge className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 text-xs">{value}</Badge>
                     : <span className="text-sm font-medium">{value}</span>
                   }
                 </div>
@@ -126,7 +126,7 @@ export default function SettingsPage() {
             </div>
             <Button
               size="sm"
-              className="gradient-emerald text-white border-0 hover:opacity-90 gap-1.5"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1.5"
               onClick={() => toast.success('Workspace settings saved')}
             >
               <Save className="h-3.5 w-3.5" />
@@ -231,7 +231,7 @@ export default function SettingsPage() {
                     <div className="text-xs text-muted-foreground">{desc}</div>
                   </div>
                   <button
-                    className={`relative h-5 w-9 rounded-full transition-colors flex-shrink-0 ${enabled ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`}
+                    className={`relative h-5 w-9 rounded-full transition-colors flex-shrink-0 ${enabled ? 'bg-green-500' : 'bg-muted-foreground/30'}`}
                     onClick={() => toast.info('Notification preferences (coming soon)')}
                   >
                     <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />

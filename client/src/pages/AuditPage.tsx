@@ -11,24 +11,24 @@ import { formatDateTime, truncate } from '@/lib/utils';
 import type { AuditLogEntry } from '@shared/schema';
 
 const ACTION_CONFIG: Record<string, { color: string; bg: string; category: string }> = {
-  'customer.created':            { color: 'text-emerald-600', bg: 'bg-emerald-500/10', category: 'Customer' },
+  'customer.created':            { color: 'text-green-400', bg: 'bg-green-500/10', category: 'Customer' },
   'customer.updated':            { color: 'text-blue-600',    bg: 'bg-blue-500/10',    category: 'Customer' },
   'customer.riskRating.updated': { color: 'text-orange-600',  bg: 'bg-orange-500/10',  category: 'Customer' },
   'customer.status.changed':     { color: 'text-purple-600',  bg: 'bg-purple-500/10',  category: 'Customer' },
   'escalation.created':          { color: 'text-red-600',     bg: 'bg-red-500/10',     category: 'Escalation' },
   'escalation.status.changed':   { color: 'text-red-500',     bg: 'bg-red-500/10',     category: 'Escalation' },
   'smr.submitted':               { color: 'text-red-700',     bg: 'bg-red-700/10',     category: 'SMR' },
-  'program.published':           { color: 'text-emerald-700', bg: 'bg-emerald-700/10', category: 'Program' },
+  'program.published':           { color: 'text-green-400', bg: 'bg-green-500/10', category: 'Program' },
   'program.updated':             { color: 'text-blue-500',    bg: 'bg-blue-500/10',    category: 'Program' },
   'member.invited':              { color: 'text-blue-600',    bg: 'bg-blue-600/10',    category: 'Member' },
   'check.requested':             { color: 'text-blue-500',    bg: 'bg-blue-500/10',    category: 'Check' },
-  'check.completed':             { color: 'text-emerald-500', bg: 'bg-emerald-500/10', category: 'Check' },
+  'check.completed':             { color: 'text-green-400', bg: 'bg-green-500/10', category: 'Check' },
   'alert.created':               { color: 'text-amber-600',   bg: 'bg-amber-600/10',   category: 'Alert' },
   'alert.acknowledged':          { color: 'text-blue-600',    bg: 'bg-blue-600/10',    category: 'Alert' },
-  'alert.resolved':              { color: 'text-emerald-600', bg: 'bg-emerald-600/10', category: 'Alert' },
-  'review.completed':            { color: 'text-emerald-600', bg: 'bg-emerald-600/10', category: 'Review' },
+  'alert.resolved':              { color: 'text-green-400', bg: 'bg-green-500/10', category: 'Alert' },
+  'review.completed':            { color: 'text-green-400', bg: 'bg-green-500/10', category: 'Review' },
   'task.created':                { color: 'text-blue-500',    bg: 'bg-blue-500/10',    category: 'Task' },
-  'task.completed':              { color: 'text-emerald-500', bg: 'bg-emerald-500/10', category: 'Task' },
+  'task.completed':              { color: 'text-green-400', bg: 'bg-green-500/10', category: 'Task' },
   'document.generated':          { color: 'text-purple-600',  bg: 'bg-purple-600/10',  category: 'Document' },
   'workspace.update':            { color: 'text-blue-600',    bg: 'bg-blue-600/10',    category: 'Workspace' },
 };
@@ -75,7 +75,7 @@ export default function AuditPage() {
           { label: 'Total entries', value: data?.total ?? 0, icon: History,  color: 'text-blue-500',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20' },
           { label: 'This page',     value: items.length,     icon: Filter,   color: 'text-purple-500',  bg: 'bg-purple-500/10',  border: 'border-purple-500/20' },
           { label: 'Categories',    value: categories.length, icon: Tag,     color: 'text-amber-500',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
-          { label: 'AUSTRAC ready', value: '100%',           icon: Shield,   color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'AUSTRAC ready', value: '100%',           icon: Shield,   color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
           <Card key={label} className="card-3d">
             <CardContent className="p-5">
@@ -92,9 +92,9 @@ export default function AuditPage() {
       </div>
 
       {/* Immutability notice */}
-      <div className="flex items-center gap-3 rounded-xl border border-emerald-200/50 bg-emerald-50/50 dark:border-emerald-800/20 dark:bg-emerald-950/10 px-5 py-3 text-sm">
-        <Shield className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-        <span className="text-emerald-700 dark:text-emerald-400">
+      <div className="flex items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/5 dark:border-green-500/20 dark:bg-green-500/5 px-5 py-3 text-sm">
+        <Shield className="h-4 w-4 text-green-400 flex-shrink-0" />
+        <span className="text-green-400 dark:text-green-400">
           This audit log is <strong>append-only</strong> and cannot be modified or deleted.
           All entries include actor, timestamp, IP address, and reason — AUSTRAC recordkeeping compliant.
         </span>

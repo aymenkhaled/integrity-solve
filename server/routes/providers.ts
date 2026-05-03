@@ -128,27 +128,26 @@ router.get('/', requireWorkspace, async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
 
-    // Per-provider check stats from DB
+    // Per-provider check stats from DB (using check_requests.status for pass/fail)
     const providerStats = await db
       .select({
         provider: checkRequests.provider,
         total:    count(),
-        passed:   sql<number>`COUNT(*) FILTER (WHERE ${checkResults.result} = 'PASS')`,
-        failed:   sql<number>`COUNT(*) FILTER (WHERE ${checkResults.result} = 'FAIL')`,
-        review:   sql<number>`COUNT(*) FILTER (WHERE ${checkResults.result} = 'MANUAL_REVIEW')`,
+        passed:   sql<number>`COUNT(*) FILTER (WHERE ${checkRequests.status}::text = 'PASS')`,
+        failed:   sql<number>`COUNT(*) FILTER (WHERE ${checkRequests.status}::text = 'FAIL')`,
+        review:   sql<number>`COUNT(*) FILTER (WHERE ${checkRequests.status}::text = 'MANUAL_REVIEW')`,
       })
       .from(checkRequests)
-      .leftJoin(checkResults, eq(checkResults.checkRequestId, checkRequests.id))
       .where(eq(checkRequests.workspaceId, workspaceId))
       .groupBy(checkRequests.provider);
 
-    // Recent activity per provider (last 5 workspace-wide)
+    // Recent activity per provider (last 10 workspace-wide)
     const recent = await db
       .select({
         provider:  checkRequests.provider,
         checkType: checkRequests.checkType,
         status:    checkRequests.status,
-        result:    checkResults.result,
+        result:    checkResults.outcome,
         createdAt: checkRequests.createdAt,
       })
       .from(checkRequests)

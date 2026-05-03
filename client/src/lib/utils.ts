@@ -30,25 +30,25 @@ export function formatABN(abn: string | null | undefined): string {
 
 export function riskRatingColor(rating: string): string {
   switch (rating) {
-    case 'LOW':      return 'text-emerald-600 bg-emerald-50';
-    case 'MEDIUM':   return 'text-amber-600 bg-amber-50';
-    case 'HIGH':     return 'text-orange-600 bg-orange-50';
-    case 'CRITICAL': return 'text-red-600 bg-red-50';
+    case 'LOW':      return 'text-green-400 bg-green-500/10 border border-green-500/20';
+    case 'MEDIUM':   return 'text-amber-400 bg-amber-500/10 border border-amber-500/20';
+    case 'HIGH':     return 'text-orange-400 bg-orange-500/10 border border-orange-500/20';
+    case 'CRITICAL': return 'text-red-400 bg-red-500/10 border border-red-500/20';
     default:         return 'text-muted-foreground bg-muted';
   }
 }
 
 export function statusColor(status: string): string {
   switch (status) {
-    case 'ACTIVE':       return 'text-emerald-600 bg-emerald-50';
+    case 'ACTIVE':       return 'text-green-400 bg-green-500/10 border border-green-500/20';
     case 'PENDING':
-    case 'DRAFT':        return 'text-amber-600 bg-amber-50';
+    case 'DRAFT':        return 'text-amber-400 bg-amber-500/10 border border-amber-500/20';
     case 'SUSPENDED':
-    case 'REJECTED':     return 'text-red-600 bg-red-50';
-    case 'EXITED':       return 'text-gray-600 bg-gray-50';
-    case 'COMPLETE':     return 'text-emerald-600 bg-emerald-50';
-    case 'IN_PROGRESS':  return 'text-blue-600 bg-blue-50';
-    case 'OVERDUE':      return 'text-red-600 bg-red-50';
+    case 'REJECTED':     return 'text-red-400 bg-red-500/10 border border-red-500/20';
+    case 'EXITED':       return 'text-gray-400 bg-gray-500/10 border border-gray-500/20';
+    case 'COMPLETE':     return 'text-green-400 bg-green-500/10 border border-green-500/20';
+    case 'IN_PROGRESS':  return 'text-blue-400 bg-blue-500/10 border border-blue-500/20';
+    case 'OVERDUE':      return 'text-red-400 bg-red-500/10 border border-red-500/20';
     default:             return 'text-muted-foreground bg-muted';
   }
 }

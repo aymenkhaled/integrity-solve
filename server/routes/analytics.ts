@@ -150,7 +150,7 @@ router.get('/training', requireWorkspace, async (req, res, next) => {
       .where(
         and(
           eq(trainingRecords.workspaceId, workspaceId),
-          sql`${trainingRecords.status} = 'COMPLETED'`,
+          eq(trainingRecords.status, 'COMPLETED'),
         ),
       );
 
@@ -160,7 +160,7 @@ router.get('/training', requireWorkspace, async (req, res, next) => {
       .where(
         and(
           eq(trainingRecords.workspaceId, workspaceId),
-          sql`${trainingRecords.status} = 'PASSED'`,
+          eq(trainingRecords.status, 'FAILED'),
         ),
       );
 
