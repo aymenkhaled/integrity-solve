@@ -34,6 +34,11 @@ import ApiGatewayPage        from '@/pages/gateway/ApiGatewayPage';
 import WhiteLabelPage        from '@/pages/whitelabel/WhiteLabelPage';
 import GroupWorkspacesPage   from '@/pages/groups/GroupWorkspacesPage';
 
+// Diamond features
+import ComplianceHealthPage  from '@/pages/compliance/ComplianceHealthPage';
+import ComplianceCalendarPage from '@/pages/compliance/ComplianceCalendarPage';
+import TransactionMonitoringPage from '@/pages/compliance/TransactionMonitoringPage';
+
 // Landing
 import LandingPage      from '@/pages/LandingPage';
 
@@ -154,28 +159,24 @@ export default function App() {
         </ProtectedRoute>
       </Route>
 
-      {/* T008: Billing */}
       <Route path="/billing">
         <ProtectedRoute>
           <AppLayout><BillingPage /></AppLayout>
         </ProtectedRoute>
       </Route>
 
-      {/* T009: Documents */}
       <Route path="/documents">
         <ProtectedRoute>
           <AppLayout><DocumentsPage /></AppLayout>
         </ProtectedRoute>
       </Route>
 
-      {/* T010: Platform Admin */}
       <Route path="/admin">
         <ProtectedRoute>
           <AppLayout><AdminPage /></AppLayout>
         </ProtectedRoute>
       </Route>
 
-      {/* T012: Diamond Features */}
       <Route path="/training">
         <ProtectedRoute>
           <AppLayout><TrainingPage /></AppLayout>
@@ -219,6 +220,23 @@ export default function App() {
       <Route path="/groups">
         <ProtectedRoute>
           <AppLayout><GroupWorkspacesPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Diamond compliance features */}
+      <Route path="/compliance-health">
+        <ProtectedRoute>
+          <AppLayout><ComplianceHealthPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/calendar">
+        <ProtectedRoute>
+          <AppLayout><ComplianceCalendarPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/monitoring">
+        <ProtectedRoute>
+          <AppLayout><TransactionMonitoringPage /></AppLayout>
         </ProtectedRoute>
       </Route>
 

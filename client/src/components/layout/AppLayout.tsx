@@ -5,9 +5,10 @@ import { cn, initials } from '@/lib/utils';
 import {
   LayoutDashboard, Users, FileText, AlertTriangle,
   CheckSquare, History, Settings, Users2, Menu, X,
-  Shield, LogOut, Bell, ChevronDown, CreditCard,
+  Shield, LogOut, ChevronDown, CreditCard,
   BookOpen, GraduationCap, CalendarCheck, ShieldAlert,
   ChevronRight, Brain, BarChart2, ShoppingBag, Key, Palette, Network,
+  HeartPulse, CalendarDays, Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +16,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationsDropdown } from '@/components/NotificationsDropdown';
 
 const NAV_GROUPS = [
   {
@@ -28,11 +30,14 @@ const NAV_GROUPS = [
   {
     label: 'Compliance',
     items: [
-      { href: '/risk',        label: 'Risk Intelligence', icon: Brain },
-      { href: '/analytics',   label: 'Analytics',         icon: BarChart2 },
-      { href: '/escalations', label: 'Escalations',       icon: AlertTriangle },
-      { href: '/alerts',      label: 'Smart Alerts',      icon: ShieldAlert },
-      { href: '/reviews',     label: 'Periodic Reviews',  icon: CalendarCheck },
+      { href: '/compliance-health', label: 'Health Score',       icon: HeartPulse },
+      { href: '/calendar',          label: 'Cal. Obligations',   icon: CalendarDays },
+      { href: '/monitoring',        label: 'Transaction Rules',  icon: Activity },
+      { href: '/risk',              label: 'Risk Intelligence',  icon: Brain },
+      { href: '/analytics',         label: 'Analytics',          icon: BarChart2 },
+      { href: '/escalations',       label: 'Escalations',        icon: AlertTriangle },
+      { href: '/alerts',            label: 'Smart Alerts',       icon: ShieldAlert },
+      { href: '/reviews',           label: 'Periodic Reviews',   icon: CalendarCheck },
     ],
   },
   {
@@ -69,6 +74,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const isActive = (href: string) =>
     location === href || (href !== '/dashboard' && location.startsWith(href + '/'));
+
+  const pageName = location.split('/')[1] || 'Home';
+  const displayPageName = pageName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#0a0a0f' }}>
@@ -128,8 +136,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         onClick={() => setSidebarOpen(false)}
                       >
                         <Icon className="h-4 w-4 flex-shrink-0" />
-                        {label}
-                        {active && <ChevronRight className="h-3 w-3 ml-auto opacity-40" />}
+                        <span className="truncate">{label}</span>
+                        {active && <ChevronRight className="h-3 w-3 ml-auto opacity-40 flex-shrink-0" />}
                       </Link>
                     </li>
                   );
@@ -159,13 +167,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
         {/* Credits widget */}
         {workspace && (
           <div className="px-3 py-2 flex-shrink-0">
-            <div className="rounded-lg p-3" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}>
-              <p className="text-[10px] text-muted-foreground/70 mb-1.5 font-medium">Compliance Status</p>
-              <div className="h-1.5 rounded-full" style={{ background: 'hsl(var(--border))' }}>
-                <div className="h-full rounded-full bg-indigo-500" style={{ width: workspace.implementationStatus === 'COMPLETE' ? '100%' : workspace.implementationStatus === 'IN_PROGRESS' ? '50%' : '10%' }} />
+            <Link href="/compliance-health">
+              <div className="rounded-lg p-3 hover:bg-indigo-500/10 transition-colors cursor-pointer" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}>
+                <p className="text-[10px] text-muted-foreground/70 mb-1.5 font-medium flex items-center gap-1">
+                  <HeartPulse className="h-3 w-3" />
+                  Compliance Status
+                </p>
+                <div className="h-1.5 rounded-full" style={{ background: 'hsl(var(--border))' }}>
+                  <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: workspace.implementationStatus === 'COMPLETE' ? '100%' : workspace.implementationStatus === 'IN_PROGRESS' ? '50%' : '10%' }} />
+                </div>
+                <p className="text-[10px] text-indigo-400 mt-1.5 font-medium capitalize">{workspace.implementationStatus?.replace(/_/g,' ').toLowerCase()}</p>
               </div>
-              <p className="text-[10px] text-indigo-400 mt-1.5 font-medium capitalize">{workspace.implementationStatus?.replace(/_/g,' ').toLowerCase()}</p>
-            </div>
+            </Link>
           </div>
         )}
 
@@ -217,16 +230,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
             <Shield className="h-3.5 w-3.5" />
             <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-medium capitalize">{location.split('/')[1] || 'Home'}</span>
+            <span className="text-foreground font-medium">{displayPageName}</span>
           </div>
 
           <div className="flex-1" />
 
           <ThemeToggle />
-
-          <Button variant="ghost" size="icon" className="relative h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
-            <Link href="/alerts"><Bell className="h-4 w-4" /></Link>
-          </Button>
+          <NotificationsDropdown />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

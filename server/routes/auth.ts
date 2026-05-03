@@ -11,7 +11,7 @@ import {
 } from '../../shared/schema.js';
 import { eq, and, gt, lt } from 'drizzle-orm';
 import {
-  RegisterSchema, LoginSchema, VerifyEmailSchema,
+  RegisterSchema, LoginSchema, VerifyEmailSchema, ChangePasswordSchema,
 } from '../../shared/validators.js';
 import { validateBody, ok } from '../lib/validate.js';
 import { createSession, destroySession, requireAuth } from '../lib/auth-session.js';
@@ -309,6 +309,57 @@ router.post('/resend-verification', requireAuth, async (req, res, next) => {
       message: 'Verification code sent',
       ...(process.env.NODE_ENV !== 'production' ? { _devOtp: otp } : {}),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── PATCH /api/auth/profile ─────────────────────────────────────────────────
+
+router.patch('/profile', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.session!.user.id;
+    const { fullName } = req.body as { fullName?: string };
+
+    if (!fullName || fullName.trim().length < 2) {
+      throw new ValidationError('Full name must be at least 2 characters', 'fullName');
+    }
+
+    await db.update(users).set({ fullName: fullName.trim() }).where(eq(users.id, userId));
+
+    await writeAudit(
+      { workspaceId: req.session!.workspace.id, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
+      { action: 'user.profile_updated', entityType: 'user', entityId: userId, newValue: { fullName } },
+    );
+
+    ok(res, { fullName: fullName.trim() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /api/auth/change-password ──────────────────────────────────────────
+
+router.post('/change-password', requireAuth, validateBody(ChangePasswordSchema), async (req, res, next) => {
+  try {
+    const userId = req.session!.user.id;
+    const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
+
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user || !user.passwordHash) throw new ValidationError('User not found');
+
+    const match = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!match) throw new ValidationError('Current password is incorrect', 'currentPassword');
+
+    const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
+
+    await writeAudit(
+      { workspaceId: req.session!.workspace.id, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
+      { action: 'user.password_changed', entityType: 'user', entityId: userId },
+    );
+
+    ok(res, { message: 'Password changed successfully' });
   } catch (err) {
     next(err);
   }

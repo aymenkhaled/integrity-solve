@@ -59,6 +59,8 @@ export const authApi = {
   verifyEmail:         (code: string)  => api.post('/auth/verify-email', { code }),
   resendVerification:  ()              => api.post('/auth/resend-verification'),
   switchWorkspace:     (workspaceId: string) => api.post('/auth/switch-workspace', { workspaceId }),
+  updateProfile:       (data: { fullName: string }) => api.patch('/auth/profile', data),
+  changePassword:      (data: { currentPassword: string; newPassword: string }) => api.post('/auth/change-password', data),
 };
 
 // ─── Workspace ────────────────────────────────────────────────────────────────
