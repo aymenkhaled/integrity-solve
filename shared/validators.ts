@@ -187,7 +187,7 @@ export const CreateTaskSchema = z.object({
   assignedTo:  z.string().optional(),
   entityType:  z.string().optional(),
   entityId:    z.string().optional(),
-  dueAt:       z.string().datetime().optional(),
+  dueAt:       z.string().optional(),
 });
 
 export const UpdateTaskSchema = CreateTaskSchema.partial().extend({

@@ -3,8 +3,8 @@
  */
 import { Router } from 'express';
 import { db } from '../db.js';
-import { customers, beneficialOwners, customerForms } from '../../shared/schema.js';
-import { eq, and, ilike, sql, desc } from 'drizzle-orm';
+import { customers, beneficialOwners } from '../../shared/schema.js';
+import { eq, and, or, ilike, sql, desc } from 'drizzle-orm';
 import {
   CreateCustomerSchema, UpdateCustomerSchema,
   UpdateRiskRatingSchema, CreateBeneficialOwnerSchema,
@@ -28,30 +28,27 @@ router.get('/', requireWorkspace, validateQuery(PaginationSchema), async (req, r
 
     const offset = (page - 1) * limit;
 
-    let query = db
-      .select()
-      .from(customers)
-      .where(eq(customers.workspaceId, workspaceId))
-      .$dynamic();
-
-    if (search) {
-      query = query.where(
-        and(
+    const baseCondition = search
+      ? and(
           eq(customers.workspaceId, workspaceId),
-          ilike(customers.entityName ?? customers.familyName, `%${search}%`),
-        ),
-      );
-    }
+          or(
+            ilike(customers.entityName, `%${search}%`),
+            ilike(customers.familyName, `%${search}%`),
+            ilike(customers.givenNames, `%${search}%`),
+            ilike(customers.referenceNumber, `%${search}%`),
+          ),
+        )
+      : eq(customers.workspaceId, workspaceId);
 
     const [countResult] = await db
       .select({ count: sql<number>`count(*)` })
       .from(customers)
-      .where(eq(customers.workspaceId, workspaceId));
+      .where(baseCondition);
 
     const items = await db
       .select()
       .from(customers)
-      .where(eq(customers.workspaceId, workspaceId))
+      .where(baseCondition)
       .orderBy(desc(customers.createdAt))
       .limit(limit)
       .offset(offset);

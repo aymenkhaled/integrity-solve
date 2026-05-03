@@ -80,19 +80,15 @@ export default function CustomersPage() {
                     {data.items.map((customer: Customer) => (
                       <tr key={customer.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3">
-                          <Link href={`/customers/${customer.id}`}>
-                            <a className="text-sm font-mono text-primary hover:underline">
-                              {customer.referenceNumber}
-                            </a>
+                          <Link href={`/customers/${customer.id}`} className="text-sm font-mono text-primary hover:underline">
+                            {customer.referenceNumber}
                           </Link>
                         </td>
                         <td className="px-4 py-3">
-                          <Link href={`/customers/${customer.id}`}>
-                            <a className="text-sm font-medium hover:text-primary transition-colors">
-                              {(customer.entityName ??
-                                `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim()) ||
-                                '—'}
-                            </a>
+                          <Link href={`/customers/${customer.id}`} className="text-sm font-medium hover:text-primary transition-colors">
+                            {(customer.entityName ??
+                              `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim()) ||
+                              '—'}
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground capitalize">

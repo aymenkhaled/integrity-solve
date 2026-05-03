@@ -5,7 +5,8 @@ import { cn, initials } from '@/lib/utils';
 import {
   LayoutDashboard, Users, FileText, AlertTriangle,
   CheckSquare, History, Settings, Users2, Menu, X,
-  Shield, LogOut, Bell, ChevronDown,
+  Shield, LogOut, Bell, ChevronDown, CreditCard,
+  BookOpen, GraduationCap, CalendarCheck, ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,14 +16,19 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 const NAV_ITEMS = [
-  { href: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/customers',    label: 'Customers',     icon: Users },
-  { href: '/programs',     label: 'AML Program',   icon: FileText },
-  { href: '/escalations',  label: 'Escalations',   icon: AlertTriangle },
-  { href: '/tasks',        label: 'Tasks',         icon: CheckSquare },
-  { href: '/audit',        label: 'Audit Log',     icon: History },
-  { href: '/members',      label: 'Members',       icon: Users2 },
-  { href: '/settings',     label: 'Settings',      icon: Settings },
+  { href: '/dashboard',   label: 'Dashboard',      icon: LayoutDashboard },
+  { href: '/customers',   label: 'Customers',       icon: Users },
+  { href: '/programs',    label: 'AML Program',     icon: FileText },
+  { href: '/escalations', label: 'Escalations',     icon: AlertTriangle },
+  { href: '/alerts',      label: 'Smart Alerts',    icon: ShieldAlert },
+  { href: '/reviews',     label: 'Periodic Reviews', icon: CalendarCheck },
+  { href: '/tasks',       label: 'Tasks',           icon: CheckSquare },
+  { href: '/documents',   label: 'Documents',       icon: BookOpen },
+  { href: '/training',    label: 'Training',        icon: GraduationCap },
+  { href: '/audit',       label: 'Audit Log',       icon: History },
+  { href: '/members',     label: 'Members',         icon: Users2 },
+  { href: '/billing',     label: 'Billing',         icon: CreditCard },
+  { href: '/settings',    label: 'Settings',        icon: Settings },
 ];
 
 interface AppLayoutProps {
@@ -35,6 +41,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { user, workspace } = useAuth();
   const logout = useLogout();
 
+  const showAdminLink = user?.isPlatformAdmin;
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
@@ -45,7 +53,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         )}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 px-6 border-b border-white/10">
+        <div className="flex h-16 items-center gap-3 px-6 border-b border-white/10 flex-shrink-0">
           <Shield className="h-7 w-7 text-brand-emerald flex-shrink-0" />
           <div className="min-w-0">
             <p className="font-bold text-sm tracking-wide truncate">Integrity Solve</p>
@@ -63,33 +71,50 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-hide">
-          <ul className="space-y-1">
+          <ul className="space-y-0.5">
             {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
               const isActive = location === href || location.startsWith(href + '/');
               return (
                 <li key={href}>
-                  <Link href={href}>
-                    <a
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'bg-brand-emerald/20 text-brand-emerald'
-                          : 'text-white/70 hover:bg-white/5 hover:text-white',
-                      )}
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Icon className="h-4 w-4 flex-shrink-0" />
-                      {label}
-                    </a>
+                  <Link
+                    href={href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-brand-emerald/20 text-brand-emerald'
+                        : 'text-white/70 hover:bg-white/5 hover:text-white',
+                    )}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    {label}
                   </Link>
                 </li>
               );
             })}
+
+            {showAdminLink && (
+              <li className="pt-2 mt-2 border-t border-white/10">
+                <Link
+                  href="/admin"
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    location === '/admin'
+                      ? 'bg-brand-emerald/20 text-brand-emerald'
+                      : 'text-white/50 hover:bg-white/5 hover:text-white',
+                  )}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Shield className="h-4 w-4 flex-shrink-0" />
+                  Platform Admin
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
 
         {/* User section */}
-        <div className="border-t border-white/10 p-3">
+        <div className="border-t border-white/10 p-3 flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-white/5 transition-colors">
@@ -106,6 +131,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem asChild>
                 <Link href="/settings" className="cursor-pointer">Settings</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/billing" className="cursor-pointer">Billing</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -131,7 +159,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-16 items-center gap-4 border-b bg-background px-4 lg:px-6">
+        <header className="flex h-16 items-center gap-4 border-b bg-background px-4 lg:px-6 flex-shrink-0">
           <button
             className="lg:hidden text-muted-foreground hover:text-foreground"
             onClick={() => setSidebarOpen(true)}
@@ -147,8 +175,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </Badge>
           )}
 
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="relative" asChild>
+            <Link href="/alerts">
+              <Bell className="h-4 w-4" />
+            </Link>
           </Button>
         </header>
 

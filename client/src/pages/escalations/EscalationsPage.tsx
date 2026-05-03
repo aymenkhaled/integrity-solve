@@ -91,10 +91,8 @@ export default function EscalationsPage() {
                     <AlertTriangle className="h-4 w-4 text-orange-500" />
                   </div>
                   <div>
-                    <Link href={`/escalations/${esc.id}`}>
-                      <a className="font-semibold text-sm hover:text-primary transition-colors">
-                        {esc.subject}
-                      </a>
+                    <Link href={`/escalations/${esc.id}`} className="font-semibold text-sm hover:text-primary transition-colors">
+                      {esc.subject}
                     </Link>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       Created {formatDate(esc.createdAt)}

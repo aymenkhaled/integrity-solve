@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from 'lucide-react';
@@ -39,11 +39,14 @@ export default function ProgramWizardPage() {
   const { data: program, isLoading } = useQuery({
     queryKey: ['programs', params.id],
     queryFn:  () => programApi.get(params.id!) as Promise<ProgramForm & { versions: unknown[] }>,
-    onSuccess: (data: ProgramForm & { versions: unknown[] }) => {
-      setCurrentStep(data.currentStep);
-      setFormData(data.formData as Record<string, unknown> ?? {});
-    },
-  } as Parameters<typeof useQuery>[0]);
+  });
+
+  useEffect(() => {
+    if (program) {
+      setCurrentStep(program.currentStep);
+      setFormData(program.formData as Record<string, unknown> ?? {});
+    }
+  }, [program?.id]);
 
   const saveStep = useMutation({
     mutationFn: (data: { step: number; data: Record<string, unknown>; reason: string }) =>

@@ -78,7 +78,7 @@ export default function ProgramsPage() {
                   <StatusBadge status={program.status} />
                   <Button asChild size="sm">
                     <Link href={`/programs/${program.id}/wizard`}>
-                      <a>{program.status === 'NOT_STARTED' ? 'Start' : program.status === 'COMPLETE' ? 'View' : 'Continue'}</a>
+                      {program.status === 'NOT_STARTED' ? 'Start' : program.status === 'COMPLETE' ? 'View' : 'Continue'}
                     </Link>
                   </Button>
                 </div>

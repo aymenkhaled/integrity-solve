@@ -146,3 +146,69 @@ export const notificationApi = {
   markRead:(id: string)           => api.post(`/notifications/${id}/read`),
   markAllRead: ()                 => api.post('/notifications/read-all'),
 };
+
+// ─── Billing ──────────────────────────────────────────────────────────────────
+
+export const billingApi = {
+  overview: ()              => api.get('/billing/overview'),
+  usage:    ()              => api.get('/billing/usage'),
+  checkout: (tier: string)  => api.post('/billing/checkout', { tier }),
+  portal:   ()              => api.post('/billing/portal'),
+};
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+
+export const documentApi = {
+  list:     ()                              => api.get('/documents'),
+  generate: (data: unknown)                => api.post('/documents/generate', data),
+  delete:   (id: string)                   => api.delete(`/documents/${id}`),
+};
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+export const adminApi = {
+  stats:      ()                               => api.get('/admin/stats'),
+  workspaces: (params?: Record<string, unknown>) =>
+    api.get(`/admin/workspaces?${new URLSearchParams(params as Record<string, string>).toString()}`),
+  workspace:  (id: string)                     => api.get(`/admin/workspaces/${id}`),
+  updateWorkspace: (id: string, data: unknown) => api.patch(`/admin/workspaces/${id}`, data),
+  users:      (params?: Record<string, unknown>) =>
+    api.get(`/admin/users?${new URLSearchParams(params as Record<string, string>).toString()}`),
+  audit:      (params?: Record<string, unknown>) =>
+    api.get(`/admin/audit?${new URLSearchParams(params as Record<string, string>).toString()}`),
+};
+
+// ─── Training ─────────────────────────────────────────────────────────────────
+
+export const trainingApi = {
+  list:   (params?: Record<string, unknown>) =>
+    api.get(`/training?${new URLSearchParams(params as Record<string, string>).toString()}`),
+  enroll: (data: unknown) => api.post('/training', data),
+  update: (id: string, data: unknown) => api.patch(`/training/${id}`, data),
+  delete: (id: string) => api.delete(`/training/${id}`),
+};
+
+// ─── Alerts ───────────────────────────────────────────────────────────────────
+
+export const alertApi = {
+  list:         (params?: Record<string, unknown>) =>
+    api.get(`/alerts?${new URLSearchParams(params as Record<string, string>).toString()}`),
+  create:       (data: unknown)        => api.post('/alerts', data),
+  get:          (id: string)           => api.get(`/alerts/${id}`),
+  acknowledge:  (id: string)           => api.post(`/alerts/${id}/acknowledge`),
+  resolve:      (id: string, note: string) => api.post(`/alerts/${id}/resolve`, { resolutionNote: note }),
+  falsePositive:(id: string, note: string) => api.post(`/alerts/${id}/false-positive`, { resolutionNote: note }),
+};
+
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+
+export const reviewApi = {
+  list:     (params?: Record<string, unknown>) =>
+    api.get(`/reviews?${new URLSearchParams(params as Record<string, string>).toString()}`),
+  overdue:  ()                         => api.get('/reviews/overdue'),
+  schedule: (data: unknown)            => api.post('/reviews', data),
+  get:      (id: string)               => api.get(`/reviews/${id}`),
+  start:    (id: string)               => api.post(`/reviews/${id}/start`),
+  complete: (id: string, data: unknown) => api.post(`/reviews/${id}/complete`, data),
+  cancel:   (id: string, reason?: string) => api.post(`/reviews/${id}/cancel`, { reason }),
+};

@@ -25,6 +25,12 @@ import taskRoutes         from './routes/tasks.js';
 import auditRoutes        from './routes/audit.js';
 import notificationRoutes from './routes/notifications.js';
 import healthRoutes       from './routes/health.js';
+import billingRoutes      from './routes/billing.js';
+import documentRoutes     from './routes/documents.js';
+import adminRoutes        from './routes/admin.js';
+import trainingRoutes     from './routes/training.js';
+import alertRoutes        from './routes/alerts.js';
+import reviewRoutes       from './routes/reviews.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -99,6 +105,12 @@ export function createApp() {
   app.use('/api/tasks',          taskRoutes);
   app.use('/api/audit',          auditRoutes);
   app.use('/api/notifications',  notificationRoutes);
+  app.use('/api/billing',        billingRoutes);
+  app.use('/api/documents',      documentRoutes);
+  app.use('/api/admin',          adminRoutes);
+  app.use('/api/training',       trainingRoutes);
+  app.use('/api/alerts',         alertRoutes);
+  app.use('/api/reviews',        reviewRoutes);
 
   // ─── Static files (production) ────────────────────────────────────────────
   if (!isDev) {

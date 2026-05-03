@@ -20,6 +20,12 @@ import TasksPage        from '@/pages/TasksPage';
 import AuditPage        from '@/pages/AuditPage';
 import SettingsPage     from '@/pages/SettingsPage';
 import MembersPage      from '@/pages/MembersPage';
+import BillingPage      from '@/pages/billing/BillingPage';
+import DocumentsPage    from '@/pages/documents/DocumentsPage';
+import AdminPage        from '@/pages/admin/AdminPage';
+import TrainingPage     from '@/pages/training/TrainingPage';
+import AlertsPage       from '@/pages/alerts/AlertsPage';
+import ReviewsPage      from '@/pages/reviews/ReviewsPage';
 
 // Landing
 import LandingPage      from '@/pages/LandingPage';
@@ -137,6 +143,44 @@ export default function App() {
       <Route path="/members">
         <ProtectedRoute>
           <AppLayout><MembersPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* T008: Billing */}
+      <Route path="/billing">
+        <ProtectedRoute>
+          <AppLayout><BillingPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* T009: Documents */}
+      <Route path="/documents">
+        <ProtectedRoute>
+          <AppLayout><DocumentsPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* T010: Platform Admin */}
+      <Route path="/admin">
+        <ProtectedRoute>
+          <AppLayout><AdminPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* T012: Diamond Features */}
+      <Route path="/training">
+        <ProtectedRoute>
+          <AppLayout><TrainingPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/alerts">
+        <ProtectedRoute>
+          <AppLayout><AlertsPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/reviews">
+        <ProtectedRoute>
+          <AppLayout><ReviewsPage /></AppLayout>
         </ProtectedRoute>
       </Route>
 

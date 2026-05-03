@@ -10,6 +10,7 @@ import { createId } from '@paralleldrive/cuid2';
 import { addDays } from 'date-fns';
 import { UnauthenticatedError, ForbiddenError } from './errors.js';
 import type { AuthSession, SessionUser, WorkspaceContext } from '../../shared/types.js';
+import { hasPermission, UserRole } from '../../shared/enums.js';
 
 const SESSION_COOKIE = 'is_session';
 const SESSION_TTL_DAYS = 7;
@@ -169,9 +170,8 @@ export function requirePermission(permission: string) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     requireWorkspace(req, _res, (err?: unknown) => {
       if (err) return next(err);
-      const { hasPermission, UserRole } = require('../../shared/enums.js') as typeof import('../../shared/enums.js');
-      const role = req.session!.workspace!.role as import('../../shared/enums.js').UserRole;
-      if (!hasPermission(role as UserRole, permission)) {
+      const role = req.session!.workspace!.role as UserRole;
+      if (!hasPermission(role, permission)) {
         return next(new ForbiddenError(`Missing permission: ${permission}`));
       }
       next();

@@ -33,10 +33,8 @@ function StatCard({
             <Icon className={`h-5 w-5 text-${color}`} />
           </div>
           {href && (
-            <Link href={href}>
-              <a className="text-muted-foreground hover:text-foreground">
-                <ArrowRight className="h-4 w-4" />
-              </a>
+            <Link href={href} className="text-muted-foreground hover:text-foreground">
+              <ArrowRight className="h-4 w-4" />
             </Link>
           )}
         </div>
