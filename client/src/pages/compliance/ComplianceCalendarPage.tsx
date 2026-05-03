@@ -123,9 +123,9 @@ export default function ComplianceCalendarPage() {
     queryKey: ['reviews-calendar'],
     queryFn: () => reviewApi.list({ limit: '100', status: 'SCHEDULED' }) as Promise<{ reviews?: { id: string; customerId: string; dueAt: string; status: string }[]; } | { id: string; customerId: string; dueAt: string; status: string }[]>,
   });
-  const { data: overdueReviews } = useQuery({
+  const { data: overdueReviewsData } = useQuery({
     queryKey: ['reviews', 'overdue'],
-    queryFn: () => reviewApi.overdue() as Promise<{ id: string; customerId: string; dueAt: string }[]>,
+    queryFn: () => reviewApi.overdue() as Promise<{ reviews: { id: string; customerId: string; dueAt: string }[]; total: number }>,
   });
   const { data: rawTraining } = useQuery({
     queryKey: ['training-calendar'],
@@ -170,7 +170,7 @@ export default function ComplianceCalendarPage() {
       }
     });
 
-    (overdueReviews ?? []).forEach((r) => {
+    (overdueReviewsData?.reviews ?? []).forEach((r) => {
       result.push({
         id: `overdue-review-${r.id}`,
         date: new Date(r.dueAt),
@@ -221,7 +221,7 @@ export default function ComplianceCalendarPage() {
     }
 
     return result.sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [rawTasks, rawReviews, overdueReviews, rawTraining, billingData]);
+  }, [rawTasks, rawReviews, overdueReviewsData, rawTraining, billingData]);
 
   const upcomingEvents = events.filter((e) => {
     const d = e.date;

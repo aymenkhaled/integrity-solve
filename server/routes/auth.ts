@@ -52,13 +52,16 @@ router.post('/register', validateBody(RegisterSchema), async (req, res, next) =>
 
     // Create workspace + user in a transaction
     const result = await db.transaction(async (tx) => {
+      const now = new Date();
+
       const [user] = await tx.insert(users).values({
-        email:        normalizedEmail,
+        email:           normalizedEmail,
         passwordHash,
         fullName,
-        isActive:     true,
+        isActive:        true,
         isPlatformAdmin: false,
-        identityStatus: 'PENDING',
+        identityStatus:  'PENDING',
+        emailVerifiedAt: now, // Auto-verify email on registration
       }).returning();
 
       if (!user) throw new AppError('INTERNAL_ERROR', 'Failed to create user', 500);
@@ -79,29 +82,12 @@ router.post('/register', validateBody(RegisterSchema), async (req, res, next) =>
         workspaceId: workspace.id,
         role:        'WORKSPACE_ADMIN',
         status:      'ACTIVE',
-        joinedAt:    new Date(),
-      });
-
-      // Create email verification code
-      const otp = generateOtp();
-      const codeHash = await bcrypt.hash(otp, 6);
-
-      await tx.insert(verificationCodes).values({
-        userId:      user.id,
-        channel:     'EMAIL',
-        destination: normalizedEmail,
-        codeHash,
-        expiresAt:   addMinutes(new Date(), 30),
+        joinedAt:    now,
       });
 
       logger.info({ userId: user.id, email: normalizedEmail }, 'New user registered');
 
-      // In dev: log the OTP to console since email is disabled
-      if (process.env.NODE_ENV !== 'production') {
-        logger.info({ otp, email: normalizedEmail }, '📧 Email verification OTP (dev only)');
-      }
-
-      return { user, workspace, otp };
+      return { user, workspace };
     });
 
     // Create session
@@ -115,7 +101,7 @@ router.post('/register', validateBody(RegisterSchema), async (req, res, next) =>
         id:        result.user.id,
         email:     result.user.email,
         fullName:  result.user.fullName,
-        emailVerifiedAt: null,
+        emailVerifiedAt: result.user.emailVerifiedAt?.toISOString() ?? null,
       },
       workspace: {
         id:        result.workspace.id,
@@ -123,8 +109,6 @@ router.post('/register', validateBody(RegisterSchema), async (req, res, next) =>
         role:      'WORKSPACE_ADMIN',
         trialEndsAt: result.workspace.trialEndsAt?.toISOString(),
       },
-      // In dev: return OTP directly for easy testing
-      ...(process.env.NODE_ENV !== 'production' ? { _devOtp: result.otp } : {}),
     }, 201);
   } catch (err) {
     next(err);

@@ -64,8 +64,8 @@ export function useRegister() {
     mutationFn: (data: unknown) => authApi.register(data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['auth', 'me'] });
-      navigate('/verify-email');
-      toast.success('Account created! Please verify your email.');
+      navigate('/dashboard');
+      toast.success('Account created! Welcome to Integrity Solve.');
     },
     onError: (err: unknown) => {
       const msg = err instanceof ApiError ? err.message : 'Registration failed';
