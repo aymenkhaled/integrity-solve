@@ -5,7 +5,7 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { auditLog } from '../../shared/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
-import { ok, paginated } from '../lib/validate.js';
+import { paginated } from '../lib/validate.js';
 import { requireWorkspace } from '../lib/auth-session.js';
 import { getWorkspaceId } from '../lib/workspace-guard.js';
 import { ForbiddenError } from '../lib/errors.js';

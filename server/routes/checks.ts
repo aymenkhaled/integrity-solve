@@ -3,14 +3,14 @@
  */
 import { Router } from 'express';
 import { db } from '../db.js';
-import { checkRequests, checkResults, customers } from '../../shared/schema.js';
+import { checkRequests, checkResults } from '../../shared/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { RunCheckSchema, ManualOverrideSchema } from '../../shared/validators.js';
 import { validateBody, ok } from '../lib/validate.js';
 import { requireWorkspace } from '../lib/auth-session.js';
 import { getWorkspaceId, getUserId, assertCustomerOwnership } from '../lib/workspace-guard.js';
 import { writeAudit } from '../lib/audit.js';
-import { NotFoundError, AppError } from '../lib/errors.js';
+import { NotFoundError } from '../lib/errors.js';
 import { runProviderCheck } from '../services/check-engine.js';
 import { addMinutes } from 'date-fns';
 
@@ -69,7 +69,7 @@ router.get('/:checkId', requireWorkspace, async (req, res, next) => {
       .from(checkRequests)
       .where(
         and(
-          eq(checkRequests.id, req.params['checkId']!),
+          eq(checkRequests.id, (req.params['checkId'] as string)),
           eq(checkRequests.workspaceId, workspaceId),
         ),
       )
@@ -128,7 +128,7 @@ router.post('/:checkId/override', requireWorkspace, validateBody(ManualOverrideS
       .from(checkRequests)
       .where(
         and(
-          eq(checkRequests.id, req.params['checkId']!),
+          eq(checkRequests.id, (req.params['checkId'] as string)),
           eq(checkRequests.workspaceId, workspaceId),
         ),
       )

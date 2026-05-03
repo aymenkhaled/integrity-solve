@@ -2,7 +2,7 @@
  * server/services/notifications.ts — Notification delivery service.
  */
 import { db } from '../db.js';
-import { notifications, users, workspaceMemberships } from '../../shared/schema.js';
+import { notifications, workspaceMemberships } from '../../shared/schema.js';
 import { eq, and } from 'drizzle-orm';
 import type { NotificationPayload } from '../../shared/types.js';
 import logger from '../lib/logger.js';

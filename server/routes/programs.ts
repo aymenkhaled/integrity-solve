@@ -3,14 +3,14 @@
  */
 import { Router } from 'express';
 import { db } from '../db.js';
-import { programForms, programVersions, programDocuments } from '../../shared/schema.js';
+import { programForms, programVersions } from '../../shared/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { SaveProgramStepSchema, PublishProgramSchema } from '../../shared/validators.js';
 import { validateBody, ok } from '../lib/validate.js';
 import { requireWorkspace } from '../lib/auth-session.js';
 import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';
 import { writeAudit } from '../lib/audit.js';
-import { NotFoundError, ForbiddenError, assertReason } from '../lib/errors.js';
+import { NotFoundError, ForbiddenError } from '../lib/errors.js';
 import { addYears } from 'date-fns';
 
 const router = Router();
@@ -75,7 +75,7 @@ router.get('/:id', requireWorkspace, async (req, res, next) => {
     const [form] = await db
       .select()
       .from(programForms)
-      .where(and(eq(programForms.id, req.params['id']!), eq(programForms.workspaceId, workspaceId)))
+      .where(and(eq(programForms.id, (req.params['id'] as string)), eq(programForms.workspaceId, workspaceId)))
       .limit(1);
 
     if (!form) throw new NotFoundError('Program form');
@@ -102,7 +102,7 @@ router.patch('/:id/step', requireWorkspace, validateBody(SaveProgramStepSchema),
     const [form] = await db
       .select()
       .from(programForms)
-      .where(and(eq(programForms.id, req.params['id']!), eq(programForms.workspaceId, workspaceId)))
+      .where(and(eq(programForms.id, (req.params['id'] as string)), eq(programForms.workspaceId, workspaceId)))
       .limit(1);
 
     if (!form) throw new NotFoundError('Program form');
@@ -127,12 +127,12 @@ router.patch('/:id/step', requireWorkspace, validateBody(SaveProgramStepSchema),
         status:      newStatus as typeof programForms.$inferInsert['status'],
         updatedAt:   new Date(),
       })
-      .where(eq(programForms.id, req.params['id']!))
+      .where(eq(programForms.id, (req.params['id'] as string)))
       .returning();
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'program.step.saved', entityType: 'program_form', entityId: req.params['id']!, newValue: { step, data }, reason },
+      { action: 'program.step.saved', entityType: 'program_form', entityId: (req.params['id'] as string), newValue: { step, data }, reason },
     );
 
     ok(res, updated);
@@ -156,7 +156,7 @@ router.post('/:id/publish', requireWorkspace, validateBody(PublishProgramSchema)
     const [form] = await db
       .select()
       .from(programForms)
-      .where(and(eq(programForms.id, req.params['id']!), eq(programForms.workspaceId, workspaceId)))
+      .where(and(eq(programForms.id, (req.params['id'] as string)), eq(programForms.workspaceId, workspaceId)))
       .limit(1);
 
     if (!form) throw new NotFoundError('Program form');

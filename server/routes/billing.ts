@@ -99,7 +99,7 @@ router.post('/checkout', requireWorkspace, async (req, res, next) => {
 });
 
 // POST /api/billing/portal — customer portal link (stub)
-router.post('/portal', requireWorkspace, async (req, res, next) => {
+router.post('/portal', requireWorkspace, async (_req, res, next) => {
   try {
     const mockPortalUrl = `/billing?portal=true&t=${Date.now()}`;
     ok(res, { url: mockPortalUrl });

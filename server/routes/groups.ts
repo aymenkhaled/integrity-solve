@@ -6,13 +6,13 @@
 import { Router }   from 'express';
 import { db }       from '../db.js';
 import { workspaces, workspaceMemberships, customers, checkRequests, escalations } from '../../shared/schema.js';
-import { eq, and, count, sql, inArray } from 'drizzle-orm';
+import { eq, count, inArray } from 'drizzle-orm';
 import { ok }       from '../lib/validate.js';
 import { requireWorkspace } from '../lib/auth-session.js';
 import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';
 import { writeAudit } from '../lib/audit.js';
 import { ForbiddenError, NotFoundError } from '../lib/errors.js';
-import { createId } from '@paralleldrive/cuid2';
+
 
 const router = Router();
 
@@ -177,7 +177,7 @@ router.delete('/link/:childId', requireWorkspace, async (req, res, next) => {
     const [child] = await db
       .select({ id: workspaces.id, groupWorkspaceId: workspaces.groupWorkspaceId })
       .from(workspaces)
-      .where(eq(workspaces.id, req.params.childId!));
+      .where(eq(workspaces.id, (req.params['childId'] as string)));
 
     if (!child) throw new NotFoundError('Child workspace');
     if (child.groupWorkspaceId !== workspaceId) {
@@ -187,11 +187,11 @@ router.delete('/link/:childId', requireWorkspace, async (req, res, next) => {
     await db
       .update(workspaces)
       .set({ groupWorkspaceId: null, updatedAt: new Date() })
-      .where(eq(workspaces.id, req.params.childId!));
+      .where(eq(workspaces.id, (req.params['childId'] as string)));
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'group.child_unlinked', entityType: 'workspace', entityId: req.params.childId!, reason: `Unlinked child workspace from group` },
+      { action: 'group.child_unlinked', entityType: 'workspace', entityId: (req.params['childId'] as string), reason: `Unlinked child workspace from group` },
     );
 
     return ok(res, { unlinked: true });

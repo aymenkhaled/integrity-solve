@@ -5,8 +5,8 @@
  */
 import { Router }    from 'express';
 import { db }        from '../db.js';
-import { workspaces, checkRequests, customers, escalations, auditLog } from '../../shared/schema.js';
-import { eq, and, gte, count, desc, sql } from 'drizzle-orm';
+import { checkRequests, customers, auditLog } from '../../shared/schema.js';
+import { eq, and, gte, count } from 'drizzle-orm';
 import { ok }        from '../lib/validate.js';
 import { requireWorkspace } from '../lib/auth-session.js';
 import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';

@@ -1,0 +1,23 @@
+Thanks for your interest in the Integrity Solve AML/CTF portal development opportunity.
+At this stage, we are speaking with a number of potential developers and technical partners to assess the most commercially sensible pathway to get a credible proof of concept live without committing to a large upfront custom build before the model has been validated with early users.
+The portal concept is not intended to be a conventional software project where we simply commission a full SaaS build at significant upfront cost. We are assessing a staged model that may involve:
+a lean proof of concept;
+use of an existing platform such as Assembly where it reduces build time and cost;
+targeted custom development only where genuinely required;
+clear visibility over client payments, provider costs, developer costs, and retained margin;
+an ongoing commercial model linked to chargeable checks, completed workflows, maintenance, and platform performance.
+The commercial structure we are considering is broadly:
+a modest initial goodwill/project payment, potentially around USD $1,000, payable once an agreed proof of concept has been completed and demonstrated;
+a clearly defined proof-of-concept scope focused on the minimum viable workflow;
+an ongoing payment model based on chargeable checks or completed paid workflows processed through the portal;
+clear exclusions for failed checks, internal testing, retries, refunds, or provider errors;
+ongoing developer responsibility for maintaining, supporting, and improving the parts of the portal they build.
+We are open to practical advice on the best technical pathway. However, proposals that require a significant upfront commitment to a full custom build before proof of concept will not be considered at this stage.
+The priority for Integrity Solve is commercial alignment. We are looking for a developer or technical partner who is prepared to help validate the model, move quickly, keep the initial build lean, and participate in the upside if the portal performs.
+If that type of structure is of interest, please provide a short response setting out:
+whether you would consider this staged commercial model;
+whether you would recommend Assembly, another platform, or a lightweight custom build for proof of concept;
+what you would include in the first proof-of-concept scope;
+what you would need from us to confirm feasibility.
+Kind regards,
+Daniel

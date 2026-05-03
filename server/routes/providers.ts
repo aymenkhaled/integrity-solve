@@ -6,11 +6,11 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { checkRequests, checkResults } from '../../shared/schema.js';
-import { eq, and, sql, count, desc } from 'drizzle-orm';
+import { eq, sql, count, desc } from 'drizzle-orm';
 import { ok } from '../lib/validate.js';
 import { requireWorkspace } from '../lib/auth-session.js';
 import { getWorkspaceId } from '../lib/workspace-guard.js';
-import { env } from '../env.js';
+
 
 const router = Router();
 

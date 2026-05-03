@@ -17,10 +17,10 @@ const router = Router();
 router.get('/', requireWorkspace, async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    const { assignedTo, status } = req.query as { assignedTo?: string; status?: string };
+    const { status } = req.query as { status?: string };
 
     const conditions = [eq(tasks.workspaceId, workspaceId)];
-    if (status) conditions.push(eq(tasks.status, status as typeof tasks.$inferInsert['status']));
+    if (status) conditions.push(eq(tasks.status, status as typeof tasks.$inferSelect['status']));
 
     const items = await db
       .select()
@@ -67,25 +67,26 @@ router.patch('/:id', requireWorkspace, validateBody(UpdateTaskSchema), async (re
     const [existing] = await db
       .select()
       .from(tasks)
-      .where(and(eq(tasks.id, req.params['id']!), eq(tasks.workspaceId, workspaceId)))
+      .where(and(eq(tasks.id, (req.params['id'] as string)), eq(tasks.workspaceId, workspaceId)))
       .limit(1);
 
     if (!existing) throw new NotFoundError('Task');
 
     const body = req.body as typeof UpdateTaskSchema._type;
-    const updates: Partial<typeof tasks.$inferInsert> = { ...body, updatedAt: new Date() };
-    if (body.dueAt) updates.dueAt = new Date(body.dueAt);
+    const { dueAt: dueAtStr, ...bodyRest } = body;
+    const updates: Partial<typeof tasks.$inferInsert> = { ...bodyRest, updatedAt: new Date() };
+    if (dueAtStr) updates.dueAt = new Date(dueAtStr);
     if (body.status === 'COMPLETE') updates.completedAt = new Date();
 
     const [updated] = await db
       .update(tasks)
       .set(updates)
-      .where(eq(tasks.id, req.params['id']!))
+      .where(eq(tasks.id, (req.params['id'] as string)))
       .returning();
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'task.updated', entityType: 'task', entityId: req.params['id']!, oldValue: existing, newValue: updated },
+      { action: 'task.updated', entityType: 'task', entityId: (req.params['id'] as string), oldValue: existing, newValue: updated },
     );
 
     ok(res, updated);

@@ -8,7 +8,7 @@ import {
   workspaces, users, workspaceMemberships,
   auditLog, customers, tasks,
 } from '../../shared/schema.js';
-import { eq, desc, sql, ilike, and } from 'drizzle-orm';
+import { eq, desc, sql, ilike } from 'drizzle-orm';
 import { ok, paginated } from '../lib/validate.js';
 import { requireAuth } from '../lib/auth-session.js';
 import { ForbiddenError } from '../lib/errors.js';

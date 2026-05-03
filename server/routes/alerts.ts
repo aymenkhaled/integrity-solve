@@ -37,8 +37,8 @@ router.get('/', requireWorkspace, async (req, res, next) => {
     const { status, severity } = req.query as { status?: string; severity?: string };
 
     const conditions = [eq(smartAlerts.workspaceId, workspaceId)];
-    if (status)   conditions.push(eq(smartAlerts.status, status as typeof smartAlerts.$inferInsert['status']));
-    if (severity) conditions.push(eq(smartAlerts.severity, severity as typeof smartAlerts.$inferInsert['severity']));
+    if (status)   conditions.push(eq(smartAlerts.status, status as typeof smartAlerts.$inferSelect['status']));
+    if (severity) conditions.push(eq(smartAlerts.severity, severity as typeof smartAlerts.$inferSelect['severity']));
 
     const alerts = await db
       .select()

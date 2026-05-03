@@ -263,6 +263,24 @@ GET  /api/seed (POST to seed demo data)
 - ✅ EscalationDetailPage: Create SMR Draft dialog + Approve/Submit actions
 - ✅ Deep API test suite: 76/76 mutations passing (scripts/test-api.mjs)
 
+## TypeScript Build — CLEAN ✅ (May 2026)
+All 30+ TypeScript strict-mode errors resolved across 14 server files:
+- `validate.ts`: removed unused `z` import
+- `auth.ts`: removed unused `createId`/`lt` imports; fixed `workspace?.id ?? ''` for nullable session workspace
+- `alerts.ts`, `reviews.ts`, `tasks.ts`, `training.ts`: `$inferInsert` → `$inferSelect` for enum eq() casts
+- `checks.ts`: removed unused `customers`, `AppError` imports
+- `customers.ts`: removed `createId`; fixed `as unknown as` query cast; explicit BO insert (numeric ownershipPct → String())
+- `documents.ts`: removed unused `programVersions` import
+- `escalations.ts`: removed unused `customers` import
+- `gateway.ts`: removed unused `workspaces`, `escalations`, `desc`, `sql` imports
+- `groups.ts`: removed unused `and`, `sql`, `createId` imports
+- `programs.ts`: removed unused `programDocuments`, `assertReason` imports
+- `providers.ts`: removed unused `and`, `env` imports
+- `reviews.ts`: removed `reviewType` from insert (column doesn't exist in schema)
+- `tasks.ts`: destructured `dueAt` separately to avoid string→Date type error; removed `assignedTo`
+- `workspaces.ts`: removed unused `inArray` import
+- `notifications.ts`: removed unused `users` import
+
 ## Known Limitations / Future Work
 - Billing: Stripe webhooks pending (requires STRIPE_SECRET_KEY)
 - Documents: PDF generation pending (currently plain-text; docxtemplater/pdfkit can be added)

@@ -2,7 +2,7 @@
  * server/lib/validate.ts — Zod validation helper for Express routes.
  */
 import type { Request, Response, NextFunction } from 'express';
-import { z, type ZodSchema } from 'zod';
+import { type ZodSchema } from 'zod';
 
 export function validate<T>(schema: ZodSchema<T>, source: 'body' | 'query' | 'params' = 'body') {
   return (req: Request, _res: Response, next: NextFunction): void => {
@@ -12,7 +12,7 @@ export function validate<T>(schema: ZodSchema<T>, source: 'body' | 'query' | 'pa
       return;
     }
     // Replace the source with parsed+coerced data
-    (req as Record<string, unknown>)[source] = result.data;
+    (req as unknown as Record<string, unknown>)[source] = result.data;
     next();
   };
 }

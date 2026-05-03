@@ -3,13 +3,12 @@
  */
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
-import { createId } from '@paralleldrive/cuid2';
 import { db } from '../db.js';
 import {
   users, workspaces, workspaceMemberships,
   verificationCodes, sessions,
 } from '../../shared/schema.js';
-import { eq, and, gt, lt } from 'drizzle-orm';
+import { eq, and, gt } from 'drizzle-orm';
 import {
   RegisterSchema, LoginSchema, VerifyEmailSchema, ChangePasswordSchema,
 } from '../../shared/validators.js';
@@ -328,7 +327,7 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
     await db.update(users).set({ fullName: fullName.trim() }).where(eq(users.id, userId));
 
     await writeAudit(
-      { workspaceId: req.session!.workspace.id, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
+      { workspaceId: req.session!.workspace?.id ?? '', actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
       { action: 'user.profile_updated', entityType: 'user', entityId: userId, newValue: { fullName } },
     );
 
@@ -355,7 +354,7 @@ router.post('/change-password', requireAuth, validateBody(ChangePasswordSchema),
     await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
 
     await writeAudit(
-      { workspaceId: req.session!.workspace.id, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
+      { workspaceId: req.session!.workspace?.id ?? '', actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
       { action: 'user.password_changed', entityType: 'user', entityId: userId },
     );
 

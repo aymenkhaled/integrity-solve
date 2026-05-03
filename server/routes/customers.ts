@@ -15,7 +15,7 @@ import { requireWorkspace } from '../lib/auth-session.js';
 import { getWorkspaceId, getUserId, assertCustomerOwnership } from '../lib/workspace-guard.js';
 import { writeAudit } from '../lib/audit.js';
 import { ForbiddenError, NotFoundError } from '../lib/errors.js';
-import { createId } from '@paralleldrive/cuid2';
+
 
 const router = Router();
 
@@ -24,7 +24,7 @@ const router = Router();
 router.get('/', requireWorkspace, validateQuery(PaginationSchema), async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    const { page, limit, search } = req.query as { page: number; limit: number; search?: string };
+    const { page, limit, search } = req.query as unknown as { page: number; limit: number; search?: string };
 
     const offset = (page - 1) * limit;
 
@@ -101,12 +101,12 @@ router.post('/', requireWorkspace, validateBody(CreateCustomerSchema), async (re
 
 router.get('/:id', requireWorkspace, async (req, res, next) => {
   try {
-    await assertCustomerOwnership(req, req.params['id']!);
+    await assertCustomerOwnership(req, (req.params['id'] as string));
 
     const [customer] = await db
       .select()
       .from(customers)
-      .where(eq(customers.id, req.params['id']!))
+      .where(eq(customers.id, (req.params['id'] as string)))
       .limit(1);
 
     if (!customer) throw new NotFoundError('Customer');
@@ -129,22 +129,22 @@ router.patch('/:id', requireWorkspace, validateBody(UpdateCustomerSchema), async
   try {
     const workspaceId = getWorkspaceId(req);
     const userId = getUserId(req);
-    await assertCustomerOwnership(req, req.params['id']!);
+    await assertCustomerOwnership(req, (req.params['id'] as string));
 
     const body = req.body as typeof UpdateCustomerSchema._type;
     const { reason, ...updateData } = body;
 
-    const [before] = await db.select().from(customers).where(eq(customers.id, req.params['id']!)).limit(1);
+    const [before] = await db.select().from(customers).where(eq(customers.id, (req.params['id'] as string))).limit(1);
 
     const [updated] = await db
       .update(customers)
       .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(customers.id, req.params['id']!))
+      .where(eq(customers.id, (req.params['id'] as string)))
       .returning();
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'customer.updated', entityType: 'customer', entityId: req.params['id']!, oldValue: before, newValue: updated, reason },
+      { action: 'customer.updated', entityType: 'customer', entityId: (req.params['id'] as string), oldValue: before, newValue: updated, reason },
     );
 
     ok(res, updated);
@@ -159,16 +159,16 @@ router.patch('/:id/risk-rating', requireWorkspace, validateBody(UpdateRiskRating
   try {
     const workspaceId = getWorkspaceId(req);
     const userId = getUserId(req);
-    await assertCustomerOwnership(req, req.params['id']!);
+    await assertCustomerOwnership(req, (req.params['id'] as string));
 
     const { riskRating, reason, riskNotes } = req.body as typeof UpdateRiskRatingSchema._type;
 
-    const [before] = await db.select({ riskRating: customers.riskRating }).from(customers).where(eq(customers.id, req.params['id']!)).limit(1);
+    const [before] = await db.select({ riskRating: customers.riskRating }).from(customers).where(eq(customers.id, (req.params['id'] as string))).limit(1);
 
     const [updated] = await db
       .update(customers)
       .set({ riskRating, riskNotes, updatedAt: new Date() })
-      .where(eq(customers.id, req.params['id']!))
+      .where(eq(customers.id, (req.params['id'] as string)))
       .returning();
 
     await writeAudit(
@@ -176,7 +176,7 @@ router.patch('/:id/risk-rating', requireWorkspace, validateBody(UpdateRiskRating
       {
         action: 'customer.riskRating.updated',
         entityType: 'customer',
-        entityId: req.params['id']!,
+        entityId: (req.params['id'] as string),
         oldValue: before,
         newValue: { riskRating, riskNotes },
         reason,
@@ -195,7 +195,7 @@ router.patch('/:id/status', requireWorkspace, async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const userId = getUserId(req);
-    await assertCustomerOwnership(req, req.params['id']!);
+    await assertCustomerOwnership(req, (req.params['id'] as string));
 
     const { status, reason } = req.body as { status: string; reason: string };
 
@@ -203,7 +203,7 @@ router.patch('/:id/status', requireWorkspace, async (req, res, next) => {
       throw new Error('Reason must be at least 10 characters');
     }
 
-    const [before] = await db.select({ status: customers.status }).from(customers).where(eq(customers.id, req.params['id']!)).limit(1);
+    const [before] = await db.select({ status: customers.status }).from(customers).where(eq(customers.id, (req.params['id'] as string))).limit(1);
 
     const [updated] = await db
       .update(customers)
@@ -212,12 +212,12 @@ router.patch('/:id/status', requireWorkspace, async (req, res, next) => {
         updatedAt: new Date(),
         ...(status === 'EXITED' ? { exitedAt: new Date(), exitReason: reason } : {}),
       })
-      .where(eq(customers.id, req.params['id']!))
+      .where(eq(customers.id, (req.params['id'] as string)))
       .returning();
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'customer.status.changed', entityType: 'customer', entityId: req.params['id']!, oldValue: before, newValue: { status }, reason },
+      { action: 'customer.status.changed', entityType: 'customer', entityId: (req.params['id'] as string), oldValue: before, newValue: { status }, reason },
     );
 
     ok(res, updated);
@@ -230,11 +230,11 @@ router.patch('/:id/status', requireWorkspace, async (req, res, next) => {
 
 router.get('/:id/beneficial-owners', requireWorkspace, async (req, res, next) => {
   try {
-    await assertCustomerOwnership(req, req.params['id']!);
+    await assertCustomerOwnership(req, (req.params['id'] as string));
     const bos = await db
       .select()
       .from(beneficialOwners)
-      .where(eq(beneficialOwners.customerId, req.params['id']!));
+      .where(eq(beneficialOwners.customerId, (req.params['id'] as string)));
     ok(res, bos);
   } catch (err) {
     next(err);
@@ -245,13 +245,19 @@ router.post('/:id/beneficial-owners', requireWorkspace, validateBody(CreateBenef
   try {
     const workspaceId = getWorkspaceId(req);
     const userId = getUserId(req);
-    await assertCustomerOwnership(req, req.params['id']!);
+    await assertCustomerOwnership(req, (req.params['id'] as string));
 
     const body = req.body as typeof CreateBeneficialOwnerSchema._type;
 
     const [bo] = await db.insert(beneficialOwners).values({
-      ...body,
-      customerId:  req.params['id']!,
+      givenNames:   body.givenNames,
+      familyName:   body.familyName,
+      dateOfBirth:  body.dateOfBirth,
+      nationality:  body.nationality,
+      ownershipPct: body.ownershipPct !== undefined ? String(body.ownershipPct) : undefined,
+      isController: body.isController,
+      roleTitle:    body.roleTitle,
+      customerId:   (req.params['id'] as string),
       workspaceId,
     }).returning();
 

@@ -6,7 +6,7 @@
  */
 import { Router } from 'express';
 import { db } from '../db.js';
-import { programDocuments, programForms, programVersions, workspaces } from '../../shared/schema.js';
+import { programDocuments, programForms, workspaces } from '../../shared/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { ok } from '../lib/validate.js';
 import { requireWorkspace } from '../lib/auth-session.js';
@@ -84,7 +84,7 @@ router.post('/generate', requireWorkspace, async (req, res, next) => {
         createdBy: userId,
         publishedAt: null,
         publishedBy: null,
-      } as typeof programForms.$inferSelect;
+      } as unknown as typeof programForms.$inferSelect;
     }
 
     // Load workspace for letterhead

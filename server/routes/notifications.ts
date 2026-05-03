@@ -40,7 +40,7 @@ router.post('/:id/read', requireAuth, async (req, res, next) => {
     const [notif] = await db
       .select()
       .from(notifications)
-      .where(and(eq(notifications.id, req.params['id']!), eq(notifications.userId, userId)))
+      .where(and(eq(notifications.id, (req.params['id'] as string)), eq(notifications.userId, userId)))
       .limit(1);
 
     if (!notif) throw new NotFoundError('Notification');

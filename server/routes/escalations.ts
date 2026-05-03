@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import {
-  escalations, smrDrafts, customers,
+  escalations, smrDrafts,
 } from '../../shared/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import {
@@ -82,7 +82,7 @@ router.get('/:id', requireWorkspace, async (req, res, next) => {
     const [escalation] = await db
       .select()
       .from(escalations)
-      .where(and(eq(escalations.id, req.params['id']!), eq(escalations.workspaceId, workspaceId)))
+      .where(and(eq(escalations.id, (req.params['id'] as string)), eq(escalations.workspaceId, workspaceId)))
       .limit(1);
 
     if (!escalation) throw new NotFoundError('Escalation');
@@ -109,7 +109,7 @@ router.patch('/:id', requireWorkspace, validateBody(UpdateEscalationSchema), asy
     const [existing] = await db
       .select()
       .from(escalations)
-      .where(and(eq(escalations.id, req.params['id']!), eq(escalations.workspaceId, workspaceId)))
+      .where(and(eq(escalations.id, (req.params['id'] as string)), eq(escalations.workspaceId, workspaceId)))
       .limit(1);
 
     if (!existing) throw new NotFoundError('Escalation');
@@ -119,12 +119,12 @@ router.patch('/:id', requireWorkspace, validateBody(UpdateEscalationSchema), asy
     const [updated] = await db
       .update(escalations)
       .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(escalations.id, req.params['id']!))
+      .where(eq(escalations.id, (req.params['id'] as string)))
       .returning();
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'escalation.updated', entityType: 'escalation', entityId: req.params['id']!, oldValue: existing, newValue: updated, reason },
+      { action: 'escalation.updated', entityType: 'escalation', entityId: (req.params['id'] as string), oldValue: existing, newValue: updated, reason },
     );
 
     ok(res, updated);
@@ -145,7 +145,7 @@ router.post('/:id/escalate', requireWorkspace, async (req, res, next) => {
     const [existing] = await db
       .select()
       .from(escalations)
-      .where(and(eq(escalations.id, req.params['id']!), eq(escalations.workspaceId, workspaceId)))
+      .where(and(eq(escalations.id, (req.params['id'] as string)), eq(escalations.workspaceId, workspaceId)))
       .limit(1);
 
     if (!existing) throw new NotFoundError('Escalation');
@@ -156,12 +156,12 @@ router.post('/:id/escalate', requireWorkspace, async (req, res, next) => {
     const [updated] = await db
       .update(escalations)
       .set({ status: 'ESCALATED_TO_SMR', reviewedBy: userId, reviewedAt: new Date(), updatedAt: new Date() })
-      .where(eq(escalations.id, req.params['id']!))
+      .where(eq(escalations.id, (req.params['id'] as string)))
       .returning();
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'escalation.escalated_to_smr', entityType: 'escalation', entityId: req.params['id']!, reason },
+      { action: 'escalation.escalated_to_smr', entityType: 'escalation', entityId: (req.params['id'] as string), reason },
     );
 
     ok(res, updated);
@@ -187,14 +187,14 @@ router.post('/:id/close', requireWorkspace, async (req, res, next) => {
     const [updated] = await db
       .update(escalations)
       .set({ status, closedBy: userId, closedAt: new Date(), closeReason: reason, updatedAt: new Date() })
-      .where(and(eq(escalations.id, req.params['id']!), eq(escalations.workspaceId, workspaceId)))
+      .where(and(eq(escalations.id, (req.params['id'] as string)), eq(escalations.workspaceId, workspaceId)))
       .returning();
 
     if (!updated) throw new NotFoundError('Escalation');
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'escalation.closed', entityType: 'escalation', entityId: req.params['id']!, newValue: { status }, reason },
+      { action: 'escalation.closed', entityType: 'escalation', entityId: (req.params['id'] as string), newValue: { status }, reason },
     );
 
     ok(res, updated);
@@ -218,7 +218,7 @@ router.post('/:id/smr', requireWorkspace, validateBody(CreateSmrDraftSchema), as
     const [existing] = await db
       .select()
       .from(escalations)
-      .where(and(eq(escalations.id, req.params['id']!), eq(escalations.workspaceId, workspaceId)))
+      .where(and(eq(escalations.id, (req.params['id'] as string)), eq(escalations.workspaceId, workspaceId)))
       .limit(1);
 
     if (!existing) throw new NotFoundError('Escalation');
@@ -257,7 +257,7 @@ router.post('/:id/smr/:smrId/submit', requireWorkspace, validateBody(SubmitSmrSc
     const [smr] = await db
       .select()
       .from(smrDrafts)
-      .where(and(eq(smrDrafts.id, req.params['smrId']!), eq(smrDrafts.workspaceId, workspaceId)))
+      .where(and(eq(smrDrafts.id, (req.params['smrId'] as string)), eq(smrDrafts.workspaceId, workspaceId)))
       .limit(1);
 
     if (!smr) throw new NotFoundError('SMR draft');
@@ -273,14 +273,14 @@ router.post('/:id/smr/:smrId/submit', requireWorkspace, validateBody(SubmitSmrSc
         submittedBy: userId,
         updatedAt:   new Date(),
       })
-      .where(eq(smrDrafts.id, req.params['smrId']!))
+      .where(eq(smrDrafts.id, (req.params['smrId'] as string)))
       .returning();
 
     // Update escalation status
     await db
       .update(escalations)
       .set({ status: 'SMR_SUBMITTED', smrId: smr.id, updatedAt: new Date() })
-      .where(eq(escalations.id, req.params['id']!));
+      .where(eq(escalations.id, (req.params['id'] as string)));
 
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
@@ -309,7 +309,7 @@ router.post('/:id/smr/:smrId/approve', requireWorkspace, validateBody(ApproveSmr
     const [smr] = await db
       .select()
       .from(smrDrafts)
-      .where(and(eq(smrDrafts.id, req.params['smrId']!), eq(smrDrafts.workspaceId, workspaceId)))
+      .where(and(eq(smrDrafts.id, (req.params['smrId'] as string)), eq(smrDrafts.workspaceId, workspaceId)))
       .limit(1);
 
     if (!smr) throw new NotFoundError('SMR draft');
@@ -326,7 +326,7 @@ router.post('/:id/smr/:smrId/approve', requireWorkspace, validateBody(ApproveSmr
         approvalReason: reason,
         updatedAt:      new Date(),
       })
-      .where(eq(smrDrafts.id, req.params['smrId']!))
+      .where(eq(smrDrafts.id, (req.params['smrId'] as string)))
       .returning();
 
     await writeAudit(

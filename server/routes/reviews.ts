@@ -62,7 +62,7 @@ router.get('/', requireWorkspace, async (req, res, next) => {
 
     const conditions = [eq(periodicReviews.workspaceId, workspaceId)];
     if (customerId) conditions.push(eq(periodicReviews.customerId, customerId));
-    if (status)     conditions.push(eq(periodicReviews.status, status as typeof periodicReviews.$inferInsert['status']));
+    if (status)     conditions.push(eq(periodicReviews.status, status as typeof periodicReviews.$inferSelect['status']));
 
     const reviews = await db
       .select()
@@ -96,7 +96,6 @@ router.post('/', requireWorkspace, validateBody(CreateReviewSchema), async (req,
       workspaceId,
       customerId:     body.customerId,
       dueAt:          new Date(body.dueAt),
-      reviewType:     body.reviewType,
       notes:          body.notes,
       previousRating: customer.riskRating,
     }).returning();

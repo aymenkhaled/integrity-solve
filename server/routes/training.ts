@@ -46,7 +46,7 @@ router.get('/', requireWorkspace, async (req, res, next) => {
 
     const conditions = [eq(trainingRecords.workspaceId, workspaceId)];
     if (userId)  conditions.push(eq(trainingRecords.userId, userId));
-    if (status)  conditions.push(eq(trainingRecords.status, status as typeof trainingRecords.$inferInsert['status']));
+    if (status)  conditions.push(eq(trainingRecords.status, status as typeof trainingRecords.$inferSelect['status']));
 
     const records = await db
       .select({

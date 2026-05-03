@@ -62,7 +62,7 @@ export async function destroySession(req: Request, res: Response): Promise<void>
   res.clearCookie(SESSION_COOKIE, { path: '/' });
 }
 
-export function sessionMiddleware(req: Request, _res: Response, next: NextFunction): void {
+export function sessionMiddleware(_req: Request, _res: Response, next: NextFunction): void {
   // Session is resolved lazily by requireAuth
   next();
 }

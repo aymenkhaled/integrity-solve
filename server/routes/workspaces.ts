@@ -6,7 +6,7 @@ import { db } from '../db.js';
 import {
   workspaces, workspaceMemberships, users, invitations,
 } from '../../shared/schema.js';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import {
   UpdateWorkspaceSchema, InviteMemberSchema, AcceptInvitationSchema,
 } from '../../shared/validators.js';
