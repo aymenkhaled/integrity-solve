@@ -9,7 +9,7 @@ import {
   Clock, ArrowRight, Shield, TrendingUp, Bell,
   ChevronRight, Zap, BarChart3,
 } from 'lucide-react';
-import { customerApi, escalationApi, taskApi, programApi, alertApi } from '@/lib/api';
+import { customerApi, escalationApi, taskApi, programApi, alertApi, analyticsApi } from '@/lib/api';
 import { formatDate, formatRelative } from '@/lib/utils';
 import { RiskBadge } from '@/components/shared/RiskBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -101,6 +101,12 @@ export default function DashboardPage() {
     queryFn: () => alertApi.list({ status: 'OPEN' }) as Promise<unknown[]>,
   });
 
+  const { data: dashboardData } = useQuery({
+    queryKey: ['analytics', 'dashboard'],
+    queryFn:  () => analyticsApi.dashboard() as Promise<{ overall: number; overallStatus: string }>,
+    staleTime: 5 * 60_000,
+  });
+
   const customers     = Array.isArray(customersData) ? customersData : (customersData?.customers ?? []);
   const customerTotal = Array.isArray(customersData) ? customers.length : (customersData?.total ?? 0);
   const escalations   = Array.isArray(escalationsData) ? escalationsData : ((escalationsData as any)?.escalations ?? []);
@@ -172,14 +178,27 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="card-3d">
+        <Card className="card-3d" role="link" onClick={() => window.location.href = '/compliance/health'} style={{ cursor: 'pointer' }}>
           <CardContent className="p-5">
             <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-2">Compliance Score</div>
-            <div className="text-3xl font-bold text-indigo-400 counter">94%</div>
-            <div className="text-xs text-muted-foreground mt-1">Excellent standing</div>
-            <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: '94%' }} />
-            </div>
+            {dashboardData ? (
+              <>
+                <div className={`text-3xl font-bold counter ${dashboardData.overall >= 80 ? 'text-green-400' : dashboardData.overall >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {dashboardData.overall}%
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 capitalize">{dashboardData.overallStatus.replace('_', ' ')} standing</div>
+                <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${dashboardData.overall >= 80 ? 'bg-green-500' : dashboardData.overall >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${dashboardData.overall}%` }} />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="h-9 w-16 rounded bg-muted/50 animate-pulse mb-1" />
+                <div className="h-3 w-24 rounded bg-muted/50 animate-pulse mt-1" />
+                <div className="mt-3 h-1.5 bg-muted rounded-full" />
+              </>
+            )}
           </CardContent>
         </Card>
 

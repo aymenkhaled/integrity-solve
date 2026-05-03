@@ -130,8 +130,10 @@ export const programApi = {
 export const taskApi = {
   list:   (params?: Record<string, unknown>) =>
     api.get(`/tasks?${new URLSearchParams(params as Record<string, string>).toString()}`),
-  create: (data: unknown) => api.post('/tasks', data),
-  update: (id: string, data: unknown) => api.patch(`/tasks/${id}`, data),
+  create: (data: unknown)              => api.post('/tasks', data),
+  get:    (id: string)                 => api.get(`/tasks/${id}`),
+  update: (id: string, data: unknown)  => api.patch(`/tasks/${id}`, data),
+  delete: (id: string)                 => api.delete(`/tasks/${id}`),
 };
 
 // ─── Audit ────────────────────────────────────────────────────────────────────
@@ -236,9 +238,10 @@ export const whitelabelApi = {
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export const analyticsApi = {
-  smr:      () => api.get('/analytics/smr'),
-  training: () => api.get('/analytics/training'),
-  reviews:  () => api.get('/analytics/reviews'),
+  smr:       () => api.get('/analytics/smr'),
+  training:  () => api.get('/analytics/training'),
+  reviews:   () => api.get('/analytics/reviews'),
+  dashboard: () => api.get('/analytics/dashboard'),
 };
 
 // ─── Risk Intelligence ────────────────────────────────────────────────────────

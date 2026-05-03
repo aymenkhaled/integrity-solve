@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, CheckSquare, Loader2, Clock, Flag, Circle, CheckCircle2, Filter } from 'lucide-react';
+import { Plus, CheckSquare, Loader2, Clock, Flag, Circle, CheckCircle2, Filter, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -87,6 +87,15 @@ export default function TasksPage() {
       toast.success('Task started');
     },
     onError: () => toast.error('Failed to start task'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => taskApi.delete(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Task deleted');
+    },
+    onError: () => toast.error('Failed to delete task'),
   });
 
   const openCount     = tasks.filter((t) => t.status === 'OPEN').length;
@@ -246,6 +255,16 @@ export default function TasksPage() {
                         Complete
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(task.id); }}
+                      disabled={deleteMutation.isPending}
+                      title="Delete task"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

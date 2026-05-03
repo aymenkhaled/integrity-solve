@@ -1,0 +1,164 @@
+
+
+Overview
+
+Logs
+
+Analytics
+
+Resources
+
+Domains
+
+Manage
+Search
+
+
+Errors only
+
+Date
+Time
+Deployment
+Source
+Log
+2026-05-03 20:46:58.51
+c03de2da
+System
+starting up user application
+2026-05-03 20:46:58.51
+c03de2da
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-05-03 20:46:58.51
+c03de2da
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-05-03 20:46:58.95
+c03de2da
+User
+throw err;
+2026-05-03 20:46:58.95
+c03de2da
+User
+at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+
+2026-05-03 20:46:58.95
+c03de2da
+User
+Node.js v20.20.0
+2026-05-03 20:46:58.95
+c03de2da
+User
+^
+2026-05-03 20:46:58.95
+c03de2da
+User
+}
+2026-05-03 20:46:58.95
+c03de2da
+User
+code: 'MODULE_NOT_FOUND',
+2026-05-03 20:46:58.95
+c03de2da
+User
+node:internal/modules/cjs/loader:1210
+2026-05-03 20:46:58.95
+c03de2da
+User
+at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-05-03 20:46:58.95
+c03de2da
+User
+requireStack: []
+2026-05-03 20:46:58.95
+c03de2da
+User
+at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2026-05-03 20:46:58.95
+c03de2da
+User
+Error: Cannot find module '/home/runner/workspace/dist/index.cjs'
+2026-05-03 20:46:58.95
+c03de2da
+User
+at node:internal/main/run_main_module:28:49 {
+2026-05-03 20:46:58.95
+c03de2da
+System
+command finished with error [node ./dist/index.cjs]: exit status 1
+2026-05-03 20:46:59.08
+c03de2da
+User
+throw err;
+2026-05-03 20:46:59.08
+c03de2da
+User
+node:internal/modules/cjs/loader:1210
+2026-05-03 20:47:04.81
+c03de2da
+User
+code: 'MODULE_NOT_FOUND',
+2026-05-03 20:47:04.81
+c03de2da
+User
+node:internal/modules/cjs/loader:1210
+2026-05-03 20:47:04.81
+c03de2da
+User
+requireStack: []
+2026-05-03 20:47:04.81
+c03de2da
+User
+at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2026-05-03 20:47:04.81
+c03de2da
+User
+Error: Cannot find module '/home/runner/workspace/dist/index.cjs'
+2026-05-03 20:47:04.81
+c03de2da
+User
+at node:internal/main/run_main_module:28:49 {
+2026-05-03 20:47:04.81
+c03de2da
+User
+}
+2026-05-03 20:47:04.81
+c03de2da
+User
+throw err;
+2026-05-03 20:47:04.81
+c03de2da
+User
+at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-05-03 20:47:04.81
+c03de2da
+User
+^
+2026-05-03 20:47:04.81
+c03de2da
+User
+at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-05-03 20:47:04.81
+c03de2da
+User
+Node.js v20.20.0
+2026-05-03 20:47:04.81
+c03de2da
+System
+command finished with error [node ./dist/index.cjs]: exit status 1
+2026-05-03 20:47:14.81
+c03de2da
+User
+at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2026-05-03 20:47:14.81
+c03de2da
+User
+code: 'MODULE_NOT_FOUND',
+2026-05-03 20:47:14.81
+c03de2da
+User
+at node:internal/main/run_main_module:28:49 {
+2026-05-03 20:47:14.81
+c03de2da
+User
+requireStack: []

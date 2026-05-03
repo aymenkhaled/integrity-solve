@@ -59,6 +59,28 @@ router.post('/', requireWorkspace, validateBody(CreateTaskSchema), async (req, r
   }
 });
 
+// ─── GET /api/tasks/:id ───────────────────────────────────────────────────────
+
+router.get('/:id', requireWorkspace, async (req, res, next) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+
+    const [task] = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.id, (req.params['id'] as string)), eq(tasks.workspaceId, workspaceId)))
+      .limit(1);
+
+    if (!task) throw new NotFoundError('Task');
+
+    ok(res, task);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── PATCH /api/tasks/:id ─────────────────────────────────────────────────────
+
 router.patch('/:id', requireWorkspace, validateBody(UpdateTaskSchema), async (req, res, next) => {
   try {
     const workspaceId = getWorkspaceId(req);
@@ -90,6 +112,34 @@ router.patch('/:id', requireWorkspace, validateBody(UpdateTaskSchema), async (re
     );
 
     ok(res, updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── DELETE /api/tasks/:id ────────────────────────────────────────────────────
+
+router.delete('/:id', requireWorkspace, async (req, res, next) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const userId = getUserId(req);
+
+    const [existing] = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.id, (req.params['id'] as string)), eq(tasks.workspaceId, workspaceId)))
+      .limit(1);
+
+    if (!existing) throw new NotFoundError('Task');
+
+    await db.delete(tasks).where(eq(tasks.id, (req.params['id'] as string)));
+
+    await writeAudit(
+      { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
+      { action: 'task.deleted', entityType: 'task', entityId: (req.params['id'] as string) },
+    );
+
+    ok(res, { deleted: true });
   } catch (err) {
     next(err);
   }
