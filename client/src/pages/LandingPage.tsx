@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import {
   Shield, CheckCircle, ArrowRight, Lock, FileText,
   Users, BarChart3, Zap, Star, ChevronRight,
-  AlertTriangle, TrendingUp, Clock, Database, Globe,
-  Brain, Key, Palette, Network, GraduationCap, Cpu,
+  TrendingUp, Clock, Database, Globe,
+  Brain, Key, Network, Cpu,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ComplianceCommandCenter from '@/components/hero/ComplianceCommandCenter';

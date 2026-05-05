@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';

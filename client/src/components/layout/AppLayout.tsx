@@ -10,7 +10,6 @@ import {
   ChevronRight, Brain, BarChart2, ShoppingBag, Key, Palette, Network,
   HeartPulse, CalendarDays, Activity, FolderOpen,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,

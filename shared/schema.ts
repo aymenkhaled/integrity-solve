@@ -890,12 +890,25 @@ export const cases = pgTable('cases', {
   partyType:        text('party_type'),                           // individual | company | trust | beneficial_owner
   riskLevel:        text('risk_level').default('not_assessed'),   // low | medium | high | not_assessed
   recommendation:   text('recommendation'),
+  // Deep links to other modules
+  customerId:       text('customer_id').references(() => customers.id),
+  programFormId:    text('program_form_id').references(() => programForms.id),
+  escalationId:     text('escalation_id').references(() => escalations.id),
+  // Reviewer decision
+  reviewerDecision:   text('reviewer_decision'),                  // approve_proceed | request_more_info | escalate_officer
+  reviewerDecisionBy: text('reviewer_decision_by').references(() => users.id),
+  reviewerDecisionAt: timestamp('reviewer_decision_at', { withTimezone: true }),
+  reviewerNotes:      text('reviewer_notes'),
+  // Extra metadata
+  metadata:         jsonb('metadata').default({}),
   createdBy:        text('created_by').references(() => users.id),
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
-  workspaceIdx: index('cases_workspace_idx').on(t.workspaceId),
-  statusIdx:    index('cases_status_idx').on(t.workspaceId, t.status),
+  workspaceIdx:  index('cases_workspace_idx').on(t.workspaceId),
+  statusIdx:     index('cases_status_idx').on(t.workspaceId, t.status),
+  customerIdx:   index('cases_customer_idx').on(t.customerId),
+  escalationIdx: index('cases_escalation_idx').on(t.escalationId),
 }));
 
 export const wizardRuns = pgTable('wizard_runs', {
@@ -940,6 +953,8 @@ export const diditSessions = pgTable('didit_sessions', {
   workflowId:       text('workflow_id'),
   vendorData:       text('vendor_data'),
   subjectId:        text('subject_id'),
+  // Bridge to check engine: set when case has a linked customer
+  checkRequestId:   text('check_request_id').references(() => checkRequests.id),
   metadata:         jsonb('metadata').default({}),
   createdBy:        text('created_by').references(() => users.id),
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1017,3 +1032,8 @@ export type Invitation               = typeof invitations.$inferSelect;
 export type EvidenceFile             = typeof evidenceFiles.$inferSelect;
 export type PersonRecord             = typeof personRecords.$inferSelect;
 export type ProviderConnection       = typeof providerConnections.$inferSelect;
+export type Case                     = typeof cases.$inferSelect;
+export type WizardRun                = typeof wizardRuns.$inferSelect;
+export type DiditSession             = typeof diditSessions.$inferSelect;
+export type DiditResult              = typeof diditResults.$inferSelect;
+export type CaseOutput               = typeof caseOutputs.$inferSelect;

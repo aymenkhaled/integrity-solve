@@ -256,8 +256,23 @@ export const riskApi = {
 export const casesApi = {
   list:    ()                  => api.get('/cases'),
   create:  (data: unknown)     => api.post('/cases', data),
+  update:  (id: string, data: unknown) => api.patch(`/cases/${id}`, data),
   summary: (id: string)        => api.get(`/cases/${id}/summary`),
   pdf:     (id: string)        => `/api/cases/${id}/pdf`, // direct download URL
+
+  linkCustomer: (id: string, customerId: string, reason: string) =>
+    api.post(`/cases/${id}/link-customer`, { customerId, reason }),
+
+  reviewerDecision: (id: string, decision: string, notes: string, reason: string) =>
+    api.post(`/cases/${id}/reviewer-decision`, { decision, notes, reason }),
+
+  createEscalation: (id: string, data: {
+    subject: string; summary: string; grounds: string;
+    riskRating?: string; reason: string;
+  }) => api.post(`/cases/${id}/escalation`, data),
+
+  generateEvidencePack: (id: string) =>
+    api.post(`/cases/${id}/generate-evidence-pack`, {}),
 };
 
 // ─── Wizard (Milestone 1) ─────────────────────────────────────────────────────

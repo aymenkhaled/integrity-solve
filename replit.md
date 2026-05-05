@@ -6,7 +6,7 @@ A production-grade AML/CTF (Anti-Money Laundering / Counter-Terrorism Financing)
 ## Architecture
 - **Frontend**: React 18 + Vite (port 5000 in dev), Wouter routing, Radix UI + shadcn/ui, TanStack Query
 - **Backend**: Express.js + TypeScript (port 3000), cookie-based session auth stored in DB
-- **Database**: PostgreSQL via Replit's built-in DB, Drizzle ORM (50 tables)
+- **Database**: PostgreSQL via Replit's built-in DB, Drizzle ORM (43 tables)
 - **Shared**: `/shared/` contains Drizzle schema, Zod validators, TypeScript types
 
 ## How to Run
@@ -42,7 +42,7 @@ Milestone 1 — Didit integration:
 - `server/env.ts` — All environment variable declarations (fail-fast validation)
 - `server/lib/auth-session.ts` — httpOnly cookie session management (DB-backed). Exports `requireAuth`, `requireWorkspace`, `requirePermission` middleware
 - `server/lib/workspace-guard.ts` — Triple-layer tenant isolation helpers (`getWorkspaceId`, `getUserId`, `assertCustomerOwnership`)
-- `shared/schema.ts` — Single source of truth for all 50 DB tables
+- `shared/schema.ts` — Single source of truth for all 43 DB tables
 - `client/src/App.tsx` — Frontend routing (all routes, including Milestone 1 cases/wizard pages)
 - `drizzle.config.ts` — Drizzle Kit configuration
 

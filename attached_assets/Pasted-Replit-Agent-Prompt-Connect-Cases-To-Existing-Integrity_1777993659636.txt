@@ -1,0 +1,963 @@
+Replit Agent Prompt - Connect Cases To Existing Integrity Solve App
+Continue the previous work on Integrity Solve.
+
+Private GitHub repo:
+
+git@github.com:aymenkhaled/integrity-solve.git
+
+You must pull the latest code first and continue from the current implementation. Do not restart from scratch. Do not remove the existing Customers, AML Program, 13-step program wizard, Checks, Documents, Audit, Escalations, Reviews, Tasks, Dashboard, Providers, or any existing MVP feature.
+
+Main Goal
+The new Cases feature is currently too separate from the rest of the app.
+
+The user is correct: the app already had Customers, AML Program, a 13-step Program Wizard, Checks, Documents, and Audit before Cases were added. Cases must not feel like a duplicate separate module. Cases must become the connected workflow hub that ties those existing features together.
+
+Daniel did not ask for random separate Cases. Daniel asked for wizard-led compliance workflows:
+
+identify the designated service
+identify who receives the service
+guide verification, screening, approval, escalation
+connect Didit checks/results
+generate PDF/result evidence
+maintain audit trail
+So the correct product model is:
+
+Case = workflow file / matter / compliance job
+
+It should connect to:
+
+existing Customer record
+existing Beneficial Owners where relevant
+existing AML Program record and old 13-step wizard
+existing Checks module
+existing Documents / Evidence Pack
+existing Tasks
+existing Escalations
+existing Audit trail
+Do not leave Cases as an isolated new screen.
+
+Working Requirement
+Work autonomously. Do not ask questions. Make safe professional assumptions and implement. Keep testing. If one part is done, continue to the next part. This app is large, and the user expects a serious implementation/test/review loop.
+
+If the platform stops you, resume by checking:
+
+git status --short --branch
+git log --oneline --decorate --max-count=8
+Then continue from the checklist below. Do not start over.
+
+Pull Latest First
+Run:
+
+git status --short --branch
+git pull --ff-only origin main
+git log --oneline --decorate --max-count=12
+If there are local changes, inspect and preserve user work. Do not run destructive reset.
+
+Current Latest State Found By Audit
+The latest pushed code already fixed some earlier Milestone 1 bugs:
+
+CasesPage.tsx now reads casesApi.list() as unwrapped Case[].
+Creating a case now starts a wizard and navigates to it.
+CaseDetailPage.tsx now reads casesApi.summary() as unwrapped CaseSummary.
+Audit UI/PDF now mostly uses reason, not detail.
+server/routes/cases.ts now uses inArray to load all Didit results.
+server/services/didit.ts has DIDIT_BASE_URL.
+Mock Didit now uses the "Mock Complete" button instead of a fake /mock-didit/:id page.
+wizard.ts creates/updates a case_outputs summary row on wizard completion.
+But the deeper issue remains:
+
+Cases are not connected enough to the rest of the already-built product.
+
+Current Local Verification Results
+After npm install --no-audit --no-fund, local verification showed:
+
+npm run typecheck
+Fails. Some failures are old app-wide unused imports, but these Milestone 1/new issues are important:
+
+client/src/pages/cases/CaseDetailPage.tsx
+unused imports: FileText, Clock
+wizardApi.start() returns unknown, but useMutation expects WizardRun
+fix by typing the API wrapper/mutation result properly
+npm run build
+Vite frontend build succeeds, but server TypeScript fails.
+
+Important errors:
+
+server/routes/cases.ts
+
+imports caseOutputs but does not use it
+req.params.id is inferred as string | string[]; Drizzle eq() needs a string
+server/routes/diditRoute.ts
+
+req.params.id is inferred as string | string[]; Drizzle eq() needs a string
+server/routes/wizard.ts
+
+unused ForbiddenError
+req.params.id and req.params.caseId are inferred as string | string[]; Drizzle eq() needs a string
+Fix pattern:
+
+const id = req.params['id'] as string;
+const caseId = req.params['caseId'] as string;
+Then use id or caseId in Drizzle queries.
+
+Do not claim build/typecheck pass until they actually pass.
+
+Table Count Documentation Is Wrong
+shared/schema.ts currently has 42 pgTable(...) declarations, not 50.
+
+Fix replit.md. Do not claim 50 tables unless the schema really has 50.
+
+.replit Deployment Path Looks Wrong
+.replit currently has:
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "./dist/index.cjs"]
+build = ["npm", "run", "build"]
+But package.json start script uses:
+
+"start": "NODE_ENV=production node dist/server/server/index.js"
+The build output observed locally is under dist/server/server/index.js, not dist/index.cjs.
+
+Fix deployment run command so production deployment starts the real built server.
+
+Preferred:
+
+run = ["npm", "start"]
+or exact:
+
+run = ["node", "dist/server/server/index.js"]
+Then test build/start if Replit allows.
+
+First Required Fixes Before New Features
+Fix Milestone 1 TypeScript/build errors.
+Fix .replit deployment run command.
+Fix replit.md table count and overclaims.
+Clean remaining mojibake in Milestone 1 comments/test output if practical.
+Re-run:
+npm run typecheck
+npm run build
+Only after this, implement deeper case integration.
+
+Product Interpretation To Preserve
+Do not explain Cases as a separate new product area.
+
+Use this concept:
+
+Cases are guided compliance workflow files that connect existing app modules.
+
+Examples:
+
+Transaction/CDD Case:
+
+linked to a Customer
+runs the transaction wizard
+recommends KYC/KYB/AML checks
+creates Didit sessions
+mirrors results into the existing Checks area
+creates reviewer/escalation/tasks when needed
+produces PDF evidence pack
+writes audit
+Program Setup Case:
+
+linked to an AML Program
+starts with a 5-step guided intake
+creates or updates an existing program_forms record
+lets the user continue into the existing 13-step AML Program wizard
+creates tasks for missing items
+can generate an AML program document through the existing Documents module
+writes audit
+Schema Integration Requirements
+Current cases table has only:
+
+id
+workspaceId
+caseType
+status
+title
+designatedService
+partyType
+riskLevel
+recommendation
+createdBy
+createdAt
+updatedAt
+That is not enough to connect the app.
+
+Add minimal nullable linking fields to cases:
+
+customerId: text('customer_id').references(() => customers.id),
+programFormId: text('program_form_id').references(() => programForms.id),
+escalationId: text('escalation_id').references(() => escalations.id),
+reviewerDecision: text('reviewer_decision'),
+reviewerDecisionBy: text('reviewer_decision_by').references(() => users.id),
+reviewerDecisionAt: timestamp('reviewer_decision_at', { withTimezone: true }),
+reviewerNotes: text('reviewer_notes'),
+metadata: jsonb('metadata').default({}),
+Add indexes:
+
+customerIdx: index('cases_customer_idx').on(t.workspaceId, t.customerId)
+programIdx: index('cases_program_idx').on(t.workspaceId, t.programFormId)
+Add relations if the project uses relations for this section.
+
+Important:
+
+Keep all fields nullable to avoid breaking existing rows.
+Run npx drizzle-kit push --force.
+Update tests for the new fields.
+Transaction Case Must Connect To Customers
+A Transaction/CDD Case must be able to link to an existing customer or create a new one.
+
+Backend
+Enhance POST /api/cases or add a separate endpoint:
+
+Preferred endpoint:
+
+POST /api/cases/:id/link-customer
+Supported body:
+
+{
+  "mode": "existing",
+  "customerId": "..."
+}
+or:
+
+{
+  "mode": "create",
+  "customer": {
+    "customerType": "INDIVIDUAL | COMPANY | TRUST",
+    "givenNames": "...",
+    "familyName": "...",
+    "entityName": "...",
+    "email": "...",
+    "phone": "...",
+    "abn": "...",
+    "acn": "..."
+  }
+}
+Behavior:
+
+Verify workspace ownership.
+If existing, link the case to the customer.
+If create, create a customer using existing customer schema/pattern.
+Update cases.customerId.
+Write audit linked to the case.
+Return updated case plus customer.
+If a case already has a customer, allow replacing only with a clear reason or prevent replacement. Choose a safe path and document it.
+
+Frontend
+In CaseDetailPage.tsx, add a "Linked Customer" section:
+
+If linked:
+show customer name/reference
+show button "Open Customer"
+If not linked:
+show selector for existing customer
+show simple create-new-customer form or "Create from wizard answers"
+Do not make the user leave the case page to understand what customer this case belongs to.
+
+Wizard
+Transaction wizard currently captures party type but not enough customer details.
+
+Add minimal party details to the transaction wizard:
+
+Individual:
+
+given names
+family name
+email optional
+phone optional
+Company/trust:
+
+entity name
+ABN optional
+ACN optional
+contact email optional
+On wizard completion:
+
+if no linked customer exists, offer "Create customer from this case"
+if customer exists, show "Linked to customer"
+Do not force customer creation before the wizard if that makes UX worse.
+
+Program Setup Case Must Connect To Existing AML Program And 13-Step Wizard
+This is the user's biggest concern.
+
+The app already has:
+
+/programs
+existing program_forms
+existing 13-step ProgramWizardPage
+programApi
+programs.ts backend route
+The new 5-step Program Setup Case should not duplicate the old 13-step wizard.
+
+It should act as an intake/front door.
+
+Backend
+When a PROGRAM_SETUP case wizard completes:
+
+If cases.programFormId is null:
+create a new program_forms row.
+title should come from case title.
+pathway should map from the program case wizard industry answer if possible.
+status should be IN_PROGRESS.
+formData should include the 5-step intake answers under a clear key:
+{
+  "case_intake": {
+    "caseId": "...",
+    "industry": "...",
+    "designatedServices": [],
+    "businessStructure": "...",
+    "locations": [],
+    "programReadiness": {}
+  }
+}
+Update cases.programFormId.
+Write audit:
+program_form_created_from_case
+Return the linked program ID in case summary.
+If programFormId already exists:
+
+update its formData.case_intake
+do not create duplicates
+write audit
+Frontend
+On Program Setup Case detail:
+
+show "Linked AML Program"
+show status/current step of the linked program
+show button:
+Continue in Full AML Program Wizard
+
+Link to:
+
+/programs/{programFormId}/wizard
+
+Also show:
+
+Open AML Program
+
+Link to:
+
+/programs
+
+or a specific program detail if it exists.
+
+Important UX Copy
+Make the distinction clear:
+
+5-step case wizard = quick intake/routing proof
+existing 13-step wizard = full AML program builder
+Do not make the user think there are two unrelated AML program systems.
+
+Didit Must Connect To Existing Checks Module
+Current Didit sessions live only in didit_sessions and didit_results.
+
+But the existing app already has:
+
+check_requests
+check_results
+checkApi
+/api/checks
+Checks page/customer checks
+So Didit checks should bridge into the existing Checks module.
+
+Schema
+Add to didit_sessions:
+
+checkRequestId: text('check_request_id').references(() => checkRequests.id),
+If safe, add DIDIT to providerEnum.
+
+Current provider enum:
+
+'GREENID', 'EQUIFAX', 'ILLION', 'REFINITIV', 'TRULIOO', 'ACIC', 'ASIC_CONNECT', 'ABR', 'MOCK'
+Preferred add:
+
+'DIDIT'
+If Postgres enum migration causes issues, use MOCK only in mock mode and document why, but preferred is to add DIDIT properly.
+
+On Didit Session Create
+When POST /api/providers/didit/session is called:
+
+Load the case.
+If the case has customerId, create a check_requests row too.
+Map capability:
+kyc -> IDENTITY
+kyb -> REGISTRY
+aml_screening -> AML
+company_aml -> AML
+Set provider:
+DIDIT if enum exists
+otherwise MOCK in mock mode with metadata explaining Didit mock bridge
+Store checkRequestId on didit_sessions.
+Write audit linked to case and check.
+On Didit Result/Webhook
+When Didit result is normalized:
+
+Update didit_sessions.status.
+Insert didit_results.
+If didit_sessions.checkRequestId exists:
+insert check_results
+update check_requests.status
+Map status:
+
+Didit passed -> check request PASS, result CLEAR
+Didit failed -> check request FAIL, result UNABLE_TO_VERIFY
+Didit review_required -> check request REFER or MANUAL_REVIEW, result POTENTIAL_HIT
+Didit processing -> check request RUNNING
+Didit error -> check request ERROR
+Use existing check schema exactly.
+
+Frontend
+Case detail "Verification Checks" tab should show:
+
+Didit session status
+linked check request ID
+button "Open Check" if existing check detail route exists
+Customer detail/checks area should show those check requests because they are linked to customer.
+
+Reviewer Decision Must Be Real
+Current CaseDetailPage.tsx has a Reviewer Decision dropdown, but handleReviewDecision() only shows a toast. This is not real.
+
+Fix it.
+
+Backend
+Add:
+
+POST /api/cases/:id/reviewer-decision
+Body:
+
+{
+  "decision": "approve_proceed | request_more_info | escalate_officer",
+  "notes": "..."
+}
+Behavior:
+
+Require workspace.
+Verify case belongs to workspace.
+Update:
+reviewerDecision
+reviewerDecisionBy
+reviewerDecisionAt
+reviewerNotes
+If decision is approve_proceed:
+update case recommendation/status appropriately
+If decision is request_more_info:
+create a task linked to case (entityType='case', entityId=case.id)
+If decision is escalate_officer:
+create a real escalations row
+link cases.escalationId
+Write audit.
+Return updated case plus created task/escalation if any.
+Frontend
+Update CaseDetailPage.tsx:
+
+add notes textarea
+call casesApi.reviewerDecision(...)
+show saved decision
+show linked task/escalation if created
+do not pretend success with toast only
+Escalations Must Connect
+If the transaction wizard returns escalations such as:
+
+PEP review required
+high-risk jurisdiction review required
+source of funds required
+TTR may be required
+Then the case should allow creating a real escalation.
+
+Implement one of these:
+
+Option A:
+
+Automatically create a draft escalation on wizard completion if risk is high.
+Option B, safer:
+
+Show "Create Escalation" button on case detail when escalation requirements exist.
+Preferred for control: Option B.
+
+Backend endpoint:
+
+POST /api/cases/:id/escalation
+Creates escalations row using:
+
+workspaceId
+customerId if linked
+subject from case title
+summary from route result
+grounds from escalation list
+riskRating mapped from case risk
+status DRAFT or UNDER_REVIEW
+Update cases.escalationId.
+
+Write audit.
+
+Tasks And CDD Checklist Must Connect
+Add a simple CDD checklist/task bridge, not a huge new module.
+
+When transaction wizard completes:
+
+Generate suggested checklist items from:
+
+party type
+risk level
+recommended checks
+escalations
+Examples:
+
+Individual:
+
+collect identity document
+verify individual identity
+run AML screening
+Company:
+
+collect company extract
+identify directors/officers
+identify beneficial owners
+run KYB
+run company AML screening
+High risk:
+
+collect source of funds/source of wealth evidence
+compliance officer review
+Implement either:
+
+Store checklist in case_outputs as outputType='cdd_checklist'
+And/or create real tasks rows linked with:
+entityType: 'case'
+entityId: case.id
+Preferred:
+
+store checklist in case_outputs
+create tasks only for actionable items requiring follow-up
+Case detail should show a "Checklist / Tasks" section or tab.
+
+Documents And Evidence Pack Must Connect
+Current case PDF exists, but it is separate from the existing Documents page.
+
+Implement minimal connection:
+
+Add case evidence pack output:
+GET /api/cases/:id/pdf
+Keep this.
+
+Add:
+POST /api/cases/:id/generate-evidence-pack
+This should:
+
+generate case PDF or text evidence pack
+store a case_outputs row outputType='evidence_pack'
+optionally store a program_documents row only if that fits existing schema without hacks
+write audit
+Case detail should show:
+Download PDF
+Generate Evidence Pack
+Last generated output timestamp
+Documents page can remain focused on program documents, but replit.md must explain that case PDF/evidence pack lives under Cases for now.
+Do not break existing /api/documents/generate.
+
+Program Documents Must Connect
+For Program Setup Case:
+
+After it creates/links a program_forms row:
+
+allow user to generate AML program document through existing documentApi.generate({ programId })
+show button in Program Case detail:
+Generate AML Program Document
+
+This should call existing /api/documents/generate.
+
+Do not duplicate document generation logic if existing route can be reused.
+
+Source Of Funds / Source Of Wealth Connection
+The schema already has:
+
+source_of_funds_assessments
+source_of_wealth_assessments
+If transaction wizard marks sourceOfFundsRequired = true:
+
+If case has linked customer:
+offer "Create Source of Funds Assessment"
+create the assessment row if an endpoint exists or add small endpoint if needed
+If no linked customer:
+show a task/checklist item: "Link or create customer before creating source of funds assessment"
+Do not force this if it creates too much scope, but at least create the checklist/task item and document the gap.
+
+Case Summary Must Include Linked Existing Modules
+Update:
+
+GET /api/cases/:id/summary
+Return:
+
+{
+  case,
+  linkedCustomer,
+  linkedProgram,
+  linkedEscalation,
+  wizardRuns,
+  checks,
+  checkRequests,
+  results,
+  outputs,
+  tasks,
+  audit
+}
+All must be workspace scoped.
+
+If a linked item is missing/null, return null or [], not an error.
+
+Update frontend types accordingly.
+
+Case List UX Must Show Connections
+/cases should not just show title/status.
+
+Add visible compact signals:
+
+linked customer name/reference if exists
+linked program title if exists
+risk level
+status
+number of checks
+number of open tasks or escalation flag if available
+Keep the UI simple and professional.
+
+Case Detail UX Must Become The Workflow Hub
+Current tabs:
+
+Wizard
+Verification Checks
+Audit Trail
+Enhance to:
+
+Overview
+Wizard
+Linked Records
+Checks
+Outputs
+Tasks/Escalation
+Audit
+If too much for one pass, at least add clear sections inside existing tabs:
+
+Overview:
+
+linked customer
+linked AML program
+risk/recommendation
+reviewer decision
+Wizard:
+
+current/complete wizard state
+continue button
+for program case, link to full 13-step wizard
+Checks:
+
+Didit sessions
+linked check_requests/check_results
+Outputs:
+
+case summary
+CDD checklist
+evidence pack/PDF
+Tasks/Escalation:
+
+open tasks linked to case
+linked escalation or button to create
+Audit:
+
+current audit timeline
+Existing 13-Step Program Wizard Must Remain
+Do not remove:
+
+client/src/pages/programs/ProgramWizardPage.tsx
+/programs/:id/wizard
+programs.ts backend route
+The new Program Setup Case should feed into it.
+
+Acceptance:
+
+Create Program Setup Case.
+Complete 5-step intake wizard.
+App creates/links program_forms.
+Case detail shows "Continue in Full AML Program Wizard".
+Button opens /programs/{programFormId}/wizard.
+Existing 13-step wizard still works.
+Existing Customer Module Must Remain
+Do not remove:
+
+Customers list
+Customer detail
+Beneficial owners
+Customer checks
+Customer risk/status
+The new Transaction Case should feed into it.
+
+Acceptance:
+
+Create Transaction CDD Case.
+Complete transaction wizard.
+Link existing customer or create customer from case.
+Case detail shows linked customer.
+Customer detail shows related checks/risk updates if existing customer page supports them.
+Existing Checks Module Must Remain
+Do not replace /api/checks.
+
+Didit should bridge into it.
+
+Acceptance:
+
+Start Didit KYC from case.
+didit_sessions row exists.
+check_requests row exists.
+Mock complete Didit.
+didit_results row exists.
+check_results row exists.
+Case summary shows both.
+Checks API can list the check by linked customer where applicable.
+Existing Documents Module Must Remain
+Do not break /api/documents.
+
+Acceptance:
+
+Program Case links to program form.
+Generate AML Program Document from Program Case uses existing document generation route.
+Documents page still lists generated document.
+Case PDF/evidence pack remains accessible from Case detail.
+Existing Escalations Must Remain
+Do not build a fake escalation inside Cases only.
+
+Acceptance:
+
+High-risk transaction case shows escalation requirements.
+User can create real escalation from case.
+escalations row exists.
+Case links to escalation.
+Existing Escalations page can show it.
+API Additions Required
+Add or update client/src/lib/api.ts:
+
+casesApi.linkCustomer(id, body)
+casesApi.reviewerDecision(id, body)
+casesApi.createEscalation(id, body)
+casesApi.generateEvidencePack(id)
+casesApi.outputs(id) // optional if summary includes outputs
+Backend endpoints:
+
+POST /api/cases/:id/link-customer
+POST /api/cases/:id/reviewer-decision
+POST /api/cases/:id/escalation
+POST /api/cases/:id/generate-evidence-pack
+GET  /api/cases/:id/summary
+GET  /api/cases/:id/pdf
+All endpoints:
+
+require workspace
+scope queries by workspaceId
+use existing error envelope
+write audit
+have tests
+Testing Requirements
+Run:
+
+npm run typecheck
+npm run build
+npx drizzle-kit push --force
+node scripts/test-api.mjs
+node scripts/test-milestone1.mjs
+If the dev server is required for API tests:
+
+npm run dev
+Then run tests in another shell.
+
+Do not claim tests pass unless they actually pass.
+
+Update scripts/test-milestone1.mjs
+The test currently proves basic case/wizard/Didit mock flow. Extend it.
+
+Required new coverage:
+
+Create Transaction CDD Case.
+Complete transaction wizard.
+Create new customer from case.
+Verify cases.customerId is set.
+Start Didit KYC.
+Verify didit_sessions.checkRequestId is set.
+Mock-complete Didit.
+Verify didit_results exists.
+Verify check_results exists.
+Verify /api/checks?customerId=... returns the linked check.
+Record reviewer decision.
+Verify reviewer decision persists on case.
+If decision is request_more_info, verify task exists.
+If decision is escalate_officer, verify escalation exists and case links to it.
+Create Program Setup Case.
+Complete 5-step program intake.
+Verify cases.programFormId is set.
+Verify linked program_forms row exists.
+Verify case summary includes linkedProgram.
+Verify case output summary exists.
+Generate AML Program Document through existing documents route.
+Verify documents list includes it.
+Generate/download case PDF/evidence pack.
+Verify audit entries exist for customer link, program link, check bridge, reviewer decision, escalation/document generation.
+Also keep existing coverage:
+
+duplicate webhook no-op
+idempotency reuse
+multiple Didit results in case summary
+PDF content type/magic bytes
+Add Browser Smoke Test Or Manual QA
+If Playwright is practical, add a smoke test.
+
+Browser flow:
+
+Register/login.
+Open /cases.
+Create Transaction CDD Case.
+Complete wizard.
+Create/link customer.
+Start KYC mock check.
+Mock complete.
+Record reviewer decision.
+Confirm audit shows events.
+Open linked customer.
+Create Program Setup Case.
+Complete intake.
+Open full 13-step program wizard.
+If Playwright is too heavy, add exact manual QA steps in replit.md.
+
+Type Safety Requirements
+Fix the current TypeScript issues.
+
+Specific Milestone 1 fixes:
+
+CaseDetailPage.tsx
+Remove unused imports:
+
+FileText
+Clock
+Type the mutation:
+
+const startWizardMutation = useMutation<WizardRun, Error, string>({
+  mutationFn: (wizardType) =>
+    wizardApi.start({ caseId: id!, wizardType: wizardType as 'PROGRAM_SETUP' | 'TRANSACTION_CDD' }) as Promise<WizardRun>,
+  ...
+});
+or strongly type wizardApi.start in api.ts.
+
+Server Route Params
+Use explicit string casts before Drizzle:
+
+const id = req.params['id'] as string;
+Do this in:
+
+server/routes/cases.ts
+server/routes/wizard.ts
+server/routes/diditRoute.ts
+Remove unused imports:
+
+caseOutputs from server/routes/cases.ts if unused
+ForbiddenError from server/routes/wizard.ts if unused
+Documentation Requirements
+Update replit.md.
+
+Must say:
+
+Current table count is 42 unless changed.
+Cases are connected workflow files, not a separate duplicate product.
+Transaction cases link to Customers and Checks.
+Program cases link to existing AML Program and the 13-step wizard.
+Didit mock mode is default.
+Didit sandbox/live requires credentials.
+Reviewer decisions are persisted.
+Evidence pack/PDF status.
+What tests were run and results.
+Remove or fix overclaims:
+
+Do not say "fully tested" unless typecheck/build/API tests actually pass.
+Do not say 50 tables unless true.
+Do not say live Didit is production-ready.
+Add a "Current Known Limitations" section:
+
+Live Didit requires Daniel's API key, KYC workflow ID, KYB workflow ID, webhook secret.
+Didit KYB Australian ABN/ACN/ASIC coverage must be confirmed with Didit/Daniel.
+AML program/risk logic must be reviewed by Daniel/compliance expert before production use.
+Stripe/billing is still not final unless actually completed.
+Diamond Improvements To Add Only After Core Links Work
+If core integration passes tests, add one or two safe diamond improvements:
+
+Diamond 1 - Case Story / Audit Narrative
+Generate readable narrative in case summary/evidence pack:
+
+"This case began as a Transaction CDD case for X. The wizard identified Y service, party type Z, risk level high because of PEP and TTR flags. KYC and AML screening were initiated through Didit mock mode. Reviewer decision was..."
+
+Store in case_outputs as:
+
+outputType='case_story'
+
+Diamond 2 - CDD Checklist
+Generate checklist from party type/risk/checks:
+
+individual identity evidence
+company registry evidence
+beneficial owner evidence
+source of funds evidence
+reviewer approval
+Store in case_outputs and show in UI.
+
+Diamond 3 - Provider Cost Placeholder
+Show configurable placeholder:
+
+"Estimated provider cost: configure after Didit pricing confirmed."
+
+Do not hardcode fake Didit pricing.
+
+Do Not Build Yet
+Do not spend this pass on:
+
+full Stripe billing
+full RBAC matrix
+complete legal AML rule engine
+full client-facing portal
+huge document templating engine
+full ongoing monitoring
+production live Didit without credentials
+Focus on connecting the existing modules.
+
+Acceptance Criteria
+Do not finish until all practical items are done or explicitly blocked:
+
+npm run typecheck passes or every remaining failure is documented as unrelated pre-existing.
+npm run build passes.
+.replit deployment run path is correct.
+replit.md table count is accurate.
+Transaction case can link/create customer.
+Program case can create/link existing AML program form.
+Program case has button to continue in the existing 13-step wizard.
+Didit sessions create linked check_requests where customer exists.
+Didit results create/update linked check_results.
+Case summary returns linked customer/program/checks/tasks/escalation/outputs.
+Reviewer decision is saved to DB and audit.
+Escalation action creates real escalation row.
+Case output/evidence pack exists.
+Existing Customers route still works.
+Existing Programs route and 13-step wizard still work.
+Existing Checks route still works.
+Existing Documents route still works.
+Existing Escalations route still works.
+node scripts/test-api.mjs passes or unrelated pre-existing failures are documented.
+node scripts/test-milestone1.mjs passes with new integration coverage.
+Final response lists exact files changed and exact commands run.
+Final Response Required
+When complete, respond with:
+
+What was disconnected before.
+What is now connected.
+How Transaction Cases connect to Customers/Checks/Didit.
+How Program Cases connect to the old 13-step AML Program wizard.
+How reviewer decisions/escalations/tasks/documents are persisted.
+Tests run and exact results.
+Remaining limitations.
+Didit credentials still needed from Daniel.
+Files changed.
+Do not end by asking whether to continue. Continue autonomously during the session.

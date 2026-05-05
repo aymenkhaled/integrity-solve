@@ -21,7 +21,7 @@ export default function ProgramsPage() {
 
   const createProgram = useMutation({
     mutationFn: () => programApi.create({ title: 'AML/CTF Program' }),
-    onSuccess: (data) => {
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['programs'] });
       toast.success('Program created');
     },

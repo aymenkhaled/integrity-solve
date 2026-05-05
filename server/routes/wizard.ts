@@ -1,16 +1,16 @@
 /**
  * server/routes/wizard.ts — Milestone 1 wizard-run endpoints.
  *
- * POST  /api/wizard/start       — start a wizard run for a case
- * PATCH /api/wizard/:id/step    — save a wizard step + get route result
- * GET   /api/wizard/:id         — get full wizard run state
- * GET   /api/wizard/case/:caseId — get all wizard runs for a case
+ * POST  /api/wizard/start         — start a wizard run for a case
+ * PATCH /api/wizard/:id/step      — save a wizard step + get route result
+ * GET   /api/wizard/:id           — get full wizard run state
+ * GET   /api/wizard/case/:caseId  — get all wizard runs for a case
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { db } from '../db.js';
 import { eq, and, desc } from 'drizzle-orm';
-import { cases, wizardRuns, wizardSteps, auditLog, caseOutputs } from '../../shared/schema.js';
+import { cases, wizardRuns, wizardSteps, auditLog, caseOutputs, programForms } from '../../shared/schema.js';
 import { createId } from '@paralleldrive/cuid2';
 import {
   routeProgramWizard,
@@ -18,7 +18,7 @@ import {
 } from '../services/workflowRouter.js';
 import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';
 import { requireWorkspace } from '../lib/auth-session.js';
-import { NotFoundError, UnauthenticatedError, ForbiddenError } from '../lib/errors.js';
+import { NotFoundError, UnauthenticatedError } from '../lib/errors.js';
 
 export const wizardRouter = Router();
 
@@ -76,7 +76,7 @@ wizardRouter.post('/api/wizard/start', requireWorkspace, async (req: Request, re
       workspaceId,
       actorUserId: userId,
       entityType:  'wizard_run',
-      entityId:    caseRow.id, // link audit to case, not wizard run
+      entityId:    caseRow.id,
       action:      'wizard_started',
       reason:      `${body.wizardType} wizard started for case ${body.caseId}`,
       newValue:    run,
@@ -98,7 +98,7 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
     const [run] = await db
       .select()
       .from(wizardRuns)
-      .where(and(eq(wizardRuns.id, req.params.id), eq(wizardRuns.workspaceId, workspaceId)));
+      .where(and(eq(wizardRuns.id, req.params['id'] as string), eq(wizardRuns.workspaceId, workspaceId)));
 
     if (!run) return void next(new NotFoundError('Wizard run'));
 
@@ -152,7 +152,8 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
       .where(eq(wizardRuns.id, run.id))
       .returning();
 
-    // If completing a transaction wizard, update case risk level
+    // ── On completion: update case + optionally create programForms row ──
+
     if (body.complete && run.wizardType === 'TRANSACTION_CDD') {
       const txResult = routeResult as ReturnType<typeof routeTransactionWizard>;
       await db.update(cases)
@@ -166,18 +167,52 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
     }
 
     if (body.complete && run.wizardType === 'PROGRAM_SETUP') {
-      await db.update(cases)
-        .set({ status: 'COMPLETED', updatedAt: new Date() })
-        .where(eq(cases.id, run.caseId));
+      // Derive industry pathway from wizard answers
+      const industryAnswer = flatAnswers['industry'] as string | undefined;
+      const pathwayMap: Record<string, string> = {
+        accounting:            'ACCOUNTING',
+        legal:                 'LEGAL',
+        real_estate:           'REAL_ESTATE',
+        financial_services:    'FINANCIAL_SERVICES',
+        gambling:              'GAMBLING',
+        precious_metals:       'PRECIOUS_METALS',
+        trust_company_services:'TRUST_COMPANY_SERVICES',
+        other:                 'OTHER',
+      };
+      const pathway = industryAnswer ? pathwayMap[industryAnswer.toLowerCase()] ?? null : null;
+
+      // Check if case already has a programFormId; if not, create one
+      const [caseRow] = await db.select().from(cases).where(eq(cases.id, run.caseId)).limit(1);
+
+      if (caseRow && !caseRow.programFormId) {
+        const [pForm] = await db.insert(programForms).values({
+          id:          createId(),
+          workspaceId,
+          title:       `AML/CTF Program — ${new Date().toLocaleDateString('en-AU')}`,
+          pathway:     pathway as typeof programForms.$inferInsert['pathway'] ?? null,
+          status:      'IN_PROGRESS',
+          currentStep: 13,
+          formData:    { case_intake: flatAnswers },
+          createdBy:   userId,
+        }).returning();
+
+        await db.update(cases)
+          .set({ programFormId: pForm.id, status: 'COMPLETED', updatedAt: new Date() })
+          .where(eq(cases.id, run.caseId));
+      } else {
+        await db.update(cases)
+          .set({ status: 'COMPLETED', updatedAt: new Date() })
+          .where(eq(cases.id, run.caseId));
+      }
     }
 
-    // Write audit log linked to the case for visibility in case summary
+    // Write audit log linked to case
     await db.insert(auditLog).values({
       id:          createId(),
       workspaceId,
       actorUserId: userId,
       entityType:  'wizard_run',
-      entityId:    run.caseId, // link audit to case
+      entityId:    run.caseId,
       action:      body.complete ? 'wizard_completed' : 'wizard_step_saved',
       reason:      `Wizard step "${body.stepKey}" saved${body.complete ? ' - wizard completed' : ''}`,
       newValue:    { stepKey: body.stepKey, routeResult },
@@ -188,13 +223,12 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
     // case_outputs: store routing summary when wizard completes
     if (body.complete) {
       const outputContent = JSON.stringify({
-        caseId:           run.caseId,
-        wizardType:       run.wizardType,
+        caseId:      run.caseId,
+        wizardType:  run.wizardType,
         routeResult,
-        generatedAt:      new Date().toISOString(),
+        generatedAt: new Date().toISOString(),
       });
 
-      // Upsert: check for existing summary output
       const existingOutput = await db
         .select()
         .from(caseOutputs)
@@ -229,7 +263,7 @@ wizardRouter.get('/api/wizard/:id', requireWorkspace, async (req: Request, res: 
     const [run] = await db
       .select()
       .from(wizardRuns)
-      .where(and(eq(wizardRuns.id, req.params.id), eq(wizardRuns.workspaceId, workspaceId)));
+      .where(and(eq(wizardRuns.id, req.params['id'] as string), eq(wizardRuns.workspaceId, workspaceId)));
 
     if (!run) return void next(new NotFoundError('Wizard run'));
 
@@ -249,18 +283,17 @@ wizardRouter.get('/api/wizard/case/:caseId', requireWorkspace, async (req: Reque
     const workspaceId = getWorkspaceId(req);
     if (!workspaceId) return void next(new UnauthenticatedError());
 
-    // Verify case belongs to workspace
     const [caseRow] = await db
       .select()
       .from(cases)
-      .where(and(eq(cases.id, req.params.caseId), eq(cases.workspaceId, workspaceId)));
+      .where(and(eq(cases.id, req.params['caseId'] as string), eq(cases.workspaceId, workspaceId)));
 
     if (!caseRow) return void next(new NotFoundError('Case'));
 
     const runs = await db
       .select()
       .from(wizardRuns)
-      .where(eq(wizardRuns.caseId, req.params.caseId))
+      .where(eq(wizardRuns.caseId, req.params['caseId'] as string))
       .orderBy(desc(wizardRuns.createdAt));
 
     res.json({ ok: true, data: runs });

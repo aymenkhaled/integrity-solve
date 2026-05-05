@@ -6,12 +6,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Shield, FileText, Users, GraduationCap, CalendarCheck,
+  Shield, FileText, GraduationCap, CalendarCheck,
   AlertTriangle, History, CheckCircle, XCircle, ArrowRight,
   TrendingUp, TrendingDown, Activity, Award,
 } from 'lucide-react';
 import {
-  analyticsApi, riskApi, programApi, customerApi,
+  analyticsApi, programApi, customerApi,
   alertApi, reviewApi, escalationApi,
 } from '@/lib/api';
 
@@ -116,7 +116,7 @@ export default function ComplianceHealthPage() {
     queryKey: ['programs'],
     queryFn: () => programApi.list() as Promise<{ status: string; currentStep: number }[]>,
   });
-  const { data: customersData } = useQuery({
+  const { data: _customersData } = useQuery({
     queryKey: ['customers-summary'],
     queryFn: () => customerApi.list({ limit: '1', page: '1' }) as Promise<{ total: number; items: { status: string; riskRating: string }[] }>,
   });

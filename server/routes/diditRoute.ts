@@ -6,6 +6,12 @@
  * GET  /api/providers/didit/sessions     — list Didit sessions for workspace
  * GET  /api/providers/didit/sessions/:id — get single session + results
  * POST /api/providers/didit/mock-complete/:id — simulate webhook (dev/mock only)
+ *
+ * Integration bridge:
+ * - When a session is created for a case with a linked customer, a checkRequests row
+ *   is created and its ID stored on the didit_session (checkRequestId).
+ * - When a webhook result arrives for a session with a checkRequestId, a checkResults
+ *   row is created, bridging Didit results into the standard check engine.
  */
 import crypto from 'node:crypto';
 import { Router, type Request, type Response, type NextFunction } from 'express';
@@ -18,6 +24,8 @@ import {
   diditResults,
   diditWebhookEvents,
   auditLog,
+  checkRequests,
+  checkResults,
 } from '../../shared/schema.js';
 import { createId } from '@paralleldrive/cuid2';
 import { createDiditSession }     from '../services/didit.js';
@@ -29,6 +37,7 @@ import { requireWorkspace } from '../lib/auth-session.js';
 import {
   NotFoundError, UnauthenticatedError, ForbiddenError,
 } from '../lib/errors.js';
+import { addMinutes } from 'date-fns';
 
 export const diditRouter = Router();
 
@@ -54,6 +63,29 @@ function idempotencyKey(workspaceId: string, caseId: string, capability: string,
     .digest('hex');
 }
 
+/** Map Didit capability to checkTypeEnum value */
+function capabilityToCheckType(capability: string): 'IDENTITY' | 'REGISTRY' | 'AML' {
+  if (capability === 'kyc') return 'IDENTITY';
+  if (capability === 'kyb') return 'REGISTRY';
+  return 'AML';
+}
+
+/** Map normalised Didit decision to checkOutcomeEnum value */
+function decisionToOutcome(decision: string): 'CLEAR' | 'POTENTIAL_HIT' | 'UNABLE_TO_VERIFY' | 'ERROR' {
+  if (decision === 'clear') return 'CLEAR';
+  if (decision === 'matched' || decision === 'unresolved') return 'POTENTIAL_HIT';
+  if (decision === 'not_verified') return 'UNABLE_TO_VERIFY';
+  return 'ERROR';
+}
+
+/** Map normalised Didit status to checkStatusEnum value */
+function diditStatusToCheckStatus(status: string): 'PASS' | 'FAIL' | 'REFER' | 'ERROR' {
+  if (status === 'passed') return 'PASS';
+  if (status === 'failed') return 'FAIL';
+  if (status === 'review_required') return 'REFER';
+  return 'ERROR';
+}
+
 async function processWebhookPayload(payload: unknown): Promise<{
   stored: boolean;
   duplicate: boolean;
@@ -69,7 +101,7 @@ async function processWebhookPayload(payload: unknown): Promise<{
     (p['decision'] as Record<string, unknown>)?.['session_id'] ?? ''
   );
 
-  // Check duplicate
+  // Duplicate check
   const existing = await db
     .select()
     .from(diditWebhookEvents)
@@ -88,7 +120,7 @@ async function processWebhookPayload(payload: unknown): Promise<{
     payload,
   }).returning();
 
-  // Map to a didit session — try by provider request ID first, then vendor_data
+  // Map to a didit session
   const vendorData = String(p['vendor_data'] ?? '');
   let session: typeof diditSessions.$inferSelect | undefined;
 
@@ -119,6 +151,7 @@ async function processWebhookPayload(payload: unknown): Promise<{
 
   const normalized = normalizeDiditDecision(payload);
 
+  // Insert Didit result
   await db.insert(diditResults).values({
     id:                createId(),
     diditSessionId:    session.id,
@@ -133,21 +166,44 @@ async function processWebhookPayload(payload: unknown): Promise<{
       ? new Date() : null,
   });
 
+  // Update Didit session status
   await db.update(diditSessions)
     .set({ status: normalized.status, updatedAt: new Date() })
     .where(eq(diditSessions.id, session.id));
 
+  // ── Bridge: create checkResults row if session has a linked checkRequest ──
+  if (session.checkRequestId && ['passed', 'failed', 'review_required'].includes(normalized.status)) {
+    const outcome = decisionToOutcome(normalized.decision);
+    const checkStatus = diditStatusToCheckStatus(normalized.status);
+
+    await db.insert(checkResults).values({
+      id:             createId(),
+      checkRequestId: session.checkRequestId,
+      workspaceId:    session.workspaceId,
+      outcome,
+      rawResponse:    { source: 'didit', payload },
+      parsedData:     normalized,
+      hitDetails:     (normalized.riskSignals as unknown[] | undefined) ?? [],
+      manualOverride: false,
+    });
+
+    await db.update(checkRequests)
+      .set({ status: checkStatus, completedAt: new Date(), updatedAt: new Date() })
+      .where(eq(checkRequests.id, session.checkRequestId));
+  }
+
+  // Mark webhook event as processed
   await db.update(diditWebhookEvents)
     .set({ processedAt: new Date(), signatureValid: true })
     .where(eq(diditWebhookEvents.id, event.id));
 
-  // Audit log linked to case for visibility in case summary
+  // Audit log linked to case
   await db.insert(auditLog).values({
     id:          createId(),
     workspaceId: session.workspaceId,
     actorUserId: 'system',
     entityType:  'didit_session',
-    entityId:    session.caseId,   // link audit to case
+    entityId:    session.caseId,
     action:      'didit_webhook_processed',
     reason:      normalized.summary,
     newValue:    normalized,
@@ -179,7 +235,7 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
 
     const iKey = idempotencyKey(workspaceId, body.caseId, body.capability, body.subjectId);
 
-    // Check for existing session (idempotency) — Bug 6 fix: wrap data properly
+    // Check for existing session (idempotency)
     const existing = await db
       .select()
       .from(diditSessions)
@@ -201,7 +257,26 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       });
     }
 
-    // Create the session record first (get the ID for vendor_data)
+    // ── Bridge: create checkRequests row if case has a linked customer ──
+    let checkRequestId: string | null = null;
+    if (caseRow.customerId) {
+      const [checkReq] = await db.insert(checkRequests).values({
+        id:          createId(),
+        workspaceId,
+        customerId:  caseRow.customerId,
+        checkType:   capabilityToCheckType(body.capability),
+        provider:    'MOCK',
+        status:      'RUNNING',
+        timeoutAt:   addMinutes(new Date(), 10),
+        requestedBy: userId,
+        requestPayload: { source: 'didit', capability: body.capability, reason: body.reason },
+        startedAt:   new Date(),
+        updatedAt:   new Date(),
+      }).returning();
+      checkRequestId = checkReq.id;
+    }
+
+    // Create session record
     const sessionId = createId();
 
     const [session] = await db.insert(diditSessions).values({
@@ -213,6 +288,7 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       idempotencyKey: iKey,
       subjectId:      body.subjectId,
       vendorData:     sessionId,
+      checkRequestId: checkRequestId ?? undefined,
       metadata:       { reason: body.reason },
       createdBy:      userId,
     }).returning();
@@ -243,13 +319,20 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       .where(eq(diditSessions.id, session.id))
       .returning();
 
+    // Update checkRequest with providerRef
+    if (checkRequestId && diditResult.providerRequestId) {
+      await db.update(checkRequests)
+        .set({ providerRef: diditResult.providerRequestId, updatedAt: new Date() })
+        .where(eq(checkRequests.id, checkRequestId));
+    }
+
     // Audit linked to case
     await db.insert(auditLog).values({
       id:          createId(),
       workspaceId,
       actorUserId: userId,
       entityType:  'didit_session',
-      entityId:    body.caseId,  // link audit to case
+      entityId:    body.caseId,
       action:      'didit_session_created',
       reason:      `Didit ${body.capability} session created for case ${body.caseId}. Reason: ${body.reason}`,
       newValue:    updated,
@@ -257,7 +340,6 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       ipAddress:   req.ip,
     });
 
-    // Bug 6 fix: wrap verificationUrl and mode inside data
     res.status(201).json({
       ok:   true,
       data: {
@@ -277,7 +359,6 @@ diditRouter.post('/api/providers/didit/webhook', async (req: Request, res: Respo
     const mode         = env.DIDIT_MODE;
     const verification = verifyDiditWebhook(payload, req.headers as Record<string, string | undefined>);
 
-    // In non-mock mode, reject invalid signatures
     if (!verification.valid && mode !== 'mock') {
       return void res.status(401).json({
         ok:    false,
@@ -331,7 +412,7 @@ diditRouter.get('/api/providers/didit/sessions/:id', requireWorkspace, async (re
     const [session] = await db
       .select()
       .from(diditSessions)
-      .where(and(eq(diditSessions.id, req.params.id), eq(diditSessions.workspaceId, workspaceId)));
+      .where(and(eq(diditSessions.id, req.params['id'] as string), eq(diditSessions.workspaceId, workspaceId)));
 
     if (!session) return void next(new NotFoundError('Session'));
 
@@ -341,11 +422,22 @@ diditRouter.get('/api/providers/didit/sessions/:id', requireWorkspace, async (re
       .where(eq(diditResults.diditSessionId, session.id))
       .orderBy(desc(diditResults.createdAt));
 
-    res.json({ ok: true, data: { session, results } });
+    // Also fetch linked check request + results if bridged
+    let checkReq: typeof checkRequests.$inferSelect | null = null;
+    let checkRes: typeof checkResults.$inferSelect[] = [];
+    if (session.checkRequestId) {
+      const [cr] = await db.select().from(checkRequests).where(eq(checkRequests.id, session.checkRequestId)).limit(1);
+      checkReq = cr ?? null;
+      if (checkReq) {
+        checkRes = await db.select().from(checkResults).where(eq(checkResults.checkRequestId, checkReq.id));
+      }
+    }
+
+    res.json({ ok: true, data: { session, results, checkRequest: checkReq, checkResults: checkRes } });
   } catch (err) { next(err); }
 });
 
-// POST /api/providers/didit/mock-complete/:id — simulate webhook (mock/dev only)
+// POST /api/providers/didit/mock-complete/:id
 diditRouter.post('/api/providers/didit/mock-complete/:id', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const mode = env.DIDIT_MODE;
@@ -359,7 +451,7 @@ diditRouter.post('/api/providers/didit/mock-complete/:id', requireWorkspace, asy
     const [session] = await db
       .select()
       .from(diditSessions)
-      .where(and(eq(diditSessions.id, req.params.id), eq(diditSessions.workspaceId, workspaceId)));
+      .where(and(eq(diditSessions.id, req.params['id'] as string), eq(diditSessions.workspaceId, workspaceId)));
 
     if (!session) return void next(new NotFoundError('Session'));
 

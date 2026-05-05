@@ -7,7 +7,7 @@ import { Link } from 'wouter';
 import {
   Users, AlertTriangle, CheckSquare, FileText,
   Clock, ArrowRight, Shield, TrendingUp, Bell,
-  ChevronRight, Zap, BarChart3,
+  ChevronRight, Zap,
 } from 'lucide-react';
 import { customerApi, escalationApi, taskApi, programApi, alertApi, analyticsApi } from '@/lib/api';
 import { formatDate, formatRelative } from '@/lib/utils';

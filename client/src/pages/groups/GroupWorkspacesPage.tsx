@@ -10,9 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { groupsApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
-  Building2, Users, Link2, Unlink, Plus, Shield,
-  CheckCircle, AlertTriangle, BarChart2, FileText,
-  ChevronRight, Network, Globe,
+  Building2, Users, Link2, Unlink, Shield,
+  CheckCircle, AlertTriangle, Network, Globe,
 } from 'lucide-react';
 import { formatRelative } from '@/lib/utils';
 
@@ -274,7 +273,7 @@ export default function GroupWorkspacesPage() {
               </div>
 
               {/* Children */}
-              {data.children.map((child, i) => (
+              {data.children.map((child) => (
                 <div key={child.id} className="ml-8">
                   <div className="ml-4 w-px h-4 bg-border" />
                   <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">

@@ -25,7 +25,7 @@ import type { Escalation, SmrDraft } from '@shared/schema';
 const STATUS_STEPS = [
   { key: 'DRAFT',         label: 'Draft',           icon: Clock },
   { key: 'UNDER_REVIEW',  label: 'Under Review',    icon: AlertTriangle },
-  { key: 'ESCALATED',     label: 'Escalated',       icon: Shield },
+  { key: 'ESCALATED_TO_SMR', label: 'Escalated',    icon: Shield },
   { key: 'SMR_SUBMITTED', label: 'SMR Submitted',   icon: CheckCircle },
 ];
 
@@ -166,7 +166,7 @@ export default function EscalationDetailPage() {
             <span className="text-sm text-muted-foreground">Created {formatDate(data.createdAt)}</span>
           </div>
         </div>
-        {isOpen && data.status === 'ESCALATED' && (
+        {isOpen && data.status === 'ESCALATED_TO_SMR' && (
           <Button
             className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 flex-shrink-0 gap-1.5"
             onClick={() => setSmrOpen(true)}
@@ -250,8 +250,8 @@ export default function EscalationDetailPage() {
                         </div>
                         <StatusBadge status={smr.status} />
                       </div>
-                      {smr.narrative && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{smr.narrative}</p>
+                      {smr.narrativeText && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{smr.narrativeText}</p>
                       )}
                       {/* SMR workflow actions */}
                       <div className="flex items-center gap-2">
@@ -284,7 +284,7 @@ export default function EscalationDetailPage() {
           )}
 
           {/* Prompt to create SMR if escalated but no drafts */}
-          {data.status === 'ESCALATED' && (!data.smrDrafts || data.smrDrafts.length === 0) && (
+          {data.status === 'ESCALATED_TO_SMR' && (!data.smrDrafts || data.smrDrafts.length === 0) && (
             <div className="flex items-center gap-4 rounded-2xl px-5 py-4 bg-amber-500/5 border border-amber-500/20">
               <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0" />
               <div className="flex-1">
@@ -325,7 +325,7 @@ export default function EscalationDetailPage() {
                       : <><Shield className="h-4 w-4 mr-2" />Escalate to SMR Workflow</>}
                   </Button>
                 )}
-                {data.status === 'ESCALATED' && (
+                {data.status === 'ESCALATED_TO_SMR' && (
                   <Button
                     className="w-full bg-indigo-600 hover:bg-indigo-500 text-white border-0"
                     onClick={() => setSmrOpen(true)}

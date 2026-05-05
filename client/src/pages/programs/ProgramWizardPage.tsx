@@ -155,6 +155,7 @@ function CheckboxGroup({
       {options.map((opt) => (
         <label
           key={opt}
+          onClick={() => toggle(opt)}
           className={cn(
             'flex items-center gap-2 cursor-pointer rounded-lg border px-3 py-2 text-sm transition-colors',
             value.includes(opt)
@@ -690,7 +691,6 @@ export default function ProgramWizardPage() {
                 {STEPS.map((s) => {
                   const isDone   = completedSteps.has(s.id) && s.id !== currentStep;
                   const isActive = s.id === currentStep;
-                  const Icon     = s.icon;
                   return (
                     <button
                       key={s.id}

@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Users, Plus, CheckCircle, XCircle, Clock, RefreshCw,
   Loader2, FileText, AlertCircle, Edit3, ShieldAlert, UserCheck,
-  ChevronDown, Download, Eye,
+  Download, Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

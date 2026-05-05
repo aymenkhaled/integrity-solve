@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import {
   CalendarCheck, Clock, AlertCircle, GraduationCap,
@@ -292,7 +291,6 @@ export default function ComplianceCalendarPage() {
               <div className="flex items-center gap-4 mt-4 flex-wrap">
                 {(Object.keys(TYPE_CONFIG) as (keyof typeof TYPE_CONFIG)[]).map((k) => {
                   const cfg = TYPE_CONFIG[k];
-                  const Icon = cfg.icon;
                   return (
                     <div key={k} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <div className={`h-2.5 w-2.5 rounded-sm ${cfg.bg}`} />
