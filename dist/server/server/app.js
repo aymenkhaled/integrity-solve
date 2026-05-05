@@ -37,6 +37,9 @@ import gatewayRoutes from './routes/gateway.js';
 import whitelabelRoutes from './routes/whitelabel.js';
 import groupRoutes from './routes/groups.js';
 import seedRoutes from './routes/seed.js';
+import { casesRouter } from './routes/cases.js';
+import { wizardRouter } from './routes/wizard.js';
+import { diditRouter } from './routes/diditRoute.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export function createApp() {
@@ -108,6 +111,10 @@ export function createApp() {
     app.use('/api/whitelabel', whitelabelRoutes);
     app.use('/api/groups', groupRoutes);
     app.use('/api/seed', seedRoutes);
+    // Milestone 1 — Wizard-led flows + Didit integration
+    app.use(casesRouter);
+    app.use(wizardRouter);
+    app.use(diditRouter);
     // ─── Static files (production) ────────────────────────────────────────────
     if (!isDev) {
         const distPath = path.resolve(__dirname, '../../public');

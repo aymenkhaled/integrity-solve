@@ -58,6 +58,24 @@ const LinkCustomerSchema = z.object({
   reason:     z.string().min(5),
 });
 
+const CreateCaseCustomerSchema = z.object({
+  customerType: z.enum(['INDIVIDUAL', 'COMPANY', 'TRUST', 'PARTNERSHIP', 'ASSOCIATION', 'GOVERNMENT', 'OTHER']).optional(),
+  givenNames:   z.string().min(1).max(200).optional(),
+  familyName:   z.string().min(1).max(200).optional(),
+  entityName:   z.string().min(1).max(300).optional(),
+  email:        z.string().email().optional(),
+  country:      z.string().length(2).default('AU'),
+  reason:       z.string().min(10),
+}).superRefine((data, ctx) => {
+  const customerType = data.customerType ?? 'INDIVIDUAL';
+  if (customerType === 'INDIVIDUAL' && (!data.givenNames || !data.familyName)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['givenNames'], message: 'Given names and family name are required for an individual customer' });
+  }
+  if (customerType !== 'INDIVIDUAL' && !data.entityName) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['entityName'], message: 'Entity name is required for a non-individual customer' });
+  }
+});
+
 const CaseEscalationSchema = z.object({
   subject:    z.string().min(5).max(300),
   summary:    z.string().min(20).max(5000),
@@ -66,6 +84,19 @@ const CaseEscalationSchema = z.object({
   reason:     z.string().min(10),
 });
 
+function requireReviewerRole(req: Request): void {
+  const role = req.session?.workspace?.role;
+  if (!role || !['WORKSPACE_ADMIN', 'COMPLIANCE_OFFICER', 'REVIEWER'].includes(role)) {
+    throw new ForbiddenError('Reviewer, Compliance Officer, or Workspace Admin role required');
+  }
+}
+
+function customerTypeFromCase(partyType?: string | null): typeof customers.$inferInsert['customerType'] {
+  if (partyType === 'company') return 'COMPANY';
+  if (partyType === 'trust') return 'TRUST';
+  return 'INDIVIDUAL';
+}
+
 // ─── PDF helpers ─────────────────────────────────────────────────────────────
 
 function escapePdf(text: string): string {
@@ -73,18 +104,34 @@ function escapePdf(text: string): string {
 }
 
 function buildPdf(lines: string[]): Buffer {
-  const pageLines = lines.slice(0, 42);
-  const pageText  = pageLines
-    .map((line, i) => `BT /F1 10 Tf 50 ${740 - i * 16} Td (${escapePdf(line)}) Tj ET`)
-    .join('\n');
+  const pageSize = 42;
+  const pages: string[][] = [];
+  for (let i = 0; i < lines.length; i += pageSize) {
+    pages.push(lines.slice(i, i + pageSize));
+  }
+  if (pages.length === 0) pages.push(['Integrity Solve - Case Summary Pack']);
 
+  const fontObj = 3 + pages.length * 2;
+  const pageRefs = pages.map((_, i) => `${3 + i * 2} 0 R`).join(' ');
   const objects: string[] = [
     '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
-    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-    `3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj`,
-    `4 0 obj << /Length ${Buffer.byteLength(pageText)} >> stream\n${pageText}\nendstream endobj`,
-    '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+    `2 0 obj << /Type /Pages /Kids [${pageRefs}] /Count ${pages.length} >> endobj`,
   ];
+
+  pages.forEach((pageLines, i) => {
+    const pageObj = 3 + i * 2;
+    const contentObj = pageObj + 1;
+    const pageText = pageLines
+      .map((line, lineIndex) => `BT /F1 10 Tf 50 ${740 - lineIndex * 16} Td (${escapePdf(line)}) Tj ET`)
+      .join('\n');
+
+    objects.push(
+      `${pageObj} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObj} 0 R >> >> /Contents ${contentObj} 0 R >> endobj`,
+      `${contentObj} 0 obj << /Length ${Buffer.byteLength(pageText)} >> stream\n${pageText}\nendstream endobj`,
+    );
+  });
+
+  objects.push(`${fontObj} 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj`);
 
   let pdf    = '%PDF-1.4\n';
   const offsets: number[] = [];
@@ -233,7 +280,8 @@ casesRouter.post('/api/cases/:id/link-customer', requireWorkspace, async (req: R
 
 // ─── POST /api/cases/:id/reviewer-decision ────────────────────────────────────
 
-casesRouter.post('/api/cases/:id/reviewer-decision', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/cases/:id/create-customer-from-case
+casesRouter.post('/api/cases/:id/create-customer-from-case', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const userId      = getUserId(req);
@@ -245,10 +293,72 @@ casesRouter.post('/api/cases/:id/reviewer-decision', requireWorkspace, async (re
       .where(and(eq(cases.id, req.params['id'] as string), eq(cases.workspaceId, workspaceId)));
 
     if (!caseRow) return void next(new NotFoundError('Case'));
+    if (caseRow.customerId) throw new ForbiddenError('This case already has a linked customer');
+
+    const body = CreateCaseCustomerSchema.parse(req.body);
+    const customerType = body.customerType ?? customerTypeFromCase(caseRow.partyType);
+    const referenceNumber = `CASE-${caseRow.id.slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-6)}`;
+
+    const [customer] = await db.insert(customers).values({
+      id:              createId(),
+      workspaceId,
+      customerType,
+      status:          'PENDING_CDD',
+      riskRating:      caseRow.riskLevel === 'high' ? 'HIGH' : 'UNRATED',
+      cddLevel:        caseRow.riskLevel === 'high' ? 'EDD' : 'STANDARD',
+      referenceNumber,
+      givenNames:      customerType === 'INDIVIDUAL' ? body.givenNames : undefined,
+      familyName:      customerType === 'INDIVIDUAL' ? body.familyName : undefined,
+      entityName:      customerType === 'INDIVIDUAL' ? undefined : body.entityName,
+      email:           body.email,
+      country:         body.country,
+      externalRef:     caseRow.id,
+      metadata: {
+        source:            'case',
+        caseId:            caseRow.id,
+        designatedService: caseRow.designatedService,
+        partyType:         caseRow.partyType,
+      },
+      onboardedBy: userId,
+    }).returning();
+
+    const [updated] = await db.update(cases)
+      .set({ customerId: customer.id, updatedAt: new Date() })
+      .where(eq(cases.id, caseRow.id))
+      .returning();
+
+    await writeAudit(
+      { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
+      {
+        action:     'case.customer_created_and_linked',
+        entityType: 'case',
+        entityId:   caseRow.id,
+        reason:     body.reason,
+        newValue:   { customerId: customer.id, referenceNumber },
+      },
+    );
+
+    res.status(201).json({ ok: true, data: { case: updated, customer } });
+  } catch (err) { next(err); }
+});
+
+casesRouter.post('/api/cases/:id/reviewer-decision', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const userId      = getUserId(req);
+    if (!workspaceId) return void next(new UnauthenticatedError());
+    requireReviewerRole(req);
+
+    const [caseRow] = await db
+      .select()
+      .from(cases)
+      .where(and(eq(cases.id, req.params['id'] as string), eq(cases.workspaceId, workspaceId)));
+
+    if (!caseRow) return void next(new NotFoundError('Case'));
 
     const body = ReviewerDecisionSchema.parse(req.body);
 
-    const [updated] = await db.update(cases)
+    let [updated] = await db.update(cases)
       .set({
         reviewerDecision:   body.decision,
         reviewerDecisionBy: userId,
@@ -259,12 +369,62 @@ casesRouter.post('/api/cases/:id/reviewer-decision', requireWorkspace, async (re
       .where(eq(cases.id, req.params['id'] as string))
       .returning();
 
+    let createdTask: typeof tasks.$inferSelect | null = null;
+    let createdEscalation: typeof escalations.$inferSelect | null = null;
+
+    if (body.decision === 'request_more_info') {
+      const [task] = await db.insert(tasks).values({
+        id:          createId(),
+        workspaceId,
+        title:       `More information required: ${caseRow.title}`,
+        description: body.notes ?? 'Reviewer requested more information before this case can proceed.',
+        status:      'OPEN',
+        priority:    caseRow.riskLevel === 'high' ? 'HIGH' : 'MEDIUM',
+        createdBy:   userId,
+        entityType:  'case',
+        entityId:    caseRow.id,
+        metadata:    { source: 'reviewer_decision', decision: body.decision },
+      }).returning();
+      createdTask = task;
+    }
+
+    if (body.decision === 'escalate_officer' && !caseRow.escalationId) {
+      const [escalation] = await db.insert(escalations).values({
+        id:         createId(),
+        workspaceId,
+        customerId: caseRow.customerId ?? undefined,
+        subject:    `Case escalation: ${caseRow.title}`,
+        summary:    body.notes ?? `Reviewer escalated case ${caseRow.title} for compliance officer review.`,
+        grounds:    `Escalated from case reviewer decision. Service: ${caseRow.designatedService ?? 'not set'}. Risk: ${caseRow.riskLevel ?? 'not assessed'}.`,
+        riskRating: caseRow.riskLevel === 'critical' ? 'CRITICAL' : 'HIGH',
+        status:     'DRAFT',
+        raisedBy:   userId,
+      }).returning();
+      createdEscalation = escalation;
+
+      [updated] = await db.update(cases)
+        .set({ escalationId: escalation.id, updatedAt: new Date() })
+        .where(eq(cases.id, caseRow.id))
+        .returning();
+    }
+
     await writeAudit(
       { workspaceId, actorUserId: userId, requestId: req.requestId, ipAddress: req.ip },
-      { action: 'case.reviewer_decision', entityType: 'case', entityId: caseRow.id, reason: body.reason, newValue: { decision: body.decision, notes: body.notes } },
+      {
+        action:     'case.reviewer_decision',
+        entityType: 'case',
+        entityId:   caseRow.id,
+        reason:     body.reason,
+        newValue: {
+          decision:     body.decision,
+          notes:        body.notes,
+          taskId:       createdTask?.id ?? null,
+          escalationId: createdEscalation?.id ?? caseRow.escalationId ?? null,
+        },
+      },
     );
 
-    res.json({ ok: true, data: updated });
+    res.json({ ok: true, data: { case: updated, task: createdTask, escalation: createdEscalation } });
   } catch (err) { next(err); }
 });
 
@@ -343,6 +503,18 @@ casesRouter.post('/api/cases/:id/generate-evidence-pack', requireWorkspace, asyn
       custRow = c;
     }
 
+    let programFormRow: typeof programForms.$inferSelect | undefined;
+    if (caseRow.programFormId) {
+      const [p] = await db.select().from(programForms).where(eq(programForms.id, caseRow.programFormId)).limit(1);
+      programFormRow = p;
+    }
+
+    let escalationRow: typeof escalations.$inferSelect | undefined;
+    if (caseRow.escalationId) {
+      const [e] = await db.select().from(escalations).where(eq(escalations.id, caseRow.escalationId)).limit(1);
+      escalationRow = e;
+    }
+
     let checkReqs: typeof checkRequests.$inferSelect[] = [];
     const sessionIds = sessionRows.map(s => s.id);
     const sessionCheckIds = sessionRows.map(s => s.checkRequestId).filter(Boolean) as string[];
@@ -360,6 +532,12 @@ casesRouter.post('/api/cases/:id/generate-evidence-pack', requireWorkspace, asyn
       diditRes = await db.select().from(diditResults).where(inArray(diditResults.diditSessionId, sessionIds));
     }
 
+    const auditRows = await db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.workspaceId, workspaceId), eq(auditLog.entityId, caseRow.id)))
+      .orderBy(desc(auditLog.createdAt));
+
     const now = new Date().toISOString();
 
     const packContent = JSON.stringify({
@@ -367,12 +545,15 @@ casesRouter.post('/api/cases/:id/generate-evidence-pack', requireWorkspace, asyn
       generatedBy:   userId,
       case:          caseRow,
       customer:      custRow ?? null,
+      programForm:   programFormRow ?? null,
+      escalation:    escalationRow ?? null,
       wizardRuns:    wizardRunsRows,
       diditSessions: sessionRows,
       diditResults:  diditRes,
       checkRequests: checkReqs,
       checkResults:  checkRes,
       tasks:         caseTasks,
+      audit:         auditRows,
     }, null, 2);
 
     // Upsert evidence pack output
@@ -543,6 +724,16 @@ casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res
         .orderBy(desc(diditResults.createdAt));
     }
 
+    const sessionCheckIds = sessionRows.map(s => s.checkRequestId).filter(Boolean) as string[];
+    let checkReqs: typeof checkRequests.$inferSelect[] = [];
+    let checkRes: typeof checkResults.$inferSelect[] = [];
+    if (sessionCheckIds.length > 0) {
+      checkReqs = await db.select().from(checkRequests).where(inArray(checkRequests.id, sessionCheckIds));
+      if (checkReqs.length > 0) {
+        checkRes = await db.select().from(checkResults).where(inArray(checkResults.checkRequestId, checkReqs.map(r => r.id)));
+      }
+    }
+
     const caseTasks = await db
       .select()
       .from(tasks)
@@ -552,6 +743,18 @@ casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res
     if (caseRow.customerId) {
       const [c] = await db.select().from(customers).where(eq(customers.id, caseRow.customerId)).limit(1);
       custRow = c;
+    }
+
+    let programFormRow: typeof programForms.$inferSelect | undefined;
+    if (caseRow.programFormId) {
+      const [p] = await db.select().from(programForms).where(eq(programForms.id, caseRow.programFormId)).limit(1);
+      programFormRow = p;
+    }
+
+    let escalationRow: typeof escalations.$inferSelect | undefined;
+    if (caseRow.escalationId) {
+      const [e] = await db.select().from(escalations).where(eq(escalations.id, caseRow.escalationId)).limit(1);
+      escalationRow = e;
     }
 
     const auditRows = await db
@@ -586,6 +789,24 @@ casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res
           ]
         : ['  No customer linked']),
       '',
+      '-- Linked AML Program --',
+      ...(programFormRow
+        ? [
+            `  Title: ${programFormRow.title}`,
+            `  Status: ${programFormRow.status}`,
+            `  Current step: ${programFormRow.currentStep}`,
+          ]
+        : ['  No program form linked']),
+      '',
+      '-- Escalation --',
+      ...(escalationRow
+        ? [
+            `  Subject: ${escalationRow.subject}`,
+            `  Status: ${escalationRow.status}`,
+            `  Risk: ${escalationRow.riskRating}`,
+          ]
+        : ['  No escalation linked']),
+      '',
       '-- Tasks --',
       ...(caseTasks.length
         ? caseTasks.map(t => `  [${t.status}] ${t.title} (${t.priority})`)
@@ -600,6 +821,15 @@ casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res
       ...(diditResultRows.length
         ? diditResultRows.map(r => `  ${r.status.padEnd(16)} decision=${r.decision}  ${r.summary ?? ''}`)
         : ['  No results yet']),
+      '',
+      '-- Check Requests / Results --',
+      ...(checkReqs.length
+        ? checkReqs.map(r => {
+            const linked = checkRes.filter(result => result.checkRequestId === r.id);
+            const outcomes = linked.length ? linked.map(result => result.outcome).join(', ') : 'pending';
+            return `  ${r.provider} ${r.checkType} status=${r.status} outcome=${outcomes}`;
+          })
+        : ['  No check engine rows yet']),
       '',
       '-- Audit Timeline --',
       ...(auditRows.length

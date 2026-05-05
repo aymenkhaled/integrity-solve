@@ -39,6 +39,7 @@ import CasesPage                  from '@/pages/cases/CasesPage';
 import CaseDetailPage             from '@/pages/cases/CaseDetailPage';
 import CaseProgramWizardPage      from '@/pages/cases/ProgramWizardPage';
 import CaseTransactionWizardPage  from '@/pages/cases/TransactionWizardPage';
+import VerificationCompletePage   from '@/pages/cases/VerificationCompletePage';
 
 // Diamond features
 import ComplianceHealthPage  from '@/pages/compliance/ComplianceHealthPage';
@@ -97,6 +98,11 @@ export default function App() {
       </Route>
       <Route path="/verify-email">
         <ProtectedRoute><VerifyEmailPage /></ProtectedRoute>
+      </Route>
+      <Route path="/verification-complete">
+        <ProtectedRoute>
+          <AppLayout><VerificationCompletePage /></AppLayout>
+        </ProtectedRoute>
       </Route>
 
       {/* Protected app routes */}

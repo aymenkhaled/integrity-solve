@@ -63,7 +63,7 @@ export const checkOutcomeEnum = pgEnum('check_outcome', [
 ]);
 export const providerEnum = pgEnum('provider', [
     'GREENID', 'EQUIFAX', 'ILLION', 'REFINITIV', 'TRULIOO',
-    'ACIC', 'ASIC_CONNECT', 'ABR', 'MOCK',
+    'ACIC', 'ASIC_CONNECT', 'ABR', 'DIDIT', 'MOCK',
 ]);
 export const documentTypeEnum = pgEnum('document_type', [
     'AML_PROGRAM', 'RISK_ASSESSMENT', 'CDD_FORM', 'EDD_FORM',
@@ -785,5 +785,128 @@ export const escalationsRelations = relations(escalations, ({ one, many }) => ({
 export const smrDraftsRelations = relations(smrDrafts, ({ one }) => ({
     workspace: one(workspaces, { fields: [smrDrafts.workspaceId], references: [workspaces.id] }),
     escalation: one(escalations, { fields: [smrDrafts.escalationId], references: [escalations.id] }),
+}));
+// ============================================================================
+// MILESTONE 1 — WIZARD-LED FLOWS + DIDIT INTEGRATION
+// ============================================================================
+export const cases = pgTable('cases', {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+    caseType: text('case_type').notNull(), // 'PROGRAM_SETUP' | 'TRANSACTION_CDD'
+    status: text('status').notNull().default('DRAFT'), // DRAFT | IN_PROGRESS | COMPLETED | ARCHIVED
+    title: text('title').notNull(),
+    designatedService: text('designated_service'),
+    partyType: text('party_type'), // individual | company | trust | beneficial_owner
+    riskLevel: text('risk_level').default('not_assessed'), // low | medium | high | not_assessed
+    recommendation: text('recommendation'),
+    // Deep links to other modules
+    customerId: text('customer_id').references(() => customers.id),
+    programFormId: text('program_form_id').references(() => programForms.id),
+    escalationId: text('escalation_id').references(() => escalations.id),
+    // Reviewer decision
+    reviewerDecision: text('reviewer_decision'), // approve_proceed | request_more_info | escalate_officer
+    reviewerDecisionBy: text('reviewer_decision_by').references(() => users.id),
+    reviewerDecisionAt: timestamp('reviewer_decision_at', { withTimezone: true }),
+    reviewerNotes: text('reviewer_notes'),
+    // Extra metadata
+    metadata: jsonb('metadata').default({}),
+    createdBy: text('created_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+    workspaceIdx: index('cases_workspace_idx').on(t.workspaceId),
+    statusIdx: index('cases_status_idx').on(t.workspaceId, t.status),
+    customerIdx: index('cases_customer_idx').on(t.customerId),
+    escalationIdx: index('cases_escalation_idx').on(t.escalationId),
+}));
+export const wizardRuns = pgTable('wizard_runs', {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+    caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+    wizardType: text('wizard_type').notNull(), // PROGRAM_SETUP | TRANSACTION_CDD
+    status: text('status').notNull().default('IN_PROGRESS'), // IN_PROGRESS | COMPLETED | ABANDONED
+    currentStep: text('current_step').notNull().default('start'),
+    answers: jsonb('answers').default({}),
+    routeResult: jsonb('route_result').default({}),
+    createdBy: text('created_by').references(() => users.id),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+    caseIdx: index('wizard_runs_case_idx').on(t.caseId),
+    workspaceIdx: index('wizard_runs_workspace_idx').on(t.workspaceId),
+}));
+export const wizardSteps = pgTable('wizard_steps', {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    wizardRunId: text('wizard_run_id').notNull().references(() => wizardRuns.id, { onDelete: 'cascade' }),
+    stepKey: text('step_key').notNull(),
+    status: text('status').notNull().default('COMPLETED'),
+    answers: jsonb('answers').default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+    runStepUniq: uniqueIndex('wizard_steps_run_step_uniq').on(t.wizardRunId, t.stepKey),
+}));
+export const diditSessions = pgTable('didit_sessions', {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+    caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+    capability: text('capability').notNull(), // kyc | kyb | aml_screening | company_aml
+    status: text('status').notNull().default('queued'), // queued | processing | passed | failed | review_required | error
+    idempotencyKey: text('idempotency_key').notNull(),
+    providerRequestId: text('provider_request_id'),
+    sessionUrl: text('session_url'),
+    sessionToken: text('session_token'),
+    workflowId: text('workflow_id'),
+    vendorData: text('vendor_data'),
+    subjectId: text('subject_id'),
+    // Bridge to check engine: set when case has a linked customer
+    checkRequestId: text('check_request_id').references(() => checkRequests.id),
+    metadata: jsonb('metadata').default({}),
+    createdBy: text('created_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+    idempotencyUniq: uniqueIndex('didit_sessions_idempotency_uniq').on(t.workspaceId, t.idempotencyKey),
+    caseIdx: index('didit_sessions_case_idx').on(t.caseId),
+}));
+export const diditResults = pgTable('didit_results', {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    diditSessionId: text('didit_session_id').notNull().references(() => diditSessions.id, { onDelete: 'cascade' }),
+    providerRequestId: text('provider_request_id'),
+    status: text('status').notNull(), // passed | failed | review_required | processing | error
+    decision: text('decision').notNull(), // clear | not_verified | matched | unresolved | pending
+    summary: text('summary'),
+    riskSignals: jsonb('risk_signals').default([]),
+    normalizedPayload: jsonb('normalized_payload').default({}),
+    rawPayload: jsonb('raw_payload').default({}),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+    sessionIdx: index('didit_results_session_idx').on(t.diditSessionId),
+    providerRequestIdx: index('didit_results_provider_request_idx').on(t.providerRequestId),
+}));
+export const diditWebhookEvents = pgTable('didit_webhook_events', {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    externalEventId: text('external_event_id').notNull(),
+    eventType: text('event_type').notNull(),
+    providerRequestId: text('provider_request_id'),
+    signatureValid: boolean('signature_valid').notNull().default(false),
+    payload: jsonb('payload').default({}),
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+    externalEventUniq: uniqueIndex('didit_webhook_events_ext_uniq').on(t.externalEventId),
+}));
+export const caseOutputs = pgTable('case_outputs', {
+    id: text('id').primaryKey().$defaultFn(() => createId()),
+    workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+    caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+    outputType: text('output_type').notNull(), // summary | pdf
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+    caseIdx: index('case_outputs_case_idx').on(t.caseId),
+    caseOutputTypeUniq: uniqueIndex('case_outputs_case_output_type_uniq').on(t.caseId, t.outputType),
 }));
 //# sourceMappingURL=schema.js.map

@@ -152,6 +152,7 @@ export var Provider;
     Provider["ACIC"] = "ACIC";
     Provider["ASIC_CONNECT"] = "ASIC_CONNECT";
     Provider["ABR"] = "ABR";
+    Provider["DIDIT"] = "DIDIT";
     Provider["MOCK"] = "MOCK";
 })(Provider || (Provider = {}));
 export var DocumentType;

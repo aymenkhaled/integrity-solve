@@ -263,6 +263,9 @@ export const casesApi = {
   linkCustomer: (id: string, customerId: string, reason: string) =>
     api.post(`/cases/${id}/link-customer`, { customerId, reason }),
 
+  createCustomerFromCase: (id: string, data: unknown) =>
+    api.post(`/cases/${id}/create-customer-from-case`, data),
+
   reviewerDecision: (id: string, decision: string, notes: string, reason: string) =>
     api.post(`/cases/${id}/reviewer-decision`, { decision, notes, reason }),
 
@@ -289,6 +292,8 @@ export const wizardApi = {
 // ─── Didit (Milestone 1) ──────────────────────────────────────────────────────
 
 export const diditApi = {
+  configStatus: () => api.get('/providers/didit/config-status'),
+
   createSession: (data: {
     caseId: string;
     capability: 'kyc' | 'kyb' | 'aml_screening' | 'company_aml';

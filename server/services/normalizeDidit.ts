@@ -37,7 +37,7 @@ export function normalizeDiditDecision(payload: unknown): NormalizedDiditDecisio
     };
   }
 
-  if (status.includes('review') || status.includes('resub')) {
+  if (status.includes('review') || status.includes('resub') || status.includes('manual')) {
     return {
       status:      'review_required',
       decision:    'unresolved',
@@ -46,11 +46,20 @@ export function normalizeDiditDecision(payload: unknown): NormalizedDiditDecisio
     };
   }
 
-  if (status.includes('declined') || status.includes('rejected') || status.includes('failed')) {
+  if (
+    status.includes('declined') ||
+    status.includes('rejected') ||
+    status.includes('failed') ||
+    status.includes('abandoned') ||
+    status.includes('expired') ||
+    status.includes('cancelled') ||
+    status.includes('canceled') ||
+    status.includes('timeout')
+  ) {
     return {
       status:      'failed',
       decision:    'not_verified',
-      summary:     'Didit verification failed or was declined.',
+      summary:     'Didit verification failed, was declined, or did not complete.',
       riskSignals: ['verification_failed'],
     };
   }

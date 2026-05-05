@@ -75,6 +75,15 @@ interface DiditSession {
   checkRequestId?: string;
 }
 
+interface DiditConfig {
+  mode: string;
+  hasApiKey: boolean;
+  hasWebhookSecret: boolean;
+  hasKycWorkflowId: boolean;
+  hasKybWorkflowId: boolean;
+  baseUrl: string;
+}
+
 interface DiditResult {
   id: string; diditSessionId: string; status: string; decision: string;
   summary?: string; riskSignals?: string[]; createdAt: string;
@@ -138,6 +147,7 @@ export default function CaseDetailPage() {
   const { id }       = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const qc           = useQueryClient();
+  const [activeTab, setActiveTab] = useState('wizard');
 
   // Verification check state
   const [startingCheck, setStartingCheck] = useState<string | null>(null);
@@ -149,6 +159,10 @@ export default function CaseDetailPage() {
   // Link customer state
   const [showLinkCustomer, setShowLinkCustomer] = useState(false);
   const [customerSearch, setCustomerSearch]     = useState('');
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false);
+  const [caseCustomerForm, setCaseCustomerForm] = useState({
+    givenNames: '', familyName: '', entityName: '', email: '', country: 'AU',
+  });
 
   // Add task state
   const [showAddTask, setShowAddTask] = useState(false);
@@ -167,7 +181,15 @@ export default function CaseDetailPage() {
     queryKey: ['case-summary', id],
     queryFn:  () => casesApi.summary(id!) as Promise<CaseSummary>,
     enabled:  !!id,
-    refetchInterval: 10000,
+    refetchInterval: (query) => {
+      const data = query.state.data as CaseSummary | undefined;
+      return data?.checks.some(ch => ch.status === 'queued' || ch.status === 'processing') ? 10000 : false;
+    },
+  });
+
+  const { data: diditConfig } = useQuery<DiditConfig>({
+    queryKey: ['didit-config-status'],
+    queryFn:  () => diditApi.configStatus() as Promise<DiditConfig>,
   });
 
   const { data: customerList } = useQuery<{ items: CustomerRecord[] }>({
@@ -238,6 +260,32 @@ export default function CaseDetailPage() {
       setShowLinkCustomer(false);
       setCustomerSearch('');
       toast.success('Customer linked to case.');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const createCustomerFromCaseMutation = useMutation({
+    mutationFn: () => {
+      const customerType =
+        summary?.case.partyType === 'company' ? 'COMPANY' :
+        summary?.case.partyType === 'trust' ? 'TRUST' : 'INDIVIDUAL';
+
+      return casesApi.createCustomerFromCase(id!, {
+        customerType,
+        givenNames: caseCustomerForm.givenNames || undefined,
+        familyName: caseCustomerForm.familyName || undefined,
+        entityName: caseCustomerForm.entityName || undefined,
+        email:      caseCustomerForm.email || undefined,
+        country:    caseCustomerForm.country || 'AU',
+        reason:     'Created and linked customer from transaction case details',
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['case-summary', id] });
+      setShowCreateCustomer(false);
+      setActiveTab('checks');
+      setCaseCustomerForm({ givenNames: '', familyName: '', entityName: '', email: '', country: 'AU' });
+      toast.success('Customer created and linked to case.');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -339,7 +387,12 @@ export default function CaseDetailPage() {
   const escalationFlags   = (routeResult?.['escalations'] as string[] | undefined) ?? [];
   const isTransaction     = caseRow.caseType === 'TRANSACTION_CDD';
   const wizardDone        = latestWizard?.status === 'COMPLETED';
-  const isMockMode        = true;
+  const diditMode         = diditConfig?.mode ?? 'mock';
+  const isMockMode        = diditMode === 'mock';
+  const canStartChecks    = !isTransaction || Boolean(customer);
+  const customerTypeForCase =
+    caseRow.partyType === 'company' ? 'COMPANY' :
+    caseRow.partyType === 'trust' ? 'TRUST' : 'INDIVIDUAL';
 
   const openTasks     = tasks.filter(t => t.status !== 'COMPLETE' && t.status !== 'CANCELLED');
   const completeTasks = tasks.filter(t => t.status === 'COMPLETE');
@@ -369,6 +422,9 @@ export default function CaseDetailPage() {
               )}
               {isMockMode && (
                 <Badge variant="outline" className="text-xs text-muted-foreground">Mock mode</Badge>
+              )}
+              {!isMockMode && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">Didit {diditMode}</Badge>
               )}
             </div>
           </div>
@@ -424,7 +480,7 @@ export default function CaseDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="wizard">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="wizard">Wizard</TabsTrigger>
           <TabsTrigger value="customer">
@@ -537,8 +593,8 @@ export default function CaseDetailPage() {
                     <div className="flex items-center gap-2 text-xs">
                       <Badge variant="outline">{programForm.status}</Badge>
                       {programForm.pathway && <span className="text-muted-foreground">{programForm.pathway}</span>}
-                      <Link href={`/programs/${programForm.id}`} className="text-primary underline">
-                        Open program →
+                      <Link href={`/programs/${programForm.id}/wizard`} className="text-primary underline">
+                        Continue Full AML Program Wizard
                       </Link>
                     </div>
                   </div>
@@ -664,8 +720,94 @@ export default function CaseDetailPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Link an existing customer to connect CDD checks, risk ratings, and audit trails.
                 </p>
-                <Button variant="outline" onClick={() => setShowLinkCustomer(true)}>
-                  Link Customer
+                <div className="flex justify-center gap-2 flex-wrap">
+                  <Button variant="outline" onClick={() => setShowLinkCustomer(true)}>
+                    Link Customer
+                  </Button>
+                  {isTransaction && (
+                    <Button onClick={() => setShowCreateCustomer(true)}>
+                      Create from Case
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Create customer from case panel */}
+          {showCreateCustomer && !customer && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center justify-between">
+                  Create Customer from Case
+                  <Button variant="ghost" size="icon" onClick={() => setShowCreateCustomer(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-xs text-muted-foreground">
+                  Customer type: {customerTypeForCase.toLowerCase().replace('_', ' ')}
+                </div>
+                {customerTypeForCase === 'INDIVIDUAL' ? (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Given names</Label>
+                      <Input
+                        value={caseCustomerForm.givenNames}
+                        onChange={e => setCaseCustomerForm(f => ({ ...f, givenNames: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Family name</Label>
+                      <Input
+                        value={caseCustomerForm.familyName}
+                        onChange={e => setCaseCustomerForm(f => ({ ...f, familyName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <Label className="text-xs">Entity name</Label>
+                    <Input
+                      value={caseCustomerForm.entityName}
+                      onChange={e => setCaseCustomerForm(f => ({ ...f, entityName: e.target.value }))}
+                    />
+                  </div>
+                )}
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Email</Label>
+                    <Input
+                      type="email"
+                      value={caseCustomerForm.email}
+                      onChange={e => setCaseCustomerForm(f => ({ ...f, email: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Country</Label>
+                    <Input
+                      value={caseCustomerForm.country}
+                      maxLength={2}
+                      onChange={e => setCaseCustomerForm(f => ({ ...f, country: e.target.value.toUpperCase() }))}
+                    />
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  disabled={
+                    createCustomerFromCaseMutation.isPending ||
+                    (customerTypeForCase === 'INDIVIDUAL'
+                      ? (!caseCustomerForm.givenNames || !caseCustomerForm.familyName)
+                      : !caseCustomerForm.entityName)
+                  }
+                  onClick={() => createCustomerFromCaseMutation.mutate()}
+                >
+                  {createCustomerFromCaseMutation.isPending
+                    ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    : <Plus className="h-3.5 w-3.5" />}
+                  Create and Link Customer
                 </Button>
               </CardContent>
             </Card>
@@ -725,7 +867,33 @@ export default function CaseDetailPage() {
 
         {/* ── Checks tab ─────────────────────────────────────────────────── */}
         <TabsContent value="checks" className="mt-4 space-y-4">
-          {wizardDone && recommendedChecks.length > 0 && (
+          {wizardDone && isTransaction && !customer && recommendedChecks.length > 0 && (
+            <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
+              <CardContent className="p-4 flex gap-3 items-start">
+                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <div className="font-medium text-sm">Link or create customer before starting Didit checks.</div>
+                  <p className="text-sm text-muted-foreground">
+                    The transaction wizard has identified recommended checks, but verification evidence must attach to a customer record.
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => { setShowCreateCustomer(true); setActiveTab('customer'); }}>
+                    Create Customer from Case
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!isMockMode && diditConfig && (!diditConfig.hasApiKey || !diditConfig.hasWebhookSecret) && (
+            <Card className="border-dashed">
+              <CardContent className="p-4 text-sm text-muted-foreground">
+                Didit is set to {diditMode}, but required backend secrets are missing.
+                Add the API key, workflow IDs, webhook secret, and APP_URL in Replit Secrets before starting hosted checks.
+              </CardContent>
+            </Card>
+          )}
+
+          {wizardDone && recommendedChecks.length > 0 && canStartChecks && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm text-muted-foreground">Start a Verification Check</CardTitle>
@@ -739,7 +907,7 @@ export default function CaseDetailPage() {
                         key={cap}
                         variant={alreadyDone ? 'secondary' : 'outline'}
                         size="sm"
-                        disabled={alreadyDone || createCheckMutation.isPending}
+                        disabled={alreadyDone || createCheckMutation.isPending || !canStartChecks}
                         onClick={() => {
                           setStartingCheck(cap);
                           createCheckMutation.mutate(cap);
@@ -830,11 +998,11 @@ export default function CaseDetailPage() {
                         {ch.sessionUrl && (
                           <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
                             <a href={ch.sessionUrl} target="_blank" rel="noreferrer">
-                              <ExternalLink className="h-3.5 w-3.5" />Verify
+                              <ExternalLink className="h-3.5 w-3.5" />Open Didit Verification
                             </a>
                           </Button>
                         )}
-                        {ch.status === 'processing' && (
+                        {isMockMode && ch.status === 'processing' && (
                           <Button
                             variant="secondary" size="sm" className="gap-1.5 text-xs"
                             onClick={() => mockCompleteMutation.mutate({ sessionId: ch.id, outcome: 'Approved' })}

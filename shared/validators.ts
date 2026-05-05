@@ -130,7 +130,7 @@ export const CreateBeneficialOwnerSchema = z.object({
 
 export const RunCheckSchema = z.object({
   checkType:   z.enum(['IDENTITY', 'REGISTRY', 'SANCTIONS', 'PEP', 'AML', 'ADDRESS', 'DOCUMENT']),
-  provider:    z.enum(['GREENID', 'EQUIFAX', 'ILLION', 'REFINITIV', 'TRULIOO', 'ACIC', 'ASIC_CONNECT', 'ABR', 'MOCK']),
+  provider:    z.enum(['GREENID', 'EQUIFAX', 'ILLION', 'REFINITIV', 'TRULIOO', 'ACIC', 'ASIC_CONNECT', 'ABR', 'DIDIT', 'MOCK']),
   subjectId:   z.string().min(1),
   subjectType: z.enum(['CUSTOMER', 'PERSON', 'BENEFICIAL_OWNER']),
   reason:      z.string().min(10, 'Reason must be at least 10 characters'),

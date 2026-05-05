@@ -152,6 +152,7 @@ export enum Provider {
   ACIC         = 'ACIC',
   ASIC_CONNECT = 'ASIC_CONNECT',
   ABR          = 'ABR',
+  DIDIT        = 'DIDIT',
   MOCK         = 'MOCK',
 }
 

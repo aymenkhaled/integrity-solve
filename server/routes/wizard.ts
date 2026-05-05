@@ -168,7 +168,7 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
 
     if (body.complete && run.wizardType === 'PROGRAM_SETUP') {
       // Derive industry pathway from wizard answers
-      const industryAnswer = flatAnswers['industry'] as string | undefined;
+      const industryAnswer = (flatAnswers['industryPathway'] ?? flatAnswers['industry']) as string | undefined;
       const pathwayMap: Record<string, string> = {
         accounting:            'ACCOUNTING',
         legal:                 'LEGAL',
@@ -188,11 +188,21 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
         const [pForm] = await db.insert(programForms).values({
           id:          createId(),
           workspaceId,
-          title:       `AML/CTF Program — ${new Date().toLocaleDateString('en-AU')}`,
+          title:       `AML/CTF Program - ${new Date().toLocaleDateString('en-AU')}`,
           pathway:     pathway as typeof programForms.$inferInsert['pathway'] ?? null,
           status:      'IN_PROGRESS',
-          currentStep: 13,
-          formData:    { case_intake: flatAnswers },
+          currentStep: 0,
+          formData: {
+            case_intake: flatAnswers,
+            step_0: {
+              industryPathway: industryAnswer,
+              businessStructure: flatAnswers['businessStructure'],
+              abn: flatAnswers['abn'],
+            },
+            step_1: {
+              designatedServices: flatAnswers['designatedServices'] ?? [],
+            },
+          },
           createdBy:   userId,
         }).returning();
 
@@ -200,6 +210,25 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
           .set({ programFormId: pForm.id, status: 'COMPLETED', updatedAt: new Date() })
           .where(eq(cases.id, run.caseId));
       } else {
+        if (caseRow?.programFormId) {
+          await db.update(programForms)
+            .set({
+              currentStep: 0,
+              formData: {
+                case_intake: flatAnswers,
+                step_0: {
+                  industryPathway: industryAnswer,
+                  businessStructure: flatAnswers['businessStructure'],
+                  abn: flatAnswers['abn'],
+                },
+                step_1: {
+                  designatedServices: flatAnswers['designatedServices'] ?? [],
+                },
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(programForms.id, caseRow.programFormId));
+        }
         await db.update(cases)
           .set({ status: 'COMPLETED', updatedAt: new Date() })
           .where(eq(cases.id, run.caseId));

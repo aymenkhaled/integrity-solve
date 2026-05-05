@@ -70,6 +70,8 @@ export default function CasesPage() {
   const qc              = useQueryClient();
   const [, navigate]    = useLocation();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [form, setForm] = useState({
     caseType:          'TRANSACTION_CDD' as 'TRANSACTION_CDD' | 'PROGRAM_SETUP',
     title:             '',
@@ -86,7 +88,14 @@ export default function CasesPage() {
     queryFn:  () => casesApi.list() as Promise<Case[]>,
   });
 
-  const caseList        = cases;
+  const filteredCases = cases.filter(c => {
+    const matchesSearch = !search.trim() || [
+      c.title, c.designatedService, c.partyType, c.status, c.riskLevel,
+    ].some(value => value?.toLowerCase().includes(search.trim().toLowerCase()));
+    const matchesType = typeFilter === 'all' || c.caseType === typeFilter;
+    return matchesSearch && matchesType;
+  });
+  const caseList        = filteredCases.slice(0, 50);
   const programCases    = caseList.filter(c => c.caseType === 'PROGRAM_SETUP');
   const transactionCases = caseList.filter(c => c.caseType === 'TRANSACTION_CDD');
 
@@ -229,10 +238,10 @@ export default function CasesPage() {
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Cases',  value: caseList.length,                                            icon: FolderOpen },
-          { label: 'In Progress',  value: caseList.filter(c => c.status === 'IN_PROGRESS').length,    icon: RefreshCw },
-          { label: 'Completed',    value: caseList.filter(c => c.status === 'COMPLETED').length,      icon: CheckCircle2 },
-          { label: 'High Risk',    value: caseList.filter(c => c.riskLevel === 'high').length,        icon: AlertTriangle },
+          { label: 'Total Cases',  value: filteredCases.length,                                            icon: FolderOpen },
+          { label: 'In Progress',  value: filteredCases.filter(c => c.status === 'IN_PROGRESS').length,    icon: RefreshCw },
+          { label: 'Completed',    value: filteredCases.filter(c => c.status === 'COMPLETED').length,      icon: CheckCircle2 },
+          { label: 'High Risk',    value: filteredCases.filter(c => c.riskLevel === 'high').length,        icon: AlertTriangle },
         ].map(({ label, value, icon: Icon }) => (
           <Card key={label} className="p-4">
             <div className="flex items-center gap-3">
@@ -255,6 +264,32 @@ export default function CasesPage() {
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span className="text-sm">Failed to load cases: {(error as Error).message}</span>
         </div>
+      )}
+
+      {cases.length > 50 && (
+        <Card>
+          <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
+            <Input
+              placeholder="Search cases..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="sm:max-w-xs"
+            />
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="sm:max-w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All case types</SelectItem>
+                <SelectItem value="TRANSACTION_CDD">Transaction / CDD</SelectItem>
+                <SelectItem value="PROGRAM_SETUP">Program setup</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="text-xs text-muted-foreground self-center">
+              Showing {caseList.length} of {filteredCases.length} matching cases
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Transaction Cases */}
@@ -287,7 +322,7 @@ export default function CasesPage() {
         </section>
       )}
 
-      {!isLoading && !error && caseList.length === 0 && (
+      {!isLoading && !error && filteredCases.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="py-16 text-center">
             <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

@@ -14,6 +14,7 @@ export type CreateDiditSessionInput = {
   sessionId:      string;       // diditSessions.id — used as vendor_data
   workspaceId:    string;
   caseId:         string;
+  checkRequestId?: string | null;
   callbackUrl:    string;
   contactDetails?: { email?: string; phone?: string };
 };
@@ -21,6 +22,7 @@ export type CreateDiditSessionInput = {
 export type DiditSessionResult = {
   providerRequestId: string;
   verificationUrl:   string | null;
+  sessionToken:      string | null;
   workflowId:        string;
   raw:               unknown;
 };
@@ -36,6 +38,13 @@ function workflowIdFor(capability: DiditCapability): string {
   return process.env['DIDIT_WORKFLOW_ID_KYC'] ?? 'mock_kyc_workflow';
 }
 
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return null;
+}
+
 export async function createDiditSession(
   input: CreateDiditSessionInput,
 ): Promise<DiditSessionResult> {
@@ -47,6 +56,7 @@ export async function createDiditSession(
     return {
       providerRequestId: `mock_${input.sessionId}`,
       verificationUrl:   null, // Bug 7: no fake URL — use Mock Complete button
+      sessionToken:      null,
       workflowId,
       raw: {
         mode:       'mock',
@@ -79,9 +89,10 @@ export async function createDiditSession(
       callback:        input.callbackUrl,
       vendor_data:     input.sessionId,
       metadata: {
-        workspace_id: input.workspaceId,
-        case_id:      input.caseId,
-        capability:   input.capability,
+        workspace_id:     input.workspaceId,
+        case_id:          input.caseId,
+        capability:       input.capability,
+        check_request_id: input.checkRequestId ?? null,
       },
       contact_details: input.contactDetails,
     }),
@@ -96,9 +107,23 @@ export async function createDiditSession(
     throw new Error(`Didit session creation failed: ${response.status} — ${JSON.stringify(body)}`);
   }
 
+  const data = (body['data'] ?? {}) as Record<string, unknown>;
+
   return {
-    providerRequestId: body['session_id'] as string,
-    verificationUrl:   body['verification_url'] as string ?? null,
+    providerRequestId: firstString(
+      body['session_id'], body['id'], body['sessionId'],
+      data['session_id'], data['id'], data['sessionId'],
+    ) ?? input.sessionId,
+    verificationUrl: firstString(
+      body['verification_url'], body['verificationUrl'], body['url'],
+      body['redirect_url'], body['hosted_url'],
+      data['verification_url'], data['verificationUrl'], data['url'],
+      data['redirect_url'], data['hosted_url'],
+    ),
+    sessionToken: firstString(
+      body['session_token'], body['sessionToken'], body['token'],
+      data['session_token'], data['sessionToken'], data['token'],
+    ),
     workflowId,
     raw: body,
   };

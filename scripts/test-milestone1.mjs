@@ -72,6 +72,7 @@ async function testAuth() {
 // ─── 1. Cases CRUD ──────────────────────────────────────────────────────────
 let programCaseId    = null;
 let transactionCaseId = null;
+let transactionCustomerId = null;
 
 async function testCases() {
   section('1. CASES — create, list');
@@ -210,6 +211,16 @@ async function testProgramWizard() {
     summaryAfter.data?.data?.case?.status === 'COMPLETED'
       ? pass('Program case status = COMPLETED after wizard')
       : fail('Program case status not COMPLETED', summaryAfter.data?.data?.case?.status);
+    const programForm = summaryAfter.data?.data?.programForm;
+    programForm?.id
+      ? pass('Program case has linked program form')
+      : fail('Program case missing linked program form', summaryAfter.data?.data);
+    Number.isInteger(programForm?.currentStep) && programForm.currentStep >= 0 && programForm.currentStep <= 12
+      ? pass(`Program form currentStep valid (${programForm.currentStep})`)
+      : fail('Program form currentStep must be between 0 and 12', programForm);
+    programForm?.formData?.case_intake
+      ? pass('Program form stores case intake in formData.case_intake')
+      : fail('Program form missing formData.case_intake', programForm?.formData);
   }
 }
 
@@ -324,6 +335,44 @@ async function testDidit() {
   section('5. DIDIT — create session, list, mock-complete, multiple results, idempotency');
   if (!transactionCaseId) return fail('Didit session', 'no transactionCaseId');
 
+  const config = await req('GET', '/providers/didit/config-status');
+  assert2xx(config, 'GET /providers/didit/config-status');
+  if (ok2xx(config)) {
+    const d = config.data?.data;
+    d?.mode
+      ? pass(`Didit config mode = "${d.mode}"`)
+      : fail('Didit config missing mode', d);
+    d?.apiKey === undefined && d?.webhookSecret === undefined && d?.DIDIT_API_KEY === undefined
+      ? pass('Didit config-status does not expose secrets')
+      : fail('Didit config-status leaked secret-looking fields', d);
+  }
+
+  const blocked = await req('POST', '/providers/didit/session', {
+    caseId:     transactionCaseId,
+    capability: 'kyc',
+    subjectId:  'individual-john-smith-001',
+    reason:     'Blocked check before customer linkage',
+  });
+  blocked.status === 403
+    ? pass('Didit session blocked before customer is linked')
+    : fail('Didit session should be blocked before customer linkage', { status: blocked.status, data: blocked.data });
+
+  const createCustomer = await req('POST', `/cases/${transactionCaseId}/create-customer-from-case`, {
+    customerType: 'INDIVIDUAL',
+    givenNames:   'John',
+    familyName:   'Smith',
+    email:        'john.smith@example.com',
+    country:      'AU',
+    reason:       'Create customer from Milestone 1 transaction case',
+  });
+  assert2xx(createCustomer, 'POST /cases/:id/create-customer-from-case');
+  if (ok2xx(createCustomer)) {
+    transactionCustomerId = createCustomer.data?.data?.customer?.id;
+    transactionCustomerId
+      ? pass('Customer created and linked from case')
+      : fail('create-customer-from-case missing customer.id', createCustomer.data);
+  }
+
   const create = await req('POST', '/providers/didit/session', {
     caseId:     transactionCaseId,
     capability: 'kyc',
@@ -346,6 +395,9 @@ async function testDidit() {
     d?.reused === false
       ? pass('Didit response: data.reused = false (new session)')
       : fail('Didit response: data.reused not false', d);
+    d?.session?.checkRequestId
+      ? pass('Didit session has linked checkRequestId')
+      : fail('Didit session missing linked checkRequestId', d?.session);
     // Bug 7 fix: mock mode returns null verificationUrl, not a fake URL
     if (d?.mode === 'mock') {
       d?.verificationUrl === null
@@ -412,6 +464,21 @@ async function testDidit() {
       : fail(`Bug 4 fix: expected ≥2 results in summary, got ${results.length}`, results);
   }
 
+  const connectedSummary = await req('GET', `/cases/${transactionCaseId}/summary`);
+  if (ok2xx(connectedSummary)) {
+    const checkRequests = connectedSummary.data?.data?.checkRequests ?? [];
+    checkRequests.length >= 2 && checkRequests.every(r => r.provider === 'DIDIT')
+      ? pass('Case summary has linked DIDIT check requests')
+      : fail('Case summary check requests missing or provider is not DIDIT', checkRequests);
+    const checkResults = connectedSummary.data?.data?.checkResults ?? [];
+    checkResults.length >= 2
+      ? pass('Mock/webhook completion created linked check results')
+      : fail('Linked check results missing after Didit completion', checkResults);
+    connectedSummary.data?.data?.customer?.id === transactionCustomerId
+      ? pass('Case summary includes linked customer')
+      : fail('Case summary missing linked customer', connectedSummary.data?.data?.customer);
+  }
+
   // Duplicate webhook no-op test: send same mock-complete again, should deduplicate
   if (diditSessionId) {
     // First, get the providerRequestId of session 1 from DB via session endpoint
@@ -465,11 +532,54 @@ async function testDidit() {
 }
 
 // ─── 6. PDF generation ───────────────────────────────────────────────────────
+async function testReviewerDecisionAndEvidence() {
+  section('6. REVIEWER DECISION, TASKS, ESCALATION, EVIDENCE PACK');
+  if (!transactionCaseId) return fail('Reviewer decision', 'no transactionCaseId');
+
+  const moreInfo = await req('POST', `/cases/${transactionCaseId}/reviewer-decision`, {
+    decision: 'request_more_info',
+    notes:    'Please confirm source of funds before proceeding.',
+    reason:   'Testing request_more_info task creation',
+  });
+  assert2xx(moreInfo, 'POST /cases/:id/reviewer-decision (request_more_info)');
+
+  let summary = await req('GET', `/cases/${transactionCaseId}/summary`);
+  if (ok2xx(summary)) {
+    const tasks = summary.data?.data?.tasks ?? [];
+    tasks.some(t => t.title?.includes('More information required'))
+      ? pass('request_more_info created a linked case task')
+      : fail('request_more_info did not create linked task', tasks);
+  }
+
+  const escalate = await req('POST', `/cases/${transactionCaseId}/reviewer-decision`, {
+    decision: 'escalate_officer',
+    notes:    'PEP and high-value transaction require compliance officer review.',
+    reason:   'Testing escalation creation from reviewer decision',
+  });
+  assert2xx(escalate, 'POST /cases/:id/reviewer-decision (escalate_officer)');
+
+  summary = await req('GET', `/cases/${transactionCaseId}/summary`);
+  if (ok2xx(summary)) {
+    summary.data?.data?.escalation?.id
+      ? pass('escalate_officer created or linked an escalation')
+      : fail('escalate_officer did not create/link escalation', summary.data?.data);
+    summary.data?.data?.case?.reviewerDecision === 'escalate_officer'
+      ? pass('Reviewer decision persisted on case')
+      : fail('Reviewer decision not persisted', summary.data?.data?.case);
+  }
+
+  const pack = await req('POST', `/cases/${transactionCaseId}/generate-evidence-pack`, {});
+  assert2xx(pack, 'POST /cases/:id/generate-evidence-pack');
+  pack.data?.data?.outputId
+    ? pass('Evidence pack output created/upserted')
+    : fail('Evidence pack missing outputId', pack.data);
+}
+
 async function testPdf() {
   section('6. PDF GENERATION');
-  if (!programCaseId) return fail('PDF', 'no programCaseId');
+  if (!transactionCaseId) return fail('PDF', 'no transactionCaseId');
 
-  const pdfRes = await fetch(`${BASE}/cases/${programCaseId}/pdf`, {
+  const pdfRes = await fetch(`${BASE}/cases/${transactionCaseId}/pdf`, {
     headers: { Cookie: cookieHeader() },
   });
   parseCookies(pdfRes.headers);
@@ -477,8 +587,8 @@ async function testPdf() {
   const body        = await pdfRes.arrayBuffer();
 
   pdfRes.status >= 200 && pdfRes.status < 300
-    ? pass(`GET /cases/${programCaseId}/pdf (HTTP ${pdfRes.status})`)
-    : fail(`GET /cases/${programCaseId}/pdf`, { status: pdfRes.status });
+    ? pass(`GET /cases/${transactionCaseId}/pdf (HTTP ${pdfRes.status})`)
+    : fail(`GET /cases/${transactionCaseId}/pdf`, { status: pdfRes.status });
 
   contentType.includes('pdf')
     ? pass(`Content-Type: ${contentType}`)
@@ -528,6 +638,7 @@ async function testCaseUpdated() {
   await testTransactionWizard();
   await testCaseSummary();
   await testDidit();
+  await testReviewerDecisionAndEvidence();
   await testPdf();
   await testCaseUpdated();
 

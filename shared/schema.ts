@@ -84,7 +84,7 @@ export const checkOutcomeEnum = pgEnum('check_outcome', [
 
 export const providerEnum = pgEnum('provider', [
   'GREENID', 'EQUIFAX', 'ILLION', 'REFINITIV', 'TRULIOO',
-  'ACIC', 'ASIC_CONNECT', 'ABR', 'MOCK',
+  'ACIC', 'ASIC_CONNECT', 'ABR', 'DIDIT', 'MOCK',
 ]);
 
 export const documentTypeEnum = pgEnum('document_type', [
@@ -950,6 +950,7 @@ export const diditSessions = pgTable('didit_sessions', {
   idempotencyKey:   text('idempotency_key').notNull(),
   providerRequestId: text('provider_request_id'),
   sessionUrl:       text('session_url'),
+  sessionToken:     text('session_token'),
   workflowId:       text('workflow_id'),
   vendorData:       text('vendor_data'),
   subjectId:        text('subject_id'),
@@ -976,7 +977,10 @@ export const diditResults = pgTable('didit_results', {
   rawPayload:       jsonb('raw_payload').default({}),
   completedAt:      timestamp('completed_at', { withTimezone: true }),
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  sessionIdx:         index('didit_results_session_idx').on(t.diditSessionId),
+  providerRequestIdx: index('didit_results_provider_request_idx').on(t.providerRequestId),
+}));
 
 export const diditWebhookEvents = pgTable('didit_webhook_events', {
   id:               text('id').primaryKey().$defaultFn(() => createId()),
@@ -998,7 +1002,10 @@ export const caseOutputs = pgTable('case_outputs', {
   outputType:  text('output_type').notNull(),    // summary | pdf
   content:     text('content').notNull(),
   createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  caseIdx:            index('case_outputs_case_idx').on(t.caseId),
+  caseOutputTypeUniq: uniqueIndex('case_outputs_case_output_type_uniq').on(t.caseId, t.outputType),
+}));
 
 // ============================================================================
 // INFERRED TYPES

@@ -92,12 +92,13 @@ async function processWebhookPayload(payload: unknown): Promise<{
   normalized?: ReturnType<typeof normalizeDiditDecision>;
 }> {
   const p = payload as Record<string, unknown>;
+  const metadata = (p['metadata'] ?? {}) as Record<string, unknown>;
   const externalEventId = String(
     p['webhook_id'] ?? p['event_id'] ??
     `${p['session_id'] ?? 'unknown'}:${p['webhook_type'] ?? 'event'}:${p['status'] ?? 'unknown'}`
   );
   const providerRequestId = String(
-    p['session_id'] ?? p['business_session_id'] ??
+    p['session_id'] ?? p['business_session_id'] ?? p['id'] ??
     (p['decision'] as Record<string, unknown>)?.['session_id'] ?? ''
   );
 
@@ -121,7 +122,7 @@ async function processWebhookPayload(payload: unknown): Promise<{
   }).returning();
 
   // Map to a didit session
-  const vendorData = String(p['vendor_data'] ?? '');
+  const vendorData = String(p['vendor_data'] ?? metadata['vendor_data'] ?? metadata['session_id'] ?? '');
   let session: typeof diditSessions.$inferSelect | undefined;
 
   if (providerRequestId) {
@@ -216,6 +217,21 @@ async function processWebhookPayload(payload: unknown): Promise<{
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
+// GET /api/providers/didit/config-status
+diditRouter.get('/api/providers/didit/config-status', requireWorkspace, async (_req: Request, res: Response) => {
+  res.json({
+    ok: true,
+    data: {
+      mode:             env.DIDIT_MODE,
+      hasApiKey:        Boolean(process.env['DIDIT_API_KEY']),
+      hasWebhookSecret: Boolean(process.env['DIDIT_WEBHOOK_SECRET']),
+      hasKycWorkflowId: Boolean(process.env['DIDIT_WORKFLOW_ID_KYC']),
+      hasKybWorkflowId: Boolean(process.env['DIDIT_WORKFLOW_ID_KYB']),
+      baseUrl:          process.env['DIDIT_BASE_URL'] ?? 'https://verification.didit.me',
+    },
+  });
+});
+
 // POST /api/providers/didit/session
 diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -232,6 +248,9 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       .where(and(eq(cases.id, body.caseId), eq(cases.workspaceId, workspaceId)));
 
     if (!caseRow) return void next(new NotFoundError('Case'));
+    if (!caseRow.customerId) {
+      throw new ForbiddenError('Link or create customer before starting Didit checks');
+    }
 
     const iKey = idempotencyKey(workspaceId, body.caseId, body.capability, body.subjectId);
 
@@ -259,22 +278,26 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
 
     // ── Bridge: create checkRequests row if case has a linked customer ──
     let checkRequestId: string | null = null;
-    if (caseRow.customerId) {
-      const [checkReq] = await db.insert(checkRequests).values({
-        id:          createId(),
-        workspaceId,
-        customerId:  caseRow.customerId,
-        checkType:   capabilityToCheckType(body.capability),
-        provider:    'MOCK',
-        status:      'RUNNING',
-        timeoutAt:   addMinutes(new Date(), 10),
-        requestedBy: userId,
-        requestPayload: { source: 'didit', capability: body.capability, reason: body.reason },
-        startedAt:   new Date(),
-        updatedAt:   new Date(),
-      }).returning();
-      checkRequestId = checkReq.id;
-    }
+    const [checkReq] = await db.insert(checkRequests).values({
+      id:          createId(),
+      workspaceId,
+      customerId:  caseRow.customerId,
+      checkType:   capabilityToCheckType(body.capability),
+      provider:    'DIDIT',
+      status:      'RUNNING',
+      timeoutAt:   addMinutes(new Date(), 10),
+      requestedBy: userId,
+      requestPayload: {
+        source:     'didit',
+        mode:       env.DIDIT_MODE,
+        capability: body.capability,
+        caseId:     body.caseId,
+        reason:     body.reason,
+      },
+      startedAt:   new Date(),
+      updatedAt:   new Date(),
+    }).returning();
+    checkRequestId = checkReq.id;
 
     // Create session record
     const sessionId = createId();
@@ -289,7 +312,13 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       subjectId:      body.subjectId,
       vendorData:     sessionId,
       checkRequestId: checkRequestId ?? undefined,
-      metadata:       { reason: body.reason },
+      metadata:       {
+        reason:           body.reason,
+        workspace_id:     workspaceId,
+        case_id:          body.caseId,
+        capability:       body.capability,
+        check_request_id: checkRequestId,
+      },
       createdBy:      userId,
     }).returning();
 
@@ -299,7 +328,8 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       sessionId:      session.id,
       workspaceId,
       caseId:         body.caseId,
-      callbackUrl:    `${env.APP_URL}/verification-complete`,
+      checkRequestId,
+      callbackUrl:    `${env.APP_URL}/verification-complete?case_id=${encodeURIComponent(body.caseId)}`,
       contactDetails: body.contactDetails,
     });
 
@@ -309,10 +339,15 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
         status:            'processing',
         providerRequestId: diditResult.providerRequestId,
         sessionUrl:        diditResult.verificationUrl ?? null,
+        sessionToken:      diditResult.sessionToken ?? null,
         workflowId:        diditResult.workflowId,
         metadata:          {
-          reason:   body.reason,
-          diditRaw: diditResult.raw,
+          reason:           body.reason,
+          workspace_id:     workspaceId,
+          case_id:          body.caseId,
+          capability:       body.capability,
+          check_request_id: checkRequestId,
+          diditRaw:         diditResult.raw,
         },
         updatedAt: new Date(),
       })
