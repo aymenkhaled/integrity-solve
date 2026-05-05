@@ -28,7 +28,7 @@ import {
   checkResults,
 } from '../../shared/schema.js';
 import { createId } from '@paralleldrive/cuid2';
-import { createDiditSession, type DiditSessionResult } from '../services/didit.js';
+import { createDiditSession, type DiditSessionResult, PAID_CAPABILITIES, FREE_CAPABILITIES } from '../services/didit.js';
 import { verifyDiditWebhook }     from '../services/diditWebhook.js';
 import { normalizeDiditDecision } from '../services/normalizeDidit.js';
 import { env } from '../env.js';
@@ -222,12 +222,15 @@ diditRouter.get('/api/providers/didit/config-status', requireWorkspace, async (_
   res.json({
     ok: true,
     data: {
-      mode:             env.DIDIT_MODE,
-      hasApiKey:        Boolean(process.env['DIDIT_API_KEY']),
-      hasWebhookSecret: Boolean(process.env['DIDIT_WEBHOOK_SECRET']),
-      hasKycWorkflowId: Boolean(process.env['DIDIT_WORKFLOW_ID_KYC']),
-      hasKybWorkflowId: Boolean(process.env['DIDIT_WORKFLOW_ID_KYB']),
-      baseUrl:          process.env['DIDIT_BASE_URL'] ?? 'https://verification.didit.me',
+      mode:               env.DIDIT_MODE,
+      hasApiKey:          Boolean(process.env['DIDIT_API_KEY']),
+      hasWebhookSecret:   Boolean(process.env['DIDIT_WEBHOOK_SECRET']),
+      hasKycWorkflowId:   Boolean(process.env['DIDIT_WORKFLOW_ID_KYC']),
+      hasKybWorkflowId:   Boolean(process.env['DIDIT_WORKFLOW_ID_KYB']),
+      baseUrl:            process.env['DIDIT_BASE_URL'] ?? 'https://verification.didit.me',
+      freeCapabilities:   FREE_CAPABILITIES,
+      paidCapabilities:   PAID_CAPABILITIES,
+      consoleUrl:         'https://business.didit.me',
     },
   });
 });

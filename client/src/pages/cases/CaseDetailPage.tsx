@@ -893,6 +893,28 @@ export default function CaseDetailPage() {
             </Card>
           )}
 
+          {/* Sandbox/live billing guidance — only shown when NOT in mock mode */}
+          {!isMockMode && (
+            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
+              <CardContent className="p-4 space-y-2">
+                <div className="font-medium text-sm flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600 shrink-0" />
+                  Didit {diditMode} mode — billing notes
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p><span className="font-medium text-emerald-700 dark:text-emerald-400">Free (500/mo):</span> KYC — ID Verification, Passive Liveness, Face Match, IP Analysis</p>
+                  <p><span className="font-medium text-amber-700 dark:text-amber-400">Requires credits ($):</span> AML Screening, KYB / Company verification, NFC, Database Validation</p>
+                  <p className="text-blue-700 dark:text-blue-300">
+                    For free KYC testing, create a <strong>KYC-only</strong> workflow in{' '}
+                    <a href="https://business.didit.me" target="_blank" rel="noreferrer" className="underline">business.didit.me</a>
+                    {' '}→ Workflows → New Workflow, using only: ID Verification + Passive Liveness + Face Match (no AML step).
+                    Set that workflow ID as <code className="text-xs bg-muted px-1 rounded">DIDIT_WORKFLOW_ID_KYC</code>.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {wizardDone && recommendedChecks.length > 0 && canStartChecks && (
             <Card>
               <CardHeader className="pb-2">
@@ -902,22 +924,29 @@ export default function CaseDetailPage() {
                 <div className="flex flex-wrap gap-2">
                   {recommendedChecks.map(cap => {
                     const alreadyDone = checks.some(ch => ch.capability === cap);
+                    const isPaid = !isMockMode && ['aml_screening', 'company_aml', 'kyb'].includes(cap);
                     return (
-                      <Button
-                        key={cap}
-                        variant={alreadyDone ? 'secondary' : 'outline'}
-                        size="sm"
-                        disabled={alreadyDone || createCheckMutation.isPending || !canStartChecks}
-                        onClick={() => {
-                          setStartingCheck(cap);
-                          createCheckMutation.mutate(cap);
-                        }}
-                        className="gap-2 uppercase text-xs"
-                      >
-                        <Shield className="h-3.5 w-3.5" />
-                        {startingCheck === cap && createCheckMutation.isPending ? 'Starting...' : cap}
-                        {alreadyDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-                      </Button>
+                      <div key={cap} className="flex flex-col items-start gap-0.5">
+                        <Button
+                          variant={alreadyDone ? 'secondary' : 'outline'}
+                          size="sm"
+                          disabled={alreadyDone || createCheckMutation.isPending || !canStartChecks}
+                          onClick={() => {
+                            setStartingCheck(cap);
+                            createCheckMutation.mutate(cap);
+                          }}
+                          className="gap-2 uppercase text-xs"
+                          title={isPaid ? 'This capability requires Didit credits — top up at business.didit.me' : undefined}
+                        >
+                          <Shield className="h-3.5 w-3.5" />
+                          {startingCheck === cap && createCheckMutation.isPending ? 'Starting...' : cap}
+                          {alreadyDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+                          {isPaid && !alreadyDone && <span className="text-amber-600 font-bold text-xs">$</span>}
+                        </Button>
+                        {isPaid && !alreadyDone && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400 px-1">requires credits</span>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -1002,7 +1031,7 @@ export default function CaseDetailPage() {
                             </a>
                           </Button>
                         )}
-                        {isMockMode && ch.status === 'processing' && (
+                        {isMockMode && (ch.status === 'processing' || ch.status === 'failed' || ch.status === 'queued') && (
                           <Button
                             variant="secondary" size="sm" className="gap-1.5 text-xs"
                             onClick={() => mockCompleteMutation.mutate({ sessionId: ch.id, outcome: 'Approved' })}
