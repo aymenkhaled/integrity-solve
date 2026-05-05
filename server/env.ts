@@ -62,6 +62,7 @@ export const env = {
   DIDIT_WEBHOOK_SECRET:   optional('DIDIT_WEBHOOK_SECRET'),
   DIDIT_WORKFLOW_ID_KYC:  optional('DIDIT_WORKFLOW_ID_KYC'),
   DIDIT_WORKFLOW_ID_KYB:  optional('DIDIT_WORKFLOW_ID_KYB'),
+  DIDIT_BASE_URL:         optional('DIDIT_BASE_URL', 'https://verification.didit.me'),
 
   // Anthropic (AI features)
   ANTHROPIC_API_KEY: optional('ANTHROPIC_API_KEY'),

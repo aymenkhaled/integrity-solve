@@ -10,7 +10,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod';
 import { db } from '../db.js';
 import { eq, and, desc } from 'drizzle-orm';
-import { cases, wizardRuns, wizardSteps, auditLog } from '../../shared/schema.js';
+import { cases, wizardRuns, wizardSteps, auditLog, caseOutputs } from '../../shared/schema.js';
 import { createId } from '@paralleldrive/cuid2';
 import {
   routeProgramWizard,
@@ -18,6 +18,7 @@ import {
 } from '../services/workflowRouter.js';
 import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';
 import { requireWorkspace } from '../lib/auth-session.js';
+import { NotFoundError, UnauthenticatedError, ForbiddenError } from '../lib/errors.js';
 
 export const wizardRouter = Router();
 
@@ -41,7 +42,7 @@ wizardRouter.post('/api/wizard/start', requireWorkspace, async (req: Request, re
   try {
     const workspaceId = getWorkspaceId(req);
     const userId      = getUserId(req);
-    if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
+    if (!workspaceId) return void next(new UnauthenticatedError());
 
     const body = StartWizardSchema.parse(req.body);
 
@@ -51,7 +52,7 @@ wizardRouter.post('/api/wizard/start', requireWorkspace, async (req: Request, re
       .from(cases)
       .where(and(eq(cases.id, body.caseId), eq(cases.workspaceId, workspaceId)));
 
-    if (!caseRow) return void res.status(404).json({ error: 'Case not found' });
+    if (!caseRow) return void next(new NotFoundError('Case'));
 
     const [run] = await db.insert(wizardRuns).values({
       id:          createId(),
@@ -75,7 +76,7 @@ wizardRouter.post('/api/wizard/start', requireWorkspace, async (req: Request, re
       workspaceId,
       actorUserId: userId,
       entityType:  'wizard_run',
-      entityId:    run.id,
+      entityId:    caseRow.id, // link audit to case, not wizard run
       action:      'wizard_started',
       reason:      `${body.wizardType} wizard started for case ${body.caseId}`,
       newValue:    run,
@@ -92,14 +93,14 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
   try {
     const workspaceId = getWorkspaceId(req);
     const userId      = getUserId(req);
-    if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
+    if (!workspaceId) return void next(new UnauthenticatedError());
 
     const [run] = await db
       .select()
       .from(wizardRuns)
       .where(and(eq(wizardRuns.id, req.params.id), eq(wizardRuns.workspaceId, workspaceId)));
 
-    if (!run) return void res.status(404).json({ error: 'Wizard run not found' });
+    if (!run) return void next(new NotFoundError('Wizard run'));
 
     const body = SaveStepSchema.parse(req.body);
 
@@ -170,18 +171,50 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
         .where(eq(cases.id, run.caseId));
     }
 
+    // Write audit log linked to the case for visibility in case summary
     await db.insert(auditLog).values({
       id:          createId(),
       workspaceId,
       actorUserId: userId,
       entityType:  'wizard_run',
-      entityId:    run.id,
+      entityId:    run.caseId, // link audit to case
       action:      body.complete ? 'wizard_completed' : 'wizard_step_saved',
-      reason:      `Wizard step "${body.stepKey}" saved${body.complete ? ' — wizard completed' : ''}`,
+      reason:      `Wizard step "${body.stepKey}" saved${body.complete ? ' - wizard completed' : ''}`,
       newValue:    { stepKey: body.stepKey, routeResult },
       requestId:   req.requestId,
       ipAddress:   req.ip,
     });
+
+    // case_outputs: store routing summary when wizard completes
+    if (body.complete) {
+      const outputContent = JSON.stringify({
+        caseId:           run.caseId,
+        wizardType:       run.wizardType,
+        routeResult,
+        generatedAt:      new Date().toISOString(),
+      });
+
+      // Upsert: check for existing summary output
+      const existingOutput = await db
+        .select()
+        .from(caseOutputs)
+        .where(and(eq(caseOutputs.caseId, run.caseId), eq(caseOutputs.outputType, 'summary')))
+        .limit(1);
+
+      if (existingOutput.length > 0) {
+        await db.update(caseOutputs)
+          .set({ content: outputContent })
+          .where(eq(caseOutputs.id, existingOutput[0].id));
+      } else {
+        await db.insert(caseOutputs).values({
+          id:         createId(),
+          workspaceId,
+          caseId:     run.caseId,
+          outputType: 'summary',
+          content:    outputContent,
+        });
+      }
+    }
 
     res.json({ ok: true, data: { run: updated, routeResult } });
   } catch (err) { next(err); }
@@ -191,14 +224,14 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
 wizardRouter.get('/api/wizard/:id', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
+    if (!workspaceId) return void next(new UnauthenticatedError());
 
     const [run] = await db
       .select()
       .from(wizardRuns)
       .where(and(eq(wizardRuns.id, req.params.id), eq(wizardRuns.workspaceId, workspaceId)));
 
-    if (!run) return void res.status(404).json({ error: 'Wizard run not found' });
+    if (!run) return void next(new NotFoundError('Wizard run'));
 
     const steps = await db
       .select()
@@ -214,7 +247,7 @@ wizardRouter.get('/api/wizard/:id', requireWorkspace, async (req: Request, res: 
 wizardRouter.get('/api/wizard/case/:caseId', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
+    if (!workspaceId) return void next(new UnauthenticatedError());
 
     // Verify case belongs to workspace
     const [caseRow] = await db
@@ -222,7 +255,7 @@ wizardRouter.get('/api/wizard/case/:caseId', requireWorkspace, async (req: Reque
       .from(cases)
       .where(and(eq(cases.id, req.params.caseId), eq(cases.workspaceId, workspaceId)));
 
-    if (!caseRow) return void res.status(404).json({ error: 'Case not found' });
+    if (!caseRow) return void next(new NotFoundError('Case'));
 
     const runs = await db
       .select()

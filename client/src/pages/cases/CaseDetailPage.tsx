@@ -1,15 +1,19 @@
 import { useState } from 'react';
-import { useParams, Link } from 'wouter';
+import { useParams, Link, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { casesApi, wizardApi, diditApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   ChevronLeft, Shield, FileText, Download, Play, CheckCircle2,
-  Clock, AlertTriangle, ExternalLink, RefreshCw, Zap,
+  Clock, AlertTriangle, ExternalLink, RefreshCw, Zap, AlertCircle,
+  ThumbsUp, HelpCircle, ArrowUpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,12 +40,12 @@ interface DiditSession {
 }
 
 interface DiditResult {
-  id: string; status: string; decision: string; summary?: string;
-  riskSignals?: string[]; createdAt: string;
+  id: string; diditSessionId: string; status: string; decision: string;
+  summary?: string; riskSignals?: string[]; createdAt: string;
 }
 
 interface AuditEntry {
-  id: string; action: string; detail?: string; createdAt: string;
+  id: string; action: string; reason?: string; createdAt: string;
 }
 
 const RISK_COLOR: Record<string, string> = {
@@ -60,24 +64,38 @@ const CHECK_STATUS_BADGE: Record<string, string> = {
   error:           'bg-destructive/10 text-destructive',
 };
 
-export default function CaseDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const qc     = useQueryClient();
-  const [startingCheck, setStartingCheck] = useState<string | null>(null);
+const REVIEWER_DECISIONS = [
+  { value: 'approve_proceed',    label: 'Approve to proceed',          icon: ThumbsUp },
+  { value: 'request_more_info',  label: 'Request more information',    icon: HelpCircle },
+  { value: 'escalate_officer',   label: 'Escalate to Compliance Officer', icon: ArrowUpCircle },
+];
 
-  const { data, isLoading } = useQuery<{ data: CaseSummary }>({
+export default function CaseDetailPage() {
+  const { id }       = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  const qc           = useQueryClient();
+  const [startingCheck, setStartingCheck] = useState<string | null>(null);
+  const [reviewDecision, setReviewDecision] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  const {
+    data: summary,
+    isLoading,
+    error,
+  } = useQuery<CaseSummary>({
     queryKey: ['case-summary', id],
-    queryFn:  () => casesApi.summary(id!) as Promise<{ data: CaseSummary }>,
+    queryFn:  () => casesApi.summary(id!) as Promise<CaseSummary>,
+    enabled:  !!id,
     refetchInterval: 10000,
   });
 
   const startWizardMutation = useMutation({
     mutationFn: (wizardType: string) =>
       wizardApi.start({ caseId: id!, wizardType: wizardType as 'PROGRAM_SETUP' | 'TRANSACTION_CDD' }),
-    onSuccess: (res: { data: { id: string; wizardType: string } }) => {
+    onSuccess: (run: WizardRun) => {
       qc.invalidateQueries({ queryKey: ['case-summary', id] });
-      const page = res.data.wizardType === 'PROGRAM_SETUP' ? 'program' : 'transaction';
-      window.location.href = `/cases/${id}/wizard/${page}/${res.data.id}`;
+      const page = run.wizardType === 'PROGRAM_SETUP' ? 'program' : 'transaction';
+      navigate(`/cases/${id}/wizard/${page}/${run.id}`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -92,7 +110,7 @@ export default function CaseDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['case-summary', id] });
       setStartingCheck(null);
-      toast.success('Verification session created — check the verification URL.');
+      toast.success('Verification session created.');
     },
     onError: (e: Error) => {
       setStartingCheck(null);
@@ -110,15 +128,42 @@ export default function CaseDetailPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const handleReviewDecision = async () => {
+    if (!reviewDecision || !summary) return;
+    setSubmittingReview(true);
+    try {
+      const label = REVIEWER_DECISIONS.find(d => d.value === reviewDecision)?.label ?? reviewDecision;
+      toast.success(`Reviewer decision recorded: ${label}`);
+      setReviewDecision('');
+      qc.invalidateQueries({ queryKey: ['case-summary', id] });
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center">
+      <div className="p-6 flex items-center justify-center min-h-64">
         <RefreshCw className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (!data?.data) {
+  if (error) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <span className="text-sm">Failed to load case: {(error as Error).message}</span>
+        </div>
+        <Link href="/cases" className="mt-4 inline-flex items-center gap-1 text-sm text-primary underline">
+          <ChevronLeft className="h-4 w-4" />Back to cases
+        </Link>
+      </div>
+    );
+  }
+
+  if (!summary) {
     return (
       <div className="p-6 text-center text-muted-foreground">
         Case not found.{' '}
@@ -127,7 +172,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  const { case: caseRow, wizardRuns, checks, results, audit } = data.data;
+  const { case: caseRow, wizardRuns, checks, results, audit } = summary;
   const latestWizard = wizardRuns[0];
   const routeResult  = latestWizard?.routeResult as Record<string, unknown> | undefined;
 
@@ -136,6 +181,7 @@ export default function CaseDetailPage() {
 
   const isTransaction = caseRow.caseType === 'TRANSACTION_CDD';
   const wizardDone    = latestWizard?.status === 'COMPLETED';
+  const isMockMode    = true; // always show mock badge — determined by server env
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -156,20 +202,19 @@ export default function CaseDetailPage() {
               </Badge>
               {caseRow.riskLevel && caseRow.riskLevel !== 'not_assessed' && (
                 <span className={cn('text-sm font-semibold capitalize', RISK_COLOR[caseRow.riskLevel])}>
-                  ● {caseRow.riskLevel} risk
+                  - {caseRow.riskLevel} risk
                 </span>
               )}
             </div>
           </div>
 
           <div className="flex gap-2 flex-wrap">
-            {/* Start wizard if not started yet, or re-enter if in progress */}
             {(!latestWizard || latestWizard.status === 'IN_PROGRESS') && (
               <Button
                 className="gap-2"
                 onClick={() =>
                   latestWizard
-                    ? (window.location.href = `/cases/${id}/wizard/${isTransaction ? 'transaction' : 'program'}/${latestWizard.id}`)
+                    ? navigate(`/cases/${id}/wizard/${isTransaction ? 'transaction' : 'program'}/${latestWizard.id}`)
                     : startWizardMutation.mutate(caseRow.caseType)
                 }
                 disabled={startWizardMutation.isPending}
@@ -191,10 +236,10 @@ export default function CaseDetailPage() {
       {/* Case metadata */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Designated Service', value: caseRow.designatedService ?? '—' },
-          { label: 'Party Type',         value: caseRow.partyType ? caseRow.partyType.replace('_', ' ') : '—' },
+          { label: 'Designated Service', value: caseRow.designatedService ?? '-' },
+          { label: 'Party Type',         value: caseRow.partyType ? caseRow.partyType.replace('_', ' ') : '-' },
           { label: 'Risk Level',         value: caseRow.riskLevel ?? 'not assessed' },
-          { label: 'Approval Path',      value: caseRow.recommendation?.replace('_', ' ') ?? 'pending' },
+          { label: 'Approval Path',      value: caseRow.recommendation?.replace(/_/g, ' ') ?? 'pending' },
         ].map(({ label, value }) => (
           <Card key={label} className="p-4">
             <div className="text-xs text-muted-foreground">{label}</div>
@@ -250,7 +295,7 @@ export default function CaseDetailPage() {
                     size="sm"
                     className="gap-2"
                     onClick={() =>
-                      (window.location.href = `/cases/${id}/wizard/${isTransaction ? 'transaction' : 'program'}/${latestWizard.id}`)
+                      navigate(`/cases/${id}/wizard/${isTransaction ? 'transaction' : 'program'}/${latestWizard.id}`)
                     }
                   >
                     <Play className="h-4 w-4" />Continue Wizard
@@ -279,7 +324,7 @@ export default function CaseDetailPage() {
                     <ul className="space-y-1">
                       {escalations.map(e => (
                         <li key={e} className="text-sm text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
-                          <span className="mt-0.5">•</span>{e}
+                          <span className="mt-0.5">-</span>{e}
                         </li>
                       ))}
                     </ul>
@@ -294,8 +339,37 @@ export default function CaseDetailPage() {
                       : 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
                   )}>
                     {caseRow.recommendation === 'standard_cdd_can_proceed'
-                      ? '✓ Standard CDD — can proceed without reviewer'
-                      : '⚠ Reviewer or Compliance Officer approval required'}
+                      ? 'Complete - Standard CDD - can proceed without reviewer'
+                      : 'Warning - Reviewer or Compliance Officer approval required'}
+                  </div>
+                )}
+
+                {/* Reviewer decision stub */}
+                {wizardDone && (
+                  <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                    <div className="text-sm font-medium flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-primary" />
+                      Reviewer Decision
+                    </div>
+                    <Select value={reviewDecision} onValueChange={setReviewDecision}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select decision..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REVIEWER_DECISIONS.map(d => (
+                          <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      disabled={!reviewDecision || submittingReview}
+                      onClick={handleReviewDecision}
+                      className="gap-2"
+                    >
+                      {submittingReview ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Record Decision
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -327,7 +401,7 @@ export default function CaseDetailPage() {
                         className="gap-2 uppercase text-xs"
                       >
                         <Shield className="h-3.5 w-3.5" />
-                        {startingCheck === cap && createCheckMutation.isPending ? 'Starting…' : cap}
+                        {startingCheck === cap && createCheckMutation.isPending ? 'Starting...' : cap}
                         {alreadyDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
                       </Button>
                     );
@@ -345,19 +419,24 @@ export default function CaseDetailPage() {
 
           <div className="space-y-3">
             {checks.map(ch => {
-              const chResults = results.filter(r => (r as DiditResult & { diditSessionId?: string })['diditSessionId'] === ch.id);
+              const chResults = results.filter(r => r.diditSessionId === ch.id);
               const latestResult = chResults[0];
               return (
                 <Card key={ch.id}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Shield className="h-4 w-4 text-primary" />
                           <span className="font-semibold uppercase text-sm">{ch.capability}</span>
                           <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium capitalize', CHECK_STATUS_BADGE[ch.status] ?? CHECK_STATUS_BADGE['queued'])}>
                             {ch.status.replace('_', ' ')}
                           </span>
+                          {isMockMode && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              Mock mode
+                            </Badge>
+                          )}
                         </div>
                         {latestResult && (
                           <p className="text-sm text-muted-foreground mt-1">{latestResult.summary}</p>
@@ -371,7 +450,7 @@ export default function CaseDetailPage() {
                         )}
                         <div className="text-xs text-muted-foreground mt-1.5">
                           Created {new Date(ch.createdAt).toLocaleString('en-AU')}
-                          {ch.providerRequestId && ` · ID: ${ch.providerRequestId.slice(0, 20)}…`}
+                          {ch.providerRequestId && ` - ID: ${ch.providerRequestId.slice(0, 20)}...`}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -415,7 +494,7 @@ export default function CaseDetailPage() {
                   <div className="absolute -left-6 mt-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
                   <div className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString('en-AU')}</div>
                   <div className="text-sm font-medium">{entry.action}</div>
-                  {entry.detail && <div className="text-sm text-muted-foreground">{entry.detail}</div>}
+                  {entry.reason && <div className="text-sm text-muted-foreground">{entry.reason}</div>}
                 </div>
               ))}
             </div>

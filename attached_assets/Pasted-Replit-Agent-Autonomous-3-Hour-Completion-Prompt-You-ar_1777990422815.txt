@@ -1,0 +1,863 @@
+Replit Agent Autonomous 3-Hour Completion Prompt
+You are continuing the previous work on Integrity Solve.
+
+Private GitHub repo:
+
+git@github.com:aymenkhaled/integrity-solve.git
+
+You must continue from the latest pushed code. Pull the latest code first. Do not restart the app from scratch. Do not discard existing features. Do not stop after a quick patch. This is a large AML/CTF compliance SaaS application and it needs serious implementation, testing, review, and iteration.
+
+Core Instruction
+Work autonomously for the full available session, with a target of 3 hours of active work if the platform allows it.
+
+Do not ask questions.
+
+Do not stop early because one bug is fixed.
+
+Do not stop after only running one test.
+
+Do not stop after writing only a summary.
+
+If you finish the obvious tasks early, continue by:
+
+Running deeper tests.
+Inspecting related files.
+Finding missing backend validation.
+Finding missing frontend states.
+Finding database consistency issues.
+Reviewing audit logging.
+Reviewing workspace isolation.
+Reviewing Didit mock/sandbox/live behavior.
+Reviewing documentation accuracy.
+Researching high-value "diamond" improvements.
+Implementing only safe, valuable, well-tested improvements.
+Re-running tests after every meaningful change.
+If the platform interrupts you with "Agent encountered an error while running, we are investigating the issue", then when you resume:
+
+Inspect git status.
+Inspect the last changed files.
+Continue from the checklist below.
+Do not restart from scratch.
+Do not forget what was already done.
+Produce a final report only after re-running tests or clearly documenting why tests could not run.
+Working Style Required
+You have full permission to make the needed code changes. Make reasonable professional assumptions. Do not pause to ask the user. The user wants an autonomous build/test/research loop.
+
+However, do not invent unsafe compliance claims. This is AML/CTF software. Any legal/regulatory logic must be presented as configurable workflow support, not final legal advice.
+
+Be honest in documentation:
+
+Mock Didit is not live Didit.
+Sandbox/live Didit requires Daniel's credentials and workflow IDs.
+A passing mock test is not proof of live provider readiness.
+The system supports compliance workflow, but client-approved AML rules/templates are still required for production.
+Business Context
+Client: Daniel.
+
+Daniel's feedback was positive but specific. He wants the portal to use wizard-led workflows as much as practical, especially for:
+
+AML program setup.
+Transaction/CDD workflow.
+Identifying the designated service.
+Identifying who the service is being provided for.
+Guiding verification, screening, approval, and escalation.
+Didit-ready VOI/KYC/KYB/AML integration points.
+Returning provider results into the case.
+Supporting PDF/result generation.
+Maintaining audit trail.
+Daniel explicitly said the next stage should focus less on adding more static screens and more on proving one or two working wizard-led flows with actual integration points in mind.
+
+So the goal is not "more screens". The goal is a working, tested, believable Milestone 1 workflow.
+
+Use Didit only. Do not add Reddit integration. Do not add unrelated providers.
+
+Existing App Context
+This app already had a broad MVP before the latest Milestone 1 work:
+
+Auth and workspace session system.
+Dashboard.
+Customers.
+Beneficial owners.
+Customer risk ratings.
+AML program pages.
+Existing AML program wizard.
+Check engine.
+Mock provider.
+Audit.
+Escalations.
+SMR-related flows.
+Documents.
+Billing stubs.
+Provider marketplace.
+Training.
+Alerts.
+Reviews.
+Analytics.
+Group workspace.
+White-label.
+API gateway.
+The latest Replit session added a new Milestone 1 case/wizard/Didit layer. It is useful but incomplete and has browser bugs. Your first job is to repair and complete that layer.
+
+Important Meaning Of "Case"
+The new cases feature is intentional.
+
+A case is not a customer and does not replace the customer module.
+
+A case is a workflow container for guided compliance work:
+
+PROGRAM_SETUP: business profile, designated service applicability, AML program setup routing summary.
+TRANSACTION_CDD: designated service, who receives the service, party type, risk triggers, recommended Didit checks, approval/escalation path, provider results, audit, PDF summary.
+Make this clear in UI labels and documentation if needed.
+
+Current Milestone 1 Files To Inspect
+Inspect every one of these before finalizing:
+
+client/src/lib/api.ts
+client/src/App.tsx
+client/src/components/layout/AppLayout.tsx
+client/src/pages/cases/CasesPage.tsx
+client/src/pages/cases/CaseDetailPage.tsx
+client/src/pages/cases/ProgramWizardPage.tsx
+client/src/pages/cases/TransactionWizardPage.tsx
+server/app.ts
+server/env.ts
+server/lib/auth-session.ts
+server/lib/workspace-guard.ts
+server/lib/error-handler.ts
+server/lib/errors.ts
+server/routes/cases.ts
+server/routes/wizard.ts
+server/routes/diditRoute.ts
+server/services/workflowRouter.ts
+server/services/didit.ts
+server/services/diditWebhook.ts
+server/services/normalizeDidit.ts
+shared/schema.ts
+scripts/test-api.mjs
+scripts/test-milestone1.mjs
+replit.md
+Also inspect nearby route/service patterns so your code matches the existing app.
+
+Use search commands to inventory:
+
+grep -R "casesApi\\|wizardApi\\|diditApi\\|DIDIT_MODE\\|didit_sessions\\|wizard_runs\\|case_outputs\\|requireWorkspace\\|getWorkspaceId\\|auditLog" -n client server shared scripts replit.md
+If rg exists, prefer:
+
+rg -n "casesApi|wizardApi|diditApi|DIDIT_MODE|didit_sessions|wizard_runs|case_outputs|requireWorkspace|getWorkspaceId|auditLog" client server shared scripts replit.md
+Pull Latest Code First
+Run:
+
+git status --short --branch
+git pull --ff-only origin main
+git log --oneline --decorate --max-count=8
+If pull fails because of local changes:
+
+Inspect the changes.
+Preserve user work.
+Do not run destructive reset.
+Continue carefully.
+Baseline Commands Before Changes
+Run these early to know current failures:
+
+npm install
+npm run typecheck
+npm run build
+node scripts/test-api.mjs
+node scripts/test-milestone1.mjs
+If DB schema is not synced, run:
+
+npx drizzle-kit push --force
+Record failures. Then fix them. Do not stop at the first failure.
+
+Critical Bug 1 - Frontend API Response Shape Is Wrong
+The frontend API helper already unwraps the server response.
+
+File: client/src/lib/api.ts
+
+Current pattern:
+
+const data = (await res.json()) as ApiResponse<T>;
+if (!data.ok) {
+  const err = new ApiError(data.error.message, data.error.code, data.error.field);
+  throw err;
+}
+return data.data;
+Therefore:
+
+casesApi.list() returns Case[], not { data: Case[] }.
+casesApi.summary(id) returns CaseSummary, not { data: CaseSummary }.
+wizardApi.start(...) returns WizardRun, not { data: WizardRun }.
+wizardApi.saveStep(...) returns { run, routeResult }, not { data: { run, routeResult } }.
+diditApi.createSession(...) should return whatever is inside the server's data.
+The new case/wizard pages currently treat responses as double-wrapped. This makes the case list look empty and detail/wizard flows break.
+
+Fix CasesPage.tsx
+Broken pattern:
+
+const { data } = useQuery<{ data: Case[] }>({
+  queryKey: ['cases'],
+  queryFn: () => casesApi.list() as Promise<{ data: Case[] }>,
+});
+
+const caseList = data?.data ?? [];
+Correct pattern:
+
+const {
+  data: cases = [],
+  isLoading,
+  error,
+} = useQuery<Case[]>({
+  queryKey: ['cases'],
+  queryFn: () => casesApi.list() as Promise<Case[]>,
+});
+
+const caseList = cases;
+Add visible error state. Do not show "No cases yet" when the API failed.
+
+Fix CaseDetailPage.tsx
+Broken pattern:
+
+const { data } = useQuery<{ data: CaseSummary }>({
+  queryKey: ['case-summary', id],
+  queryFn: () => casesApi.summary(id!) as Promise<{ data: CaseSummary }>,
+});
+
+if (!data?.data) ...
+
+const { case: caseRow, wizardRuns, checks, results, audit } = data.data;
+Correct pattern:
+
+const {
+  data: summary,
+  isLoading,
+  error,
+} = useQuery<CaseSummary>({
+  queryKey: ['case-summary', id],
+  queryFn: () => casesApi.summary(id!) as Promise<CaseSummary>,
+  enabled: !!id,
+  refetchInterval: 10000,
+});
+
+if (!summary) ...
+
+const { case: caseRow, wizardRuns, checks, results, audit } = summary;
+Fix wizard start success. Broken:
+
+onSuccess: (res: { data: { id: string; wizardType: string } }) => {
+  const page = res.data.wizardType === 'PROGRAM_SETUP' ? 'program' : 'transaction';
+  window.location.href = `/cases/${id}/wizard/${page}/${res.data.id}`;
+}
+Correct:
+
+onSuccess: (run: WizardRun) => {
+  const page = run.wizardType === 'PROGRAM_SETUP' ? 'program' : 'transaction';
+  navigate(`/cases/${id}/wizard/${page}/${run.id}`);
+}
+Use Wouter navigation instead of window.location.href where practical.
+
+Fix ProgramWizardPage.tsx
+Use one typed useParams() call:
+
+const { caseId, runId } = useParams<{ caseId: string; runId: string }>();
+Fix save result:
+
+onSuccess: (res: { run: unknown; routeResult: Record<string, unknown> }) => {
+  qc.invalidateQueries({ queryKey: ['case-summary', caseId] });
+  setRouteResult(res.routeResult);
+}
+Fix TransactionWizardPage.tsx
+Use one typed useParams() call:
+
+const { caseId, runId } = useParams<{ caseId: string; runId: string }>();
+Fix save result:
+
+setRouteResult(res.routeResult);
+Critical Bug 2 - "Create Case & Start Wizard" Must Actually Start Wizard
+In CasesPage.tsx, the button says "Create Case & Start Wizard", but current behavior only creates a case and closes the modal.
+
+Make the behavior match the label.
+
+Required flow:
+
+Validate title.
+For TRANSACTION_CDD, require designatedService.
+For TRANSACTION_CDD, require partyType.
+POST /api/cases.
+Use returned case ID.
+POST /api/wizard/start:
+{
+  caseId: created.id,
+  wizardType: created.caseType
+}
+Navigate:
+Program case: /cases/{caseId}/wizard/program/{runId}
+Transaction case: /cases/{caseId}/wizard/transaction/{runId}
+If case creation succeeds but wizard start fails:
+Navigate to /cases/{caseId}.
+Show toast: "Case created, but wizard did not start. You can start it from the case page."
+Invalidate ['cases'].
+If you do not auto-start, then rename the button to "Create Case". Preferred behavior is auto-start.
+
+Critical Bug 3 - Backend Error Responses Must Use Existing Envelope
+The app expects failed API responses as:
+
+{
+  "ok": false,
+  "error": {
+    "code": "...",
+    "message": "..."
+  }
+}
+Some new routes return raw errors like:
+
+res.status(404).json({ error: 'Case not found' })
+Fix new routes:
+
+server/routes/cases.ts
+server/routes/wizard.ts
+server/routes/diditRoute.ts
+Use existing errors:
+
+NotFoundError
+ForbiddenError
+UnauthenticatedError
+ValidationError
+ConflictError
+Let server/lib/error-handler.ts format the response.
+
+Example:
+
+if (!caseRow) throw new NotFoundError('Case');
+Do not return raw { error: '...' } in new routes.
+
+Critical Bug 4 - Case Summary Must Return All Didit Results
+File: server/routes/cases.ts
+
+Current logic only gets results for the first Didit session even if there are multiple sessions.
+
+Fix using inArray.
+
+import { eq, desc, and, inArray } from 'drizzle-orm';
+Then:
+
+if (checkIds.length > 0) {
+  resultsRows = await db
+    .select()
+    .from(diditResults)
+    .where(inArray(diditResults.diditSessionId, checkIds))
+    .orderBy(desc(diditResults.createdAt));
+}
+Add a test proving that if two Didit sessions are completed, both results appear in the case summary.
+
+Critical Bug 5 - Audit UI/PDF Must Use reason, Not detail
+In shared/schema.ts, audit_log has:
+
+reason
+newValue
+oldValue
+It does not have detail.
+
+Fix:
+
+client/src/pages/cases/CaseDetailPage.tsx
+server/routes/cases.ts PDF generation
+Frontend type:
+
+interface AuditEntry {
+  id: string;
+  action: string;
+  reason?: string;
+  createdAt: string;
+}
+Display entry.reason.
+
+PDF:
+
+a.reason ?? ''
+Critical Bug 6 - Didit Session Response Shape
+Current POST /api/providers/didit/session may return verificationUrl and mode outside data, so the frontend API helper discards them.
+
+Make response consistent:
+
+res.status(201).json({
+  ok: true,
+  data: {
+    session: updated,
+    verificationUrl: diditResult.verificationUrl,
+    mode: env.DIDIT_MODE,
+    reused: false,
+  },
+});
+Idempotency reuse:
+
+res.json({
+  ok: true,
+  data: {
+    session: existing[0],
+    verificationUrl: existing[0].sessionUrl,
+    mode: env.DIDIT_MODE,
+    reused: true,
+  },
+});
+Update:
+
+client/src/lib/api.ts types if useful.
+client/src/pages/cases/CaseDetailPage.tsx.
+scripts/test-milestone1.mjs.
+Critical Bug 7 - Mock Didit URL Goes Nowhere
+Current mock mode returns:
+
+verificationUrl: `${appUrl}/mock-didit/${input.sessionId}`
+But no page exists for /mock-didit/:id.
+
+Choose one:
+
+Option A - Preferred
+Do not expose a fake URL in mock mode. Use the case detail "Mock Complete" button.
+
+Set mock sessionUrl to null, or use a harmless internal reference.
+Show "Mock mode" badge on the check.
+Keep mock completion on case detail.
+Option B
+Build minimal /mock-didit/:sessionId page:
+
+Clearly says mock/dev only.
+Shows session ID.
+Buttons: Approved, Declined, Review Required.
+Calls /api/providers/didit/mock-complete/:id.
+Do not build a fake Didit clone.
+
+Didit Integration Requirements
+Keep modes:
+
+mock: default, no external API calls, no credentials required.
+sandbox: external Didit call only with sandbox credentials/workflow IDs.
+live: external Didit call only with live credentials/workflow IDs.
+Add or confirm env vars:
+
+DIDIT_MODE=mock
+DIDIT_API_KEY=
+DIDIT_WEBHOOK_SECRET=
+DIDIT_WORKFLOW_ID_KYC=
+DIDIT_WORKFLOW_ID_KYB=
+DIDIT_BASE_URL=https://verification.didit.me
+APP_URL=
+Add DIDIT_BASE_URL to server/env.ts, defaulting to https://verification.didit.me.
+
+Never hardcode secrets in frontend code.
+
+Didit Session Creation
+Review official Didit docs during the session:
+
+https://docs.didit.me/integration/api-full-flow
+https://docs.didit.me/business-verification/integration-guide
+https://docs.didit.me/getting-started/pricing
+The live/sandbox session request must include:
+
+workflow_id
+callback
+vendor_data
+metadata
+contact_details if available
+vendor_data must equal internal didit_sessions.id.
+
+Metadata:
+
+{
+  "workspace_id": "...",
+  "case_id": "...",
+  "capability": "kyc | kyb | aml_screening | company_aml"
+}
+Workflow ID selection:
+
+kyc and aml_screening: DIDIT_WORKFLOW_ID_KYC
+kyb and company_aml: DIDIT_WORKFLOW_ID_KYB
+If mode is sandbox or live and credentials/workflow IDs are missing, fail clearly with an API error.
+
+Didit Webhooks
+Review official Didit webhook docs:
+
+https://docs.didit.me/integration/webhooks
+Required:
+
+Try X-Signature-V2 first.
+Fall back to X-Signature-Simple.
+Reject stale timestamps outside 5 minutes in non-mock mode.
+Allow unsigned local mock webhook only in mock mode.
+Store raw events in didit_webhook_events.
+Deduplicate by external event ID.
+Duplicate webhooks return HTTP 200 no-op.
+Normalize into didit_results.
+Update didit_sessions.status.
+Write audit log.
+The real webhook endpoint must not require a user session. Didit will not have browser auth. In non-mock mode, trust signature verification, not workspace session.
+
+Wizard Requirements
+Program Setup Wizard
+Must prove:
+
+Business/industry profile.
+Designated service applicability.
+Business structure.
+Locations.
+AML program readiness.
+Structured routing summary.
+Output:
+
+Completion status.
+Missing inputs.
+Risk signals.
+Recommended next step.
+Outputs to generate later.
+Do not generate a final legal AML program yet.
+
+Transaction/CDD Wizard
+Must prove:
+
+Designated service.
+Who the service is being provided for.
+Party type:
+individual
+company
+trust
+beneficial owner/controller
+Risk triggers:
+PEP
+adverse media
+high-risk jurisdiction
+complex ownership
+source of funds/source of wealth required
+Transaction value and currency.
+Possible TTR at AUD 10,000 or more.
+Recommended checks.
+Approval/escalation path.
+Recommended checks:
+
+Individual: kyc, aml_screening
+Beneficial owner/controller: kyc, aml_screening
+Company: kyb, company_aml
+Trust: kyb, company_aml, beneficial ownership review if controllers are unclear
+Escalations:
+
+PEP: compliance officer review.
+Adverse media: reviewer/compliance officer review.
+High-risk jurisdiction: enhanced CDD review.
+Complex ownership: beneficial ownership review.
+Source of funds required: collect evidence.
+Transaction value >= AUD 10,000: TTR may be required.
+Case Detail Requirements
+Tabs:
+
+Wizard
+Verification Checks
+Audit Trail
+Wizard tab:
+
+Start wizard if no run.
+Continue if in progress.
+Show completed routing summary.
+Show recommended checks.
+Show escalations.
+Show approval path.
+Verification Checks tab:
+
+Show recommended check buttons after transaction wizard is complete.
+Create Didit session per recommended capability.
+Show session status.
+Show result summary and risk signals.
+In mock mode, show "Mock Complete".
+Do not duplicate sessions for same workspace/case/capability/subject.
+Audit tab:
+
+Case created.
+Wizard started.
+Wizard step saved.
+Wizard completed.
+Didit session created.
+Didit webhook processed.
+Reviewer decision events when added later.
+case_outputs Minimal Usage
+case_outputs exists but may not be used. Add useful minimal usage.
+
+When a wizard completes, create or update a case_outputs row:
+
+outputType = 'summary'
+content contains JSON string or readable text with:
+case ID
+wizard type
+route result
+recommended checks
+escalation path
+generated timestamp
+Do not overbuild full document automation.
+
+PDF Requirements
+PDF endpoint must include:
+
+Case title.
+Case type.
+Status.
+Designated service.
+Party type.
+Risk level.
+Recommendation/approval path.
+Verification checks.
+Didit results.
+Audit timeline using reason.
+It must not crash when data is missing.
+
+Encoding Cleanup
+Clean visible mojibake in Milestone 1 files only:
+
+â€”
+â€¦
+âœ“
+âš 
+Â·
+broken emoji sequences
+Prefer ASCII:
+
+-
+...
+Complete
+Warning
+simple text labels
+lucide icons where already used
+Do not perform broad unrelated formatting churn.
+
+Deep Testing Requirements
+Run tests repeatedly after changes.
+
+Required commands:
+
+npm run typecheck
+npm run build
+npx drizzle-kit push --force
+node scripts/test-api.mjs
+node scripts/test-milestone1.mjs
+If one fails, fix it and re-run. Do not stop with "there are failures" unless blocked by platform/environment.
+
+Update scripts/test-milestone1.mjs so it proves:
+
+Register/login/me.
+Create program case.
+Create transaction CDD case.
+List cases.
+Start program wizard.
+Save all 5 program steps.
+Confirm program route result.
+Confirm program case output summary exists.
+Start transaction wizard.
+Save all 4 transaction steps.
+Confirm transaction route result contains risk level, checks, escalations.
+Get case summary.
+Create Didit KYC mock session.
+Create Didit AML screening mock session.
+Create KYB/company AML session for company/trust test if practical.
+Confirm idempotency returns reused session.
+Mock-complete Didit session.
+Confirm Didit result appears in case summary.
+Confirm multiple Didit results appear, not only first.
+Download PDF.
+Confirm PDF content type.
+Confirm case status/risk update after wizard completion.
+Confirm audit entries exist.
+Confirm duplicate webhook no-op returns 200.
+Confirm invalid signature rejected in non-mock mode if testable without breaking env.
+If Playwright is available, add or run browser smoke test:
+
+Register/login.
+Open /cases.
+Create transaction case.
+Confirm navigation to wizard.
+Complete transaction wizard.
+Confirm case detail shows recommended checks.
+Start mock Didit session.
+Mock complete it.
+Confirm result appears.
+If Playwright is not practical, write exact manual smoke test steps in replit.md.
+
+Entire App Regression Pass
+After fixing Milestone 1, do a wider regression scan.
+
+Run existing API suite:
+
+node scripts/test-api.mjs
+Inspect important routes and make sure your changes did not break:
+
+Auth.
+Workspaces.
+Customers.
+Checks.
+Programs.
+Audit.
+Documents.
+Escalations.
+Providers.
+Do not modify unrelated modules unless your tests reveal a direct break caused by Milestone 1 or a tiny safe fix is obvious.
+
+Diamond Ideas Phase
+After the core Milestone 1 flow passes tests, continue working. Do not stop.
+
+Research and add safe high-value improvements. Use judgment. Do not overbuild risky features. Prefer improvements that:
+
+Strengthen Daniel's requested wizard-led proof.
+Improve demo/pilot believability.
+Improve auditability.
+Improve provider cost transparency.
+Improve trust without large new architecture.
+Diamond ideas to evaluate:
+
+Case Story / Audit Narrative:
+
+Generate a readable timeline summary from wizard steps, Didit checks, decisions, and audit.
+Safe to add as case summary output or PDF section.
+Compliance Evidence Pack:
+
+One PDF/download endpoint that includes case, wizard answers, check results, and audit.
+Keep simple in Milestone 1.
+Provider Cost Preview:
+
+In mock mode, show estimated cost placeholders for KYC/KYB/AML checks.
+Clearly label "estimate/configurable".
+Do not claim real Didit prices unless sourced and configurable.
+CDD Checklist Builder:
+
+Generate required documents/tasks based on party type, risk level, and recommended checks.
+Example: individual ID, company extract, beneficial owner evidence, source of funds.
+Reviewer Decision Stub:
+
+Add a simple manual decision capture on case detail:
+approve to proceed
+request more info
+escalate to compliance officer
+Must write audit log.
+Keep it small and tested.
+Open Questions Panel:
+
+Case or settings page showing missing Daniel/Didit items:
+Didit API key
+webhook secret
+KYC workflow ID
+KYB workflow ID
+hosted/iframe/redirect choice
+client-approved AML rules/templates
+Configurable Risk Rules:
+
+Do not hardcode everything forever.
+If easy, structure rules so later changes are centralized.
+Only implement diamond improvements that can be completed and tested within the session. If too large, document them clearly as "Next".
+
+Documentation Updates
+Update replit.md.
+
+Must include:
+
+Accurate table count. Do not claim 50 tables unless schema really has 50 pgTable declarations.
+New Milestone 1 routes.
+New frontend pages.
+Current Didit mode behavior.
+Required Replit Secrets for sandbox/live.
+How to run tests.
+Manual browser test steps.
+Known limitations.
+Remaining Daniel questions.
+Current status section must be honest:
+
+Current Milestone 1 Status:
+- Case list/detail/wizard flow works.
+- Program setup wizard produces routing summary.
+- Transaction CDD wizard produces recommended checks and escalation path.
+- Didit integration works in mock mode.
+- Sandbox/live Didit requires Daniel to provide API key, webhook secret, KYC workflow ID, KYB workflow ID, and the desired hosted/redirect/iframe verification flow.
+Do not claim:
+
+Final legal AML rule engine.
+Production-ready live Didit unless tested with real credentials.
+Full RBAC matrix.
+Full Stripe billing.
+Full document automation.
+Client Questions To Keep In Docs
+Keep these open questions:
+
+Can Daniel provide Didit sandbox credentials?
+Can Daniel provide KYC workflow ID?
+Can Daniel provide KYB workflow ID?
+Can Daniel provide webhook secret?
+Should Didit verification open as hosted link, iframe, or redirect?
+Does Didit KYB cover Australian ABN/ACN, ASIC/ABR, directors/officers, UBOs, and local registry data?
+Does Didit provide downloadable PDF/result evidence for KYC/KYB/AML?
+Can Didit provide sample webhook payloads for KYC and KYB?
+Which Didit features are paid in Daniel's intended workflow?
+What is the cost per completed check?
+Is this build for sales/demo validation or pilot-ready use?
+Are AML questions, designated-service logic, risk rules, and document templates approved by Daniel?
+Final Acceptance Criteria
+Do not finish until all practical criteria below are met, tested, or clearly documented as blocked:
+
+Logged-in user can open /cases.
+Existing cases display.
+Creating a case does not show empty list due to response-shape bug.
+"Create Case & Start Wizard" starts correct wizard.
+Program setup wizard completes.
+Program setup wizard returns routing summary.
+Program case output summary is stored.
+Transaction wizard completes.
+Transaction wizard returns risk level.
+Transaction wizard returns recommended checks.
+Transaction wizard returns escalation/approval path.
+Case detail shows wizard result.
+Case detail starts Didit mock checks.
+Mock completion creates normalized result.
+Case summary returns all Didit results.
+PDF endpoint works.
+PDF includes case/check/audit data.
+Audit tab displays reason.
+New routes use consistent API error envelope.
+Mock mode requires no credentials.
+Sandbox/live fail clearly when missing credentials.
+Webhook duplicates return 200 no-op.
+Webhook signature uses V2 first, Simple fallback, stale timestamp rejection.
+scripts/test-milestone1.mjs passes.
+scripts/test-api.mjs passes or unrelated failures are documented.
+npm run typecheck passes or environment blocker documented.
+npm run build passes or environment blocker documented.
+replit.md is accurate.
+Visible Milestone 1 UI text is clean and not mojibake.
+Final response includes evidence, not vague claims.
+3-Hour Work Loop
+Use this loop until the session limit or at least 3 hours of work:
+
+Inspect.
+Implement.
+Test.
+Fix.
+Re-test.
+Document.
+Research Didit/AML workflow improvements.
+Add safe diamond improvement.
+Test again.
+Review for regressions.
+Repeat.
+If everything passes before 3 hours:
+
+Run a full code search for TODOs, mock-only dead ends, broken UI labels, and response shape mistakes.
+Add missing tests.
+Add manual QA checklist.
+Improve docs.
+Add one safe diamond feature if it can be tested.
+Re-run tests.
+Final Response Format
+When and only when done, respond with:
+
+What I fixed.
+What now works in the browser.
+What now works in the API.
+Didit status: mock vs sandbox/live.
+Diamond improvements added or researched.
+Tests run and exact results.
+Files changed.
+Remaining limitations.
+Exact secrets Daniel must provide.
+Suggested next milestone.
+Do not end with "Would you like me to continue?" The user explicitly wants you to continue autonomously during the session.

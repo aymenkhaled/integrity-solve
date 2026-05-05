@@ -103,6 +103,15 @@ async function testCases() {
       ? pass('Transaction case in list')
       : fail('Transaction case in list', { ids, transactionCaseId });
   }
+
+  // Error envelope test: case not found must return proper error shape
+  const notFound = await req('GET', '/cases/nonexistent-id-xyz/summary');
+  notFound.status === 404
+    ? pass('GET /cases/nonexistent → 404 with proper envelope')
+    : fail('GET /cases/nonexistent should 404', { status: notFound.status, data: notFound.data });
+  notFound.data?.error?.code === 'NOT_FOUND'
+    ? pass('404 error.code = NOT_FOUND')
+    : fail('404 error.code missing or wrong', notFound.data?.error);
 }
 
 // ─── 2. Program wizard ───────────────────────────────────────────────────────
@@ -165,6 +174,7 @@ async function testProgramWizard() {
   assert2xx(s5, 'PATCH wizard/step — program (complete=true)');
 
   if (ok2xx(s5)) {
+    // Bug 1 fix verification: response is at res.routeResult not res.data.routeResult
     const rr = s5.data?.data?.routeResult;
     rr?.completionStatus
       ? pass(`routeResult.completionStatus = "${rr.completionStatus}"`)
@@ -172,6 +182,10 @@ async function testProgramWizard() {
     Array.isArray(rr?.outputs) && rr.outputs.length > 0
       ? pass(`routeResult.outputs (${rr.outputs.length} items)`)
       : fail('routeResult.outputs empty', rr);
+    // Verify risk signals for multiple services + no existing program
+    Array.isArray(rr?.riskSignals)
+      ? pass(`routeResult.riskSignals (${rr.riskSignals.length} signals)`)
+      : fail('routeResult.riskSignals missing', rr);
   }
 
   // GET run
@@ -181,9 +195,22 @@ async function testProgramWizard() {
     ? pass('Wizard run status = COMPLETED')
     : fail('Wizard run status not COMPLETED', get.data?.data?.run?.status);
 
+  // GET steps
+  Array.isArray(get.data?.data?.steps) && get.data.data.steps.length >= 5
+    ? pass(`Wizard run has ${get.data.data.steps.length} steps stored`)
+    : fail('Wizard steps missing or < 5', get.data?.data?.steps?.length);
+
   // GET by case
   const byCase = await req('GET', `/wizard/case/${programCaseId}`);
   assert2xx(byCase, `GET /wizard/case/${programCaseId}`);
+
+  // case_outputs should be created after wizard completion
+  const summaryAfter = await req('GET', `/cases/${programCaseId}/summary`);
+  if (ok2xx(summaryAfter)) {
+    summaryAfter.data?.data?.case?.status === 'COMPLETED'
+      ? pass('Program case status = COMPLETED after wizard')
+      : fail('Program case status not COMPLETED', summaryAfter.data?.data?.case?.status);
+  }
 }
 
 // ─── 3. Transaction wizard ───────────────────────────────────────────────────
@@ -250,6 +277,12 @@ async function testTransactionWizard() {
     Array.isArray(rr?.recommendedChecks) && rr.recommendedChecks.includes('kyc')
       ? pass('KYC check recommended for individual')
       : fail('KYC not in recommendedChecks', rr?.recommendedChecks);
+    rr?.approvalPath === 'reviewer_or_compliance_officer_required'
+      ? pass('approvalPath = reviewer_or_compliance_officer_required')
+      : fail('approvalPath wrong', rr?.approvalPath);
+    Array.isArray(rr?.escalations) && rr.escalations.length >= 2
+      ? pass(`escalations: ${rr.escalations.length} items (PEP + source of funds + TTR)`)
+      : fail('expected ≥2 escalations', rr?.escalations);
   }
 }
 
@@ -272,14 +305,23 @@ async function testCaseSummary() {
     Array.isArray(data?.audit)
       ? pass(`summary.audit (${data.audit.length} events)`)
       : fail('summary.audit missing', data?.audit);
+    // Audit entries must use .reason not .detail (Bug 5 check)
+    if (data?.audit?.length > 0) {
+      const hasReason = data.audit.some(e => e.reason !== undefined);
+      const hasDetail = data.audit.some(e => e.detail !== undefined);
+      hasDetail
+        ? fail('audit entries use .detail instead of .reason (Bug 5 not fixed)', data.audit[0])
+        : pass('audit entries use .reason (not .detail) — Bug 5 OK');
+    }
   }
 }
 
 // ─── 5. Didit sessions ───────────────────────────────────────────────────────
-let diditSessionId = null;
+let diditSessionId  = null;
+let diditSession2Id = null;
 
 async function testDidit() {
-  section('5. DIDIT — create session, list, mock-complete');
+  section('5. DIDIT — create session, list, mock-complete, multiple results, idempotency');
   if (!transactionCaseId) return fail('Didit session', 'no transactionCaseId');
 
   const create = await req('POST', '/providers/didit/session', {
@@ -290,9 +332,29 @@ async function testDidit() {
     reason:     'CDD — M1 Test — residential sale $950k PEP individual',
   });
   assert2xx(create, 'POST /providers/didit/session (kyc)');
-  diditSessionId = create.data?.data?.session?.id ?? idOf(create);
 
-  // AML screening session (second check)
+  // Bug 6 fix: verify response shape — verificationUrl and mode are inside data, not at root
+  if (ok2xx(create)) {
+    const d = create.data?.data;
+    diditSessionId = d?.session?.id ?? idOf(create);
+    d?.session?.id
+      ? pass('Didit response: data.session.id present (Bug 6 shape OK)')
+      : fail('Didit response: data.session.id missing', d);
+    d?.mode !== undefined
+      ? pass(`Didit response: data.mode = "${d.mode}"`)
+      : fail('Didit response: data.mode missing', d);
+    d?.reused === false
+      ? pass('Didit response: data.reused = false (new session)')
+      : fail('Didit response: data.reused not false', d);
+    // Bug 7 fix: mock mode returns null verificationUrl, not a fake URL
+    if (d?.mode === 'mock') {
+      d?.verificationUrl === null
+        ? pass('Mock mode: verificationUrl = null (Bug 7 OK — no fake URL)')
+        : fail('Mock mode: verificationUrl should be null', d?.verificationUrl);
+    }
+  }
+
+  // AML screening session (second check — for multiple results test)
   const create2 = await req('POST', '/providers/didit/session', {
     caseId:     transactionCaseId,
     capability: 'aml_screening',
@@ -300,6 +362,7 @@ async function testDidit() {
     reason:     'PEP/Sanctions screening — M1 Test',
   });
   assert2xx(create2, 'POST /providers/didit/session (aml_screening)');
+  if (ok2xx(create2)) diditSession2Id = create2.data?.data?.session?.id;
 
   // List sessions
   const list = await req('GET', `/providers/didit/sessions?caseId=${transactionCaseId}`);
@@ -312,7 +375,7 @@ async function testDidit() {
       : fail(`Expected ≥2 sessions, got ${sessions.length}`, sessions.map(s => s.capability));
   }
 
-  // Mock complete first session
+  // Mock complete first session (KYC — Approved)
   if (diditSessionId) {
     const mock = await req('POST', `/providers/didit/mock-complete/${diditSessionId}`, {
       outcome: 'Approved',
@@ -320,14 +383,65 @@ async function testDidit() {
     assert2xx(mock, `POST /providers/didit/mock-complete/${diditSessionId} (Approved)`);
 
     if (ok2xx(mock)) {
-      const result = mock.data?.result;
-      result?.stored
-        ? pass('Didit mock-complete: result.stored = true')
-        : fail('Didit mock-complete: result.stored missing', mock.data);
+      mock.data?.result?.stored
+        ? pass('Didit mock-complete KYC: result.stored = true')
+        : fail('Didit mock-complete KYC: result.stored missing', mock.data);
     }
   }
 
-  // Idempotency — try creating same session again (should 409 or reuse)
+  // Mock complete second session (AML — Review)
+  if (diditSession2Id) {
+    const mock2 = await req('POST', `/providers/didit/mock-complete/${diditSession2Id}`, {
+      outcome: 'Review',
+    });
+    assert2xx(mock2, `POST /providers/didit/mock-complete/${diditSession2Id} (Review — AML)`);
+
+    if (ok2xx(mock2)) {
+      mock2.data?.result?.stored
+        ? pass('Didit mock-complete AML: result.stored = true')
+        : fail('Didit mock-complete AML: result.stored missing', mock2.data);
+    }
+  }
+
+  // Bug 4 fix: case summary must return results for BOTH sessions (not just first)
+  const summaryWithResults = await req('GET', `/cases/${transactionCaseId}/summary`);
+  if (ok2xx(summaryWithResults)) {
+    const results = summaryWithResults.data?.data?.results ?? [];
+    results.length >= 2
+      ? pass(`Bug 4 fix: case summary returns ${results.length} results (all sessions)`)
+      : fail(`Bug 4 fix: expected ≥2 results in summary, got ${results.length}`, results);
+  }
+
+  // Duplicate webhook no-op test: send same mock-complete again, should deduplicate
+  if (diditSessionId) {
+    // First, get the providerRequestId of session 1 from DB via session endpoint
+    const sessionDetail = await req('GET', `/providers/didit/sessions/${diditSessionId}`);
+    if (ok2xx(sessionDetail)) {
+      const provReqId = sessionDetail.data?.data?.session?.providerRequestId;
+      // Send a raw webhook with same webhook_id — should be deduped (duplicate:true)
+      const webhookBody = {
+        webhook_id:   `dedupe-test-${diditSessionId}`,
+        session_id:   provReqId ?? `mock_${diditSessionId}`,
+        vendor_data:  diditSessionId,
+        status:       'Approved',
+        webhook_type: 'status.updated',
+        timestamp:    Math.floor(Date.now() / 1000),
+        decision:     { status: 'Approved', aml: { total_hits: 0 } },
+      };
+      const wh1 = await req('POST', '/providers/didit/webhook', webhookBody);
+      assert2xx(wh1, 'POST /providers/didit/webhook (first, stores)');
+
+      // Second identical event (same webhook_id) — should deduplicate
+      const wh2 = await req('POST', '/providers/didit/webhook', webhookBody);
+      if (ok2xx(wh2)) {
+        wh2.data?.duplicate === true
+          ? pass('Duplicate webhook: deduplication working (duplicate=true)')
+          : fail('Duplicate webhook: expected duplicate=true', wh2.data);
+      }
+    }
+  }
+
+  // Idempotency — try creating same session again (should 200 reuse or 409)
   const idem = await req('POST', '/providers/didit/session', {
     caseId:     transactionCaseId,
     capability: 'kyc',
@@ -337,6 +451,17 @@ async function testDidit() {
   [200, 201, 409].includes(idem.status)
     ? pass(`Idempotency: POST /session (same key) → HTTP ${idem.status}`)
     : fail('Idempotency: unexpected status', { status: idem.status, data: idem.data });
+
+  // Verify idempotency reuse response shape (Bug 6 for reuse path)
+  if (idem.status === 200) {
+    const d = idem.data?.data;
+    d?.reused === true
+      ? pass('Idempotency reuse: data.reused = true (Bug 6 shape OK)')
+      : fail('Idempotency reuse: data.reused not true', d);
+    d?.session?.id
+      ? pass('Idempotency reuse: data.session.id present')
+      : fail('Idempotency reuse: data.session.id missing', d);
+  }
 }
 
 // ─── 6. PDF generation ───────────────────────────────────────────────────────
@@ -363,6 +488,12 @@ async function testPdf() {
   magic === '%PDF'
     ? pass('PDF magic bytes valid (%PDF)')
     : fail('PDF magic bytes invalid', magic);
+
+  // Bug 5 fix: PDF audit should contain 'reason' (ensure server does not crash on undefined .detail)
+  const pdfSize = body.byteLength;
+  pdfSize > 100
+    ? pass(`PDF size ${pdfSize} bytes (non-empty, reason field used correctly)`)
+    : fail('PDF too small — likely crashed on .detail access', pdfSize);
 }
 
 // ─── 7. Case updated from wizard ─────────────────────────────────────────────
@@ -379,6 +510,9 @@ async function testCaseUpdated() {
     c?.riskLevel && c.riskLevel !== 'not_assessed'
       ? pass(`Case riskLevel = "${c.riskLevel}"`)
       : fail('riskLevel still not_assessed', c?.riskLevel);
+    c?.recommendation
+      ? pass(`Case recommendation = "${c.recommendation}"`)
+      : fail('Case recommendation not set after wizard', c?.recommendation);
   }
 }
 

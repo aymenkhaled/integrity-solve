@@ -19,19 +19,19 @@ import {
 import { cn } from '@/lib/utils';
 
 const DESIGNATED_SERVICES = [
-  'Account providers',      'Bullion dealing',
-  'Digital currency exchange', 'Gambling services',
+  'Account providers',          'Bullion dealing',
+  'Digital currency exchange',  'Gambling services',
   'International funds transfer', 'Loan provision',
-  'Mortgage broking',       'Real estate agency',
-  'Remittance dealing',     'Superannuation services',
+  'Mortgage broking',           'Real estate agency',
+  'Remittance dealing',         'Superannuation services',
   'Solicitor / Conveyancing services',
 ];
 
 const STEPS = [
-  { key: 'service',     label: 'Designated Service',    icon: Building2 },
-  { key: 'party',       label: 'Party Identification',  icon: Users },
-  { key: 'risk',        label: 'Risk Assessment',       icon: Shield },
-  { key: 'transaction', label: 'Transaction Details',   icon: DollarSign },
+  { key: 'service',     label: 'Designated Service',   icon: Building2 },
+  { key: 'party',       label: 'Party Identification', icon: Users },
+  { key: 'risk',        label: 'Risk Assessment',      icon: Shield },
+  { key: 'transaction', label: 'Transaction Details',  icon: DollarSign },
 ];
 
 type TransactionAnswers = {
@@ -44,31 +44,35 @@ type TransactionAnswers = {
 function stepComplete(key: string, a: Partial<TransactionAnswers>): boolean {
   if (key === 'service')     return !!a.service?.designatedService;
   if (key === 'party')       return !!a.party?.providedFor;
-  if (key === 'risk')        return true; // all optional risk flags
+  if (key === 'risk')        return true;
   if (key === 'transaction') return (a.transaction?.transactionValue ?? 0) > 0;
   return false;
 }
 
 const PARTY_OPTIONS = [
-  { value: 'individual',        label: 'Individual',                       icon: '👤', desc: 'Natural person customer' },
-  { value: 'company',           label: 'Company',                          icon: '🏢', desc: 'Pty Ltd or similar entity' },
-  { value: 'trust',             label: 'Trust',                            icon: '⚖️', desc: 'Discretionary or unit trust' },
-  { value: 'beneficial_owner',  label: 'Beneficial Owner / Controller',    icon: '🔑', desc: 'UBO or controlling person' },
+  { value: 'individual',       label: 'Individual',                    icon: '👤', desc: 'Natural person customer' },
+  { value: 'company',          label: 'Company',                       icon: '🏢', desc: 'Pty Ltd or similar entity' },
+  { value: 'trust',            label: 'Trust',                         icon: '⚖️', desc: 'Discretionary or unit trust' },
+  { value: 'beneficial_owner', label: 'Beneficial Owner / Controller', icon: '🔑', desc: 'UBO or controlling person' },
 ];
 
 const RISK_FLAGS = [
-  { key: 'politicallyExposedPerson',  label: 'Politically Exposed Person (PEP)',        severity: 'high' },
-  { key: 'adverseMedia',              label: 'Adverse media / negative news found',      severity: 'high' },
-  { key: 'highRiskJurisdiction',      label: 'High-risk jurisdiction involved',          severity: 'high' },
-  { key: 'complexOwnership',          label: 'Complex / layered ownership structure',    severity: 'medium' },
+  { key: 'politicallyExposedPerson',  label: 'Politically Exposed Person (PEP)',         severity: 'high' },
+  { key: 'adverseMedia',              label: 'Adverse media / negative news found',       severity: 'high' },
+  { key: 'highRiskJurisdiction',      label: 'High-risk jurisdiction involved',           severity: 'high' },
+  { key: 'complexOwnership',          label: 'Complex / layered ownership structure',     severity: 'medium' },
   { key: 'sourceOfFundsRequired',     label: 'Source of funds / wealth verification needed', severity: 'medium' },
 ];
 
+interface WizardStepResult {
+  run: unknown;
+  routeResult: Record<string, unknown>;
+}
+
 export default function TransactionWizardPage() {
-  const { runId }     = useParams<{ runId: string }>();
-  const caseId        = useParams<{ caseId: string }>()['caseId'];
-  const [, navigate]  = useLocation();
-  const qc            = useQueryClient();
+  const { caseId, runId } = useParams<{ caseId: string; runId: string }>();
+  const [, navigate]      = useLocation();
+  const qc                = useQueryClient();
 
   const [step,    setStep]    = useState(0);
   const [answers, setAnswers] = useState<Partial<TransactionAnswers>>({
@@ -81,10 +85,10 @@ export default function TransactionWizardPage() {
 
   const saveMutation = useMutation({
     mutationFn: (payload: { stepKey: string; answers: Record<string, unknown>; complete: boolean }) =>
-      wizardApi.saveStep(runId!, payload),
-    onSuccess: (res: { data: { run: unknown; routeResult: Record<string, unknown> } }) => {
+      wizardApi.saveStep(runId!, payload) as Promise<WizardStepResult>,
+    onSuccess: (res: WizardStepResult) => {
       qc.invalidateQueries({ queryKey: ['case-summary', caseId] });
-      setRouteResult(res.data.routeResult);
+      setRouteResult(res.routeResult);
     },
     onError: (e: Error) => toast.error('Save failed: ' + e.message),
   });
@@ -100,12 +104,12 @@ export default function TransactionWizardPage() {
     else            setStep(s => s + 1);
   };
 
-  // ── Results screen ────────────────────────────────────────────────────────
+  // Results screen
   if (completed && routeResult) {
-    const riskLevel      = routeResult['riskLevel'] as string ?? 'low';
+    const riskLevel         = (routeResult['riskLevel'] as string) ?? 'low';
     const recommendedChecks = (routeResult['recommendedChecks'] as string[]) ?? [];
-    const approvalPath   = routeResult['approvalPath'] as string ?? '';
-    const escalations    = (routeResult['escalations'] as string[]) ?? [];
+    const approvalPath      = (routeResult['approvalPath'] as string) ?? '';
+    const escalations       = (routeResult['escalations'] as string[]) ?? [];
 
     const riskColor = riskLevel === 'high' ? 'red' : riskLevel === 'medium' ? 'amber' : 'emerald';
 
@@ -125,7 +129,7 @@ export default function TransactionWizardPage() {
         )}>
           <div className={cn(
             'text-2xl font-bold capitalize mb-1',
-            riskColor === 'red' ? 'text-red-700 dark:text-red-300' :
+            riskColor === 'red'   ? 'text-red-700 dark:text-red-300' :
             riskColor === 'amber' ? 'text-amber-700 dark:text-amber-300' :
             'text-emerald-700 dark:text-emerald-300',
           )}>
@@ -134,7 +138,7 @@ export default function TransactionWizardPage() {
           <div className="text-sm text-muted-foreground">
             {riskLevel === 'high'   ? 'Immediate compliance officer review required before proceeding' :
              riskLevel === 'medium' ? 'Reviewer approval required' :
-             'Standard CDD — can proceed with verification'}
+             'Standard CDD - can proceed with verification'}
           </div>
         </div>
 
@@ -161,7 +165,7 @@ export default function TransactionWizardPage() {
             <ul className="space-y-2">
               {escalations.map(e => (
                 <li key={e} className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
-                  <span className="mt-0.5">•</span>{e}
+                  <span className="mt-0.5">-</span>{e}
                 </li>
               ))}
             </ul>
@@ -176,8 +180,8 @@ export default function TransactionWizardPage() {
             : 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
         )}>
           {approvalPath === 'standard_cdd_can_proceed'
-            ? '✓ Standard CDD complete — verification can proceed'
-            : '⚠ Reviewer or Compliance Officer approval required before proceeding'}
+            ? 'Complete - Standard CDD - verification can proceed'
+            : 'Warning - Reviewer or Compliance Officer approval required before proceeding'}
         </div>
 
         <div className="flex gap-3">
@@ -194,7 +198,7 @@ export default function TransactionWizardPage() {
     );
   }
 
-  // ── Wizard steps ──────────────────────────────────────────────────────────
+  // Wizard steps
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       {/* Header */}
@@ -207,7 +211,7 @@ export default function TransactionWizardPage() {
         </button>
         <h1 className="text-xl font-bold">Transaction / CDD Wizard</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Step {step + 1} of {STEPS.length} — {current.label}
+          Step {step + 1} of {STEPS.length} - {current.label}
         </p>
       </div>
 
@@ -305,7 +309,7 @@ export default function TransactionWizardPage() {
                       }))}
                     />
                     <label htmlFor="boKnown" className="text-sm cursor-pointer">
-                      All beneficial owners (≥25% ownership) are known and identifiable
+                      All beneficial owners (25%+ ownership) are known and identifiable
                     </label>
                   </div>
                 )}
@@ -325,7 +329,7 @@ export default function TransactionWizardPage() {
               <div className="space-y-3">
                 {RISK_FLAGS.map(flag => {
                   const riskAnswers = answers.risk ?? {} as TransactionAnswers['risk'];
-                  const checked = riskAnswers[flag.key as keyof TransactionAnswers['risk']] ?? false;
+                  const checked     = riskAnswers[flag.key as keyof TransactionAnswers['risk']] ?? false;
                   return (
                     <div
                       key={flag.key}

@@ -37,11 +37,11 @@ const DESIGNATED_SERVICES_OPTIONS = [
 ];
 
 const STEPS = [
-  { key: 'industry',   label: 'Industry',         icon: Building2 },
+  { key: 'industry',   label: 'Industry',           icon: Building2 },
   { key: 'services',   label: 'Designated Services', icon: FileText },
-  { key: 'structure',  label: 'Business Structure', icon: Users },
-  { key: 'locations',  label: 'Locations',         icon: MapPin },
-  { key: 'program',    label: 'Program Readiness', icon: BookOpen },
+  { key: 'structure',  label: 'Business Structure',  icon: Users },
+  { key: 'locations',  label: 'Locations',           icon: MapPin },
+  { key: 'program',    label: 'Program Readiness',   icon: BookOpen },
 ];
 
 type StepAnswers = {
@@ -61,11 +61,15 @@ function stepComplete(key: string, answers: Partial<StepAnswers>): boolean {
   return false;
 }
 
+interface WizardStepResult {
+  run: unknown;
+  routeResult: Record<string, unknown>;
+}
+
 export default function ProgramWizardPage() {
-  const { runId } = useParams<{ runId: string }>();
-  const caseId    = useParams<{ caseId: string }>()['caseId'];
-  const [,         navigate] = useLocation();
-  const qc        = useQueryClient();
+  const { caseId, runId } = useParams<{ caseId: string; runId: string }>();
+  const [, navigate]      = useLocation();
+  const qc                = useQueryClient();
 
   const [step,    setStep]    = useState(0);
   const [answers, setAnswers] = useState<Partial<StepAnswers>>({
@@ -79,10 +83,10 @@ export default function ProgramWizardPage() {
 
   const saveMutation = useMutation({
     mutationFn: (payload: { stepKey: string; answers: Record<string, unknown>; complete: boolean }) =>
-      wizardApi.saveStep(runId!, payload),
-    onSuccess: (res: { data: { run: unknown; routeResult: Record<string, unknown> } }) => {
+      wizardApi.saveStep(runId!, payload) as Promise<WizardStepResult>,
+    onSuccess: (res: WizardStepResult) => {
       qc.invalidateQueries({ queryKey: ['case-summary', caseId] });
-      setRouteResult(res.data.routeResult);
+      setRouteResult(res.routeResult);
     },
     onError: (e: Error) => toast.error('Save failed: ' + e.message),
   });
@@ -91,7 +95,7 @@ export default function ProgramWizardPage() {
   const isLastStep = step === STEPS.length - 1;
 
   const handleNext = async () => {
-    const stepKey = current.key as keyof StepAnswers;
+    const stepKey     = current.key as keyof StepAnswers;
     const stepAnswers = (answers[stepKey] ?? {}) as Record<string, unknown>;
 
     await saveMutation.mutateAsync({
@@ -108,10 +112,10 @@ export default function ProgramWizardPage() {
   };
 
   if (completed && routeResult) {
-    const missing      = (routeResult['missing'] as string[]) ?? [];
-    const riskSignals  = (routeResult['riskSignals'] as string[]) ?? [];
-    const outputs      = (routeResult['outputs'] as string[]) ?? [];
-    const status       = routeResult['completionStatus'] as string;
+    const missing     = (routeResult['missing']     as string[]) ?? [];
+    const riskSignals = (routeResult['riskSignals'] as string[]) ?? [];
+    const outputs     = (routeResult['outputs']     as string[]) ?? [];
+    const status      = routeResult['completionStatus'] as string;
 
     return (
       <div className="p-6 max-w-2xl mx-auto space-y-6">
@@ -132,8 +136,8 @@ export default function ProgramWizardPage() {
                 : 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
             )}>
               {status === 'ready_for_summary'
-                ? '✓ All required information collected — ready for AML program summary'
-                : '⚠ Some required items are still missing'}
+                ? 'Complete - All required information collected - ready for AML program summary'
+                : 'Warning - Some required items are still missing'}
             </div>
 
             {missing.length > 0 && (
@@ -197,7 +201,7 @@ export default function ProgramWizardPage() {
         </button>
         <h1 className="text-xl font-bold">AML Program Setup Wizard</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Step {step + 1} of {STEPS.length} — {current.label}
+          Step {step + 1} of {STEPS.length} - {current.label}
         </p>
       </div>
 
@@ -248,7 +252,7 @@ export default function ProgramWizardPage() {
               <p className="text-sm text-muted-foreground">Select all that apply under the AML/CTF Act</p>
               <div className="space-y-2">
                 {DESIGNATED_SERVICES_OPTIONS.map(svc => {
-                  const selected = answers.services?.designatedServices ?? [];
+                  const selected   = answers.services?.designatedServices ?? [];
                   const isSelected = selected.includes(svc);
                   return (
                     <div key={svc} className="flex items-center gap-3">
@@ -286,7 +290,7 @@ export default function ProgramWizardPage() {
                     structure: { ...a.structure!, businessStructure: v },
                   }))}
                 >
-                  <SelectTrigger><SelectValue placeholder="Select structure…" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select structure..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="sole_trader">Sole trader</SelectItem>
                     <SelectItem value="partnership">Partnership</SelectItem>
@@ -378,7 +382,7 @@ export default function ProgramWizardPage() {
                     program: { ...a.program!, riskApproach: v },
                   }))}
                 >
-                  <SelectTrigger><SelectValue placeholder="Select approach…" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select approach..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="rule_based">Rule-based (standard thresholds)</SelectItem>
                     <SelectItem value="risk_based">Risk-based approach (recommended)</SelectItem>
@@ -432,7 +436,7 @@ function LocationsInput({ value, onChange }: { value: string[]; onChange: (v: st
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="e.g. Sydney NSW, Melbourne VIC…"
+          placeholder="e.g. Sydney NSW, Melbourne VIC..."
         />
         <Button variant="outline" onClick={add} type="button">Add</Button>
       </div>
@@ -443,7 +447,7 @@ function LocationsInput({ value, onChange }: { value: string[]; onChange: (v: st
             <button
               onClick={() => onChange(value.filter(l => l !== loc))}
               className="ml-1 hover:text-destructive"
-            >×</button>
+            >x</button>
           </Badge>
         ))}
       </div>

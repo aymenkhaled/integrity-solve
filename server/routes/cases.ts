@@ -9,21 +9,22 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { db } from '../db.js';
-import { eq, desc, and } from 'drizzle-orm';
-import { cases, wizardRuns, diditSessions, diditResults, auditLog } from '../../shared/schema.js';
+import { eq, desc, and, inArray } from 'drizzle-orm';
+import { cases, wizardRuns, diditSessions, diditResults, auditLog, caseOutputs } from '../../shared/schema.js';
 import { createId } from '@paralleldrive/cuid2';
 import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';
 import { requireWorkspace } from '../lib/auth-session.js';
+import { NotFoundError, UnauthenticatedError } from '../lib/errors.js';
 
 export const casesRouter = Router();
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
 const CreateCaseSchema = z.object({
-  caseType:         z.enum(['PROGRAM_SETUP', 'TRANSACTION_CDD']),
-  title:            z.string().min(2).max(200),
+  caseType:          z.enum(['PROGRAM_SETUP', 'TRANSACTION_CDD']),
+  title:             z.string().min(2).max(200),
   designatedService: z.string().optional(),
-  partyType:        z.enum(['individual', 'company', 'trust', 'beneficial_owner']).optional(),
+  partyType:         z.enum(['individual', 'company', 'trust', 'beneficial_owner']).optional(),
 });
 
 function escapePdf(text: string): string {
@@ -67,7 +68,7 @@ casesRouter.post('/api/cases', requireWorkspace, async (req: Request, res: Respo
   try {
     const workspaceId = getWorkspaceId(req);
     const userId      = getUserId(req);
-    if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
+    if (!workspaceId) return void next(new UnauthenticatedError());
 
     const body = CreateCaseSchema.parse(req.body);
 
@@ -104,7 +105,7 @@ casesRouter.post('/api/cases', requireWorkspace, async (req: Request, res: Respo
 casesRouter.get('/api/cases', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
+    if (!workspaceId) return void next(new UnauthenticatedError());
 
     const rows = await db
       .select()
@@ -120,14 +121,14 @@ casesRouter.get('/api/cases', requireWorkspace, async (req: Request, res: Respon
 casesRouter.get('/api/cases/:id/summary', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
+    if (!workspaceId) return void next(new UnauthenticatedError());
 
     const [caseRow] = await db
       .select()
       .from(cases)
       .where(and(eq(cases.id, req.params.id), eq(cases.workspaceId, workspaceId)));
 
-    if (!caseRow) return void res.status(404).json({ error: 'Case not found' });
+    if (!caseRow) return void next(new NotFoundError('Case'));
 
     const wizardRunsRows = await db
       .select()
@@ -141,17 +142,15 @@ casesRouter.get('/api/cases/:id/summary', requireWorkspace, async (req: Request,
       .where(eq(diditSessions.caseId, caseRow.id))
       .orderBy(desc(diditSessions.createdAt));
 
+    // Bug 4 fix: use inArray to return ALL Didit results, not just first session's
     const checkIds = checksRows.map(c => c.id);
     let resultsRows: typeof diditResults.$inferSelect[] = [];
     if (checkIds.length > 0) {
       resultsRows = await db
         .select()
         .from(diditResults)
-        .where(
-          checkIds.length === 1
-            ? eq(diditResults.diditSessionId, checkIds[0])
-            : eq(diditResults.diditSessionId, checkIds[0]) // simplified — each session has at most one result
-        );
+        .where(inArray(diditResults.diditSessionId, checkIds))
+        .orderBy(desc(diditResults.createdAt));
     }
 
     const auditRows = await db
@@ -177,20 +176,31 @@ casesRouter.get('/api/cases/:id/summary', requireWorkspace, async (req: Request,
 casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
+    if (!workspaceId) return void next(new UnauthenticatedError());
 
     const [caseRow] = await db
       .select()
       .from(cases)
       .where(and(eq(cases.id, req.params.id), eq(cases.workspaceId, workspaceId)));
 
-    if (!caseRow) return void res.status(404).json({ error: 'Case not found' });
+    if (!caseRow) return void next(new NotFoundError('Case'));
 
     const checksRows = await db
       .select()
       .from(diditSessions)
       .where(eq(diditSessions.caseId, caseRow.id))
       .orderBy(desc(diditSessions.createdAt));
+
+    // Get all results for all checks
+    const checkIds = checksRows.map(c => c.id);
+    let resultsRows: typeof diditResults.$inferSelect[] = [];
+    if (checkIds.length > 0) {
+      resultsRows = await db
+        .select()
+        .from(diditResults)
+        .where(inArray(diditResults.diditSessionId, checkIds))
+        .orderBy(desc(diditResults.createdAt));
+    }
 
     const auditRows = await db
       .select()
@@ -202,25 +212,31 @@ casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res
     const now = new Date().toISOString().slice(0, 10);
 
     const lines = [
-      'Integrity Solve — Case Summary Pack',
+      'Integrity Solve - Case Summary Pack',
       `Generated: ${now}`,
       '',
-      `Case:              ${caseRow.title}`,
-      `Type:              ${caseRow.caseType}`,
-      `Status:            ${caseRow.status}`,
-      `Risk level:        ${caseRow.riskLevel ?? 'not assessed'}`,
+      `Case:               ${caseRow.title}`,
+      `Type:               ${caseRow.caseType}`,
+      `Status:             ${caseRow.status}`,
+      `Risk level:         ${caseRow.riskLevel ?? 'not assessed'}`,
       `Designated service: ${caseRow.designatedService ?? 'not set'}`,
-      `Party type:        ${caseRow.partyType ?? 'not set'}`,
-      `Recommendation:    ${caseRow.recommendation ?? 'pending wizard completion'}`,
+      `Party type:         ${caseRow.partyType ?? 'not set'}`,
+      `Recommendation:     ${caseRow.recommendation ?? 'pending wizard completion'}`,
       '',
-      '── Verification Checks ──────────────────────────',
+      '-- Verification Checks --',
       ...(checksRows.length
         ? checksRows.map(c => `  ${c.capability.padEnd(16)} status=${c.status}  session=${c.providerRequestId ?? 'pending'}`)
         : ['  No checks initiated yet']),
       '',
-      '── Audit Timeline ───────────────────────────────',
+      '-- Didit Results --',
+      ...(resultsRows.length
+        ? resultsRows.map(r => `  ${r.status.padEnd(16)} decision=${r.decision}  ${r.summary ?? ''}`)
+        : ['  No results yet']),
+      '',
+      '-- Audit Timeline --',
+      // Bug 5 fix: use a.reason not a.detail
       ...(auditRows.length
-        ? auditRows.map(a => `  ${String(a.createdAt).slice(0, 19)}  ${a.action}  ${a.detail ?? ''}`)
+        ? auditRows.map(a => `  ${String(a.createdAt).slice(0, 19)}  ${a.action}  ${a.reason ?? ''}`)
         : ['  No audit events yet']),
     ];
 

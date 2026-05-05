@@ -2,6 +2,9 @@
  * server/services/didit.ts — Didit integration service.
  * Supports mock mode (DIDIT_MODE=mock) and sandbox/live mode.
  * Uses vendor_data = diditSession.id for webhook mapping.
+ *
+ * Bug 7 fix (Option A): mock mode returns null verificationUrl.
+ * The "Mock Complete" button on case detail is the correct mechanism in mock mode.
  */
 
 export type DiditCapability = 'kyc' | 'kyb' | 'aml_screening' | 'company_aml';
@@ -17,18 +20,20 @@ export type CreateDiditSessionInput = {
 
 export type DiditSessionResult = {
   providerRequestId: string;
-  verificationUrl:   string;
+  verificationUrl:   string | null;
   workflowId:        string;
   raw:               unknown;
 };
 
-const DIDIT_BASE_URL = 'https://verification.didit.me';
+function getBaseUrl(): string {
+  return process.env['DIDIT_BASE_URL'] ?? 'https://verification.didit.me';
+}
 
 function workflowIdFor(capability: DiditCapability): string {
   if (capability === 'kyb' || capability === 'company_aml') {
-    return process.env['DIDIT_WORKFLOW_ID_KYB'] ?? `mock_kyb_workflow`;
+    return process.env['DIDIT_WORKFLOW_ID_KYB'] ?? 'mock_kyb_workflow';
   }
-  return process.env['DIDIT_WORKFLOW_ID_KYC'] ?? `mock_kyc_workflow`;
+  return process.env['DIDIT_WORKFLOW_ID_KYC'] ?? 'mock_kyc_workflow';
 }
 
 export async function createDiditSession(
@@ -36,30 +41,34 @@ export async function createDiditSession(
 ): Promise<DiditSessionResult> {
   const mode       = process.env['DIDIT_MODE'] ?? 'mock';
   const workflowId = workflowIdFor(input.capability);
-  const appUrl     = process.env['APP_URL'] ?? 'http://localhost:3000';
 
-  // ── Mock mode ──────────────────────────────────────────────────────────────
+  // Mock mode: return null verificationUrl — use "Mock Complete" button in UI
   if (mode === 'mock') {
     return {
       providerRequestId: `mock_${input.sessionId}`,
-      verificationUrl:   `${appUrl}/mock-didit/${input.sessionId}`,
-      workflowId:        workflowId,
+      verificationUrl:   null, // Bug 7: no fake URL — use Mock Complete button
+      workflowId,
       raw: {
-        mode:              'mock',
-        status:            'Not Started',
-        session_id:        `mock_${input.sessionId}`,
-        verification_url:  `${appUrl}/mock-didit/${input.sessionId}`,
+        mode:       'mock',
+        status:     'Not Started',
+        session_id: `mock_${input.sessionId}`,
+        note:       'Use the Mock Complete button in the case detail to simulate a webhook result.',
       },
     };
   }
 
-  // ── Live / sandbox mode ───────────────────────────────────────────────────
-  if (!process.env['DIDIT_API_KEY']) throw new Error('DIDIT_API_KEY is not set');
-  if (!process.env[`DIDIT_WORKFLOW_ID_${input.capability === 'kyb' || input.capability === 'company_aml' ? 'KYB' : 'KYC'}`]) {
-    throw new Error(`Missing Didit workflow ID for capability: ${input.capability}`);
+  // Sandbox / live mode: require credentials
+  if (!process.env['DIDIT_API_KEY']) {
+    throw new Error('DIDIT_API_KEY is not set — required for sandbox/live mode');
+  }
+  const wfKey = input.capability === 'kyb' || input.capability === 'company_aml'
+    ? 'DIDIT_WORKFLOW_ID_KYB' : 'DIDIT_WORKFLOW_ID_KYC';
+  if (!process.env[wfKey]) {
+    throw new Error(`${wfKey} is not set — required for capability: ${input.capability}`);
   }
 
-  const response = await fetch(`${DIDIT_BASE_URL}/v3/session/`, {
+  const baseUrl  = getBaseUrl();
+  const response = await fetch(`${baseUrl}/v3/session/`, {
     method:  'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -89,7 +98,7 @@ export async function createDiditSession(
 
   return {
     providerRequestId: body['session_id'] as string,
-    verificationUrl:   body['verification_url'] as string,
+    verificationUrl:   body['verification_url'] as string ?? null,
     workflowId,
     raw: body,
   };

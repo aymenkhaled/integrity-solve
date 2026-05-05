@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { casesApi } from '@/lib/api';
+import { casesApi, wizardApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner';
 import {
   FolderOpen, Plus, Shield, AlertTriangle, CheckCircle2, Clock,
-  FileText, ArrowRight, RefreshCw,
+  FileText, ArrowRight, RefreshCw, AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +30,12 @@ interface Case {
   riskLevel?: string;
   recommendation?: string;
   createdAt: string;
+}
+
+interface WizardRun {
+  id: string;
+  wizardType: string;
+  status: string;
 }
 
 const RISK_BADGE: Record<string, string> = {
@@ -61,35 +67,64 @@ const DESIGNATED_SERVICES = [
 ];
 
 export default function CasesPage() {
-  const qc = useQueryClient();
+  const qc              = useQueryClient();
+  const [, navigate]    = useLocation();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    caseType:         'TRANSACTION_CDD' as 'TRANSACTION_CDD' | 'PROGRAM_SETUP',
-    title:            '',
+    caseType:          'TRANSACTION_CDD' as 'TRANSACTION_CDD' | 'PROGRAM_SETUP',
+    title:             '',
     designatedService: '',
-    partyType:        '' as '' | 'individual' | 'company' | 'trust' | 'beneficial_owner',
+    partyType:         '' as '' | 'individual' | 'company' | 'trust' | 'beneficial_owner',
   });
 
-  const { data, isLoading } = useQuery<{ data: Case[] }>({
+  const {
+    data: cases = [],
+    isLoading,
+    error,
+  } = useQuery<Case[]>({
     queryKey: ['cases'],
-    queryFn:  () => casesApi.list() as Promise<{ data: Case[] }>,
+    queryFn:  () => casesApi.list() as Promise<Case[]>,
   });
+
+  const caseList        = cases;
+  const programCases    = caseList.filter(c => c.caseType === 'PROGRAM_SETUP');
+  const transactionCases = caseList.filter(c => c.caseType === 'TRANSACTION_CDD');
 
   const createMutation = useMutation({
-    mutationFn: (body: typeof form) => casesApi.create(body),
-    onSuccess: () => {
+    mutationFn: async (body: typeof form) => {
+      const created = await casesApi.create(body) as Case;
+
+      try {
+        const run = await wizardApi.start({
+          caseId:     created.id,
+          wizardType: body.caseType,
+        }) as WizardRun;
+
+        const page = run.wizardType === 'PROGRAM_SETUP' ? 'program' : 'transaction';
+        return { created, runId: run.id, page };
+      } catch {
+        return { created, runId: null, page: null };
+      }
+    },
+    onSuccess: ({ created, runId, page }) => {
       qc.invalidateQueries({ queryKey: ['cases'] });
       setOpen(false);
       setForm({ caseType: 'TRANSACTION_CDD', title: '', designatedService: '', partyType: '' });
-      toast.success('Case created — start the wizard to guide through verification.');
+
+      if (runId && page) {
+        navigate(`/cases/${created.id}/wizard/${page}/${runId}`);
+      } else {
+        navigate(`/cases/${created.id}`);
+        toast.warning('Case created, but wizard did not start. You can start it from the case page.');
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const caseList = data?.data ?? [];
-
-  const programCases    = caseList.filter(c => c.caseType === 'PROGRAM_SETUP');
-  const transactionCases = caseList.filter(c => c.caseType === 'TRANSACTION_CDD');
+  const canSubmit =
+    !!form.title &&
+    (form.caseType === 'PROGRAM_SETUP' ||
+     (!!form.designatedService && !!form.partyType));
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -101,7 +136,7 @@ export default function CasesPage() {
             Cases
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Wizard-led AML/CTF compliance cases — program setup and transaction CDD
+            Wizard-led AML/CTF compliance cases - program setup and transaction CDD
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -117,7 +152,7 @@ export default function CasesPage() {
                 <Label>Case Type</Label>
                 <Select
                   value={form.caseType}
-                  onValueChange={(v) => setForm(f => ({ ...f, caseType: v as typeof form.caseType }))}
+                  onValueChange={(v) => setForm(f => ({ ...f, caseType: v as typeof form.caseType, designatedService: '', partyType: '' }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -132,7 +167,9 @@ export default function CasesPage() {
               <div className="space-y-1.5">
                 <Label>Case Title</Label>
                 <Input
-                  placeholder={form.caseType === 'PROGRAM_SETUP' ? 'e.g. Acme Realty AML Program 2025' : 'e.g. Smith – Property Purchase CDD'}
+                  placeholder={form.caseType === 'PROGRAM_SETUP'
+                    ? 'e.g. Acme Realty AML Program 2025'
+                    : 'e.g. Smith - Property Purchase CDD'}
                   value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                 />
@@ -141,13 +178,13 @@ export default function CasesPage() {
               {form.caseType === 'TRANSACTION_CDD' && (
                 <>
                   <div className="space-y-1.5">
-                    <Label>Designated Service</Label>
+                    <Label>Designated Service <span className="text-destructive">*</span></Label>
                     <Select
                       value={form.designatedService}
                       onValueChange={v => setForm(f => ({ ...f, designatedService: v }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select service…" />
+                        <SelectValue placeholder="Select service..." />
                       </SelectTrigger>
                       <SelectContent>
                         {DESIGNATED_SERVICES.map(s => (
@@ -158,7 +195,7 @@ export default function CasesPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label>Party Type</Label>
+                    <Label>Party Type <span className="text-destructive">*</span></Label>
                     <Select
                       value={form.partyType}
                       onValueChange={v => setForm(f => ({ ...f, partyType: v as typeof form.partyType }))}
@@ -179,10 +216,10 @@ export default function CasesPage() {
 
               <Button
                 className="w-full"
-                disabled={!form.title || createMutation.isPending}
+                disabled={!canSubmit || createMutation.isPending}
                 onClick={() => createMutation.mutate(form)}
               >
-                {createMutation.isPending ? 'Creating…' : 'Create Case & Start Wizard'}
+                {createMutation.isPending ? 'Creating...' : 'Create Case & Start Wizard'}
               </Button>
             </div>
           </DialogContent>
@@ -192,10 +229,10 @@ export default function CasesPage() {
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Cases',   value: caseList.length,                                icon: FolderOpen },
-          { label: 'In Progress',   value: caseList.filter(c => c.status === 'IN_PROGRESS').length,  icon: RefreshCw },
-          { label: 'Completed',     value: caseList.filter(c => c.status === 'COMPLETED').length,    icon: CheckCircle2 },
-          { label: 'High Risk',     value: caseList.filter(c => c.riskLevel === 'high').length,      icon: AlertTriangle },
+          { label: 'Total Cases',  value: caseList.length,                                            icon: FolderOpen },
+          { label: 'In Progress',  value: caseList.filter(c => c.status === 'IN_PROGRESS').length,    icon: RefreshCw },
+          { label: 'Completed',    value: caseList.filter(c => c.status === 'COMPLETED').length,      icon: CheckCircle2 },
+          { label: 'High Risk',    value: caseList.filter(c => c.riskLevel === 'high').length,        icon: AlertTriangle },
         ].map(({ label, value, icon: Icon }) => (
           <Card key={label} className="p-4">
             <div className="flex items-center gap-3">
@@ -210,11 +247,18 @@ export default function CasesPage() {
       </div>
 
       {isLoading && (
-        <div className="text-center text-muted-foreground py-12">Loading cases…</div>
+        <div className="text-center text-muted-foreground py-12">Loading cases...</div>
+      )}
+
+      {error && !isLoading && (
+        <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <span className="text-sm">Failed to load cases: {(error as Error).message}</span>
+        </div>
       )}
 
       {/* Transaction Cases */}
-      {transactionCases.length > 0 && (
+      {!error && transactionCases.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
             <Shield className="h-5 w-5 text-blue-500" />
@@ -229,7 +273,7 @@ export default function CasesPage() {
       )}
 
       {/* Program Cases */}
-      {programCases.length > 0 && (
+      {!error && programCases.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
             <FileText className="h-5 w-5 text-purple-500" />
@@ -243,7 +287,7 @@ export default function CasesPage() {
         </section>
       )}
 
-      {!isLoading && caseList.length === 0 && (
+      {!isLoading && !error && caseList.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="py-16 text-center">
             <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -273,8 +317,8 @@ function CaseRow({ c }: { c: Case }) {
                 <div className="font-semibold truncate">{c.title}</div>
                 <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
                   {c.designatedService && <span>{c.designatedService}</span>}
-                  {c.partyType && <span className="capitalize">· {c.partyType.replace('_', ' ')}</span>}
-                  <span>· {new Date(c.createdAt).toLocaleDateString('en-AU')}</span>
+                  {c.partyType && <span className="capitalize">- {c.partyType.replace('_', ' ')}</span>}
+                  <span>- {new Date(c.createdAt).toLocaleDateString('en-AU')}</span>
                 </div>
               </div>
             </div>

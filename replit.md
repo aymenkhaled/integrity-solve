@@ -150,6 +150,28 @@ Risk escalation rules:
 - **Live mode** (`DIDIT_MODE=live`): Sessions are created via the real Didit REST API. Webhooks arrive at `/api/providers/didit/webhook` and are verified with HMAC-SHA256.
 - **Idempotency**: Sessions are deduplicated on `(workspaceId, caseId, capability, subjectId)` — duplicate requests return the existing session.
 
+### Bug Fixes Applied (post-M1 patch)
+
+All 7 critical bugs corrected in a single autonomous pass:
+
+| # | Bug | Fix |
+|---|---|---|
+| 1 | Frontend double-unwrapping of `data.data` | All pages updated to use `useQuery<T>` directly — `api.ts` already unwraps `data.data`; wizard `onSuccess` now uses `res.routeResult` and `run.wizardType` |
+| 2 | "Create Case & Start Wizard" only created the case | `CasesPage` `createMutation` now calls `wizardApi.start()` after case creation and navigates to the wizard page |
+| 3 | Backend raw `res.status(401).json(...)` error responses | All routes now throw `NotFoundError`, `UnauthenticatedError`, `ForbiddenError` and let `error-handler.ts` produce the standard envelope |
+| 4 | Case summary only returned results for the first Didit session | `inArray(diditResults.diditSessionId, checkIds)` now fetches results for all sessions |
+| 5 | Audit UI/PDF used `entry.detail` — field is `entry.reason` | `CaseDetailPage` and PDF generator updated to use `a.reason` throughout |
+| 6 | Didit session response put `verificationUrl`/`mode` outside `data` | Both new-session (201) and idempotency-reuse (200) responses now wrap all fields inside `data: { session, verificationUrl, mode, reused }` |
+| 7 | Mock Didit URL pointed to non-existent `/mock-didit/:id` page | `didit.ts` now returns `verificationUrl: null` in mock mode; UI shows "Mock mode" badge; the "Mock Complete" button is the correct mechanism |
+
+Additional improvements:
+- `server/env.ts` — added `DIDIT_BASE_URL` env var (defaults to `https://verification.didit.me`)
+- `server/routes/wizard.ts` — writes `case_outputs` row on wizard completion (upsert)
+- `CaseDetailPage` — added reviewer decision stub (Approve / Request info / Escalate)
+- `CaseDetailPage` — audit trail uses `entry.reason` (Bug 5)
+- `server/routes/cases.ts` — PDF audit lines use `a.reason` (Bug 5)
+- Wouter `useLocation` navigate replaces all `window.location.href` assignments
+
 ### Test Suite
 Run: `node scripts/test-milestone1.mjs`
 
@@ -159,9 +181,9 @@ Run: `node scripts/test-milestone1.mjs`
 2. Program wizard (start + all 5 steps + routeResult verification)
 3. Transaction wizard (start + all 4 steps + risk level + recommended checks)
 4. Case summary (wizard runs, audit trail)
-5. Didit sessions (create KYC, create AML screening, list, mock-complete, idempotency)
+5. Didit sessions (create KYC, create AML screening, list 2 sessions, mock-complete, idempotency reuse → HTTP 200)
 6. PDF generation (magic bytes, content-type)
-7. Case status after wizard (COMPLETED, riskLevel propagated)
+7. Case status after wizard (COMPLETED, riskLevel = high propagated)
 
 ---
 
