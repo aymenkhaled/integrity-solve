@@ -32,10 +32,14 @@ function getBaseUrl(): string {
 }
 
 function workflowIdFor(capability: DiditCapability): string {
+  // Note: secrets were entered in alphabetical order by Replit UI so the values
+  // ended up swapped. We correct that here:
+  // DIDIT_WORKFLOW_ID_KYB env var actually holds 327d9e74 (KYC+AML)
+  // DIDIT_WORKFLOW_ID_KYC env var actually holds fa8e7700 (KYB)
   if (capability === 'kyb' || capability === 'company_aml') {
-    return process.env['DIDIT_WORKFLOW_ID_KYB'] ?? 'mock_kyb_workflow';
+    return process.env['DIDIT_WORKFLOW_ID_KYC'] ?? 'mock_kyb_workflow';
   }
-  return process.env['DIDIT_WORKFLOW_ID_KYC'] ?? 'mock_kyc_workflow';
+  return process.env['DIDIT_WORKFLOW_ID_KYB'] ?? 'mock_kyc_workflow';
 }
 
 function firstString(...values: unknown[]): string | null {
