@@ -1,0 +1,186 @@
+Test Webhook
+Send a test webhook to verify your integration
+
+Result
+Webhook delivery failed
+
+Webhook received non-success response. Status code: 500
+
+Response Status
+500
+signature-headers.json
+JSON
+
+{
+  "X-Signature-V2": "960dd32ad1ab3e0864e70fa63ef708108a9b036819e7c95fd58193c5bca1a12b",
+  "X-Signature-Simple": "0c1357dcad899e58e21395cb68933702f57d5459c4048cb4f7df0cf41549af90",
+  "X-Timestamp": "1778004101",
+  "X-Didit-Test-Webhook": "true"
+}
+Payload Sent
+request-body.json
+JSON
+
+{
+  "session_id": "4de72b76-1127-41ec-9012-14ca39aa5ec2",
+  "status": "Approved",
+  "vendor_data": "test-vendor-data-123",
+  "webhook_type": "status.updated",
+  "timestamp": 1778004101,
+  "created_at": 1778004101,
+  "workflow_id": "9c85ff52-5d9e-4d48-b35b-6f735581199d",
+  "metadata": {
+    "test_webhook": true
+  },
+  "decision": {
+    "session_id": "4de72b76-1127-41ec-9012-14ca39aa5ec2",
+    "session_number": 12345,
+    "session_url": "https://verify.didit.me/session/5TUvvhx1Qq6L",
+    "status": "Approved",
+    "workflow_id": "9c85ff52-5d9e-4d48-b35b-6f735581199d",
+    "features": [
+      "ID_VERIFICATION",
+      "LIVENESS",
+      "FACE_MATCH",
+      "AML"
+    ],
+    "vendor_data": "test-vendor-data-123",
+    "metadata": {
+      "test_webhook": true
+    },
+    "callback": "https://example.com/callback",
+    "id_verifications": [
+      {
+        "status": "Approved",
+        "full_name": "John Michael Smith",
+        "first_name": "John Michael",
+        "last_name": "Smith",
+        "date_of_birth": "1988-03-15",
+        "document_type": "Driver's License",
+        "document_number": "D1234567890",
+        "issuing_state": "USA",
+        "issuing_state_name": "United States",
+        "nationality": "USA",
+        "expiration_date": "2028-03-15",
+        "date_of_issue": "2020-03-15",
+        "age": 36,
+        "gender": "M",
+        "address": "123 Main Street, Apt 4B, New York, NY 10001",
+        "formatted_address": null,
+        "place_of_birth": "Los Angeles",
+        "personal_number": null,
+        "marital_status": "UNKNOWN",
+        "parsed_address": {
+          "street_1": "123 Main Street",
+          "street_2": "Apt 4B",
+          "city": "New York",
+          "region": "NY",
+          "postal_code": "10001",
+          "country": "USA"
+        },
+        "front_image": "https://cdn.didit.me/test/20e260eb-c34d-4a27-9415-0266f0902264/front.jpg",
+        "back_image": "https://cdn.didit.me/test/20e260eb-c34d-4a27-9415-0266f0902264/back.jpg",
+        "portrait_image": "https://cdn.didit.me/test/20e260eb-c34d-4a27-9415-0266f0902264/portrait.jpg",
+        "full_front_image": "https://cdn.didit.me/test/20e260eb-c34d-4a27-9415-0266f0902264/full_front.jpg",
+        "full_back_image": "https://cdn.didit.me/test/20e260eb-c34d-4a27-9415-0266f0902264/full_back.jpg",
+        "front_video": null,
+        "back_video": null,
+        "front_image_camera_front": null,
+        "back_image_camera_front": null,
+        "front_image_camera_front_face_match_score": null,
+        "back_image_camera_front_face_match_score": null,
+        "front_image_quality_score": {
+          "focus_score": 85.3,
+          "brightness_score": 92.1,
+          "brightness_issue": "ok",
+          "is_document_fully_visible": true,
+          "resolution_score": 72.4,
+          "overall_score": 88.7
+        },
+        "back_image_quality_score": {
+          "focus_score": 85.3,
+          "brightness_score": 92.1,
+          "brightness_issue": "ok",
+          "is_document_fully_visible": true,
+          "resolution_score": 72.4,
+          "overall_score": 88.7
+        },
+        "extra_fields": {
+          "dl_categories": [
+            "C",
+            "D"
+          ],
+          "reference_number": "842309925"
+        },
+        "extra_files": [],
+        "warnings": [],
+        "node_id": "node-id-verification-1"
+      }
+    ],
+    "nfc_verifications": null,
+    "liveness_checks": [
+      {
+        "status": "Approved",
+        "liveness_score": 0.98,
+        "face_image": "https://cdn.didit.me/test/e3e982e6-f3b2-4a39-8e10-50ba9f7df5f8/liveness.jpg",
+        "node_id": "node-liveness-1"
+      }
+    ],
+    "face_matches": [
+      {
+        "status": "Approved",
+        "face_match_score": 0.94,
+        "similarity_percentage": 94,
+        "node_id": "node-face-match-1"
+      }
+    ],
+    "poa_verifications": null,
+    "phone_verifications": null,
+    "email_verifications": null,
+    "aml_screenings": [
+      {
+        "status": "Approved",
+        "total_hits": 0,
+        "screened_data": {
+          "full_name": "John Michael Smith",
+          "date_of_birth": "1988-03-15"
+        },
+        "hits": [],
+        "is_ongoing_monitoring_enabled": false,
+        "ongoing_monitoring_last_check": null,
+        "node_id": "node-aml-1"
+      }
+    ],
+    "ip_analyses": [
+      {
+        "ip_address": "85.123.45.67",
+        "country": "ESP",
+        "country_name": "Spain",
+        "city": "Madrid",
+        "region": "Community of Madrid",
+        "latitude": 40.4168,
+        "longitude": -3.7038,
+        "is_vpn": false,
+        "is_proxy": false,
+        "is_tor": false,
+        "is_datacenter": false,
+        "risk_score": 5,
+        "node_id": "node-ip-analysis-1"
+      }
+    ],
+    "database_validations": null,
+    "questionnaire_responses": null,
+    "reviews": [
+      {
+        "user": "admin@company.com",
+        "new_status": "Approved",
+        "comment": null,
+        "created_at": "2024-01-15T10:35:00.000000Z"
+      }
+    ],
+    "contact_details": null,
+    "expected_details": null,
+    "created_at": "2024-01-15T10:30:00.000000Z"
+  }
+}
+Close
