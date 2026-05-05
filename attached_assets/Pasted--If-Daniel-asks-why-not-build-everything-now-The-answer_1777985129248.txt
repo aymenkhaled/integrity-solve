@@ -1,0 +1,106 @@
+
+If Daniel asks why not build everything now
+The answer should be simple: the product is promising, but the smartest next step is to
+validate the core commercial behavior before committing to a full platform build. The first
+milestone proves the thing Daniel specifically asked for: guided flows that trigger checks,
+receive results, produce outputs, and preserve an audit trail.
+13. High-Impact Features for Later
+These features should be mentioned as future differentiation, not included in Milestone 1.
+- Case Story / Audit Narrative: a human-readable explanation of service, party, checks,
+result, decision, and reason.
+- Provider Cost Simulator: estimate Didit cost before running checks based on workflow and
+party count.
+- Compliance Evidence Pack: export a regulator-ready pack with documents, decisions,
+training, checks, and audit trail.
+- Compliance Debt Score: show overdue reviews, unresolved escalations, stale program
+sections, and missing evidence.
+- Program Diff / Review Pack: show what changed when AML program data is updated.
+- Weekly Compliance Pulse: short dashboard/email summary of urgent items and completed
+compliance progress.
+- Reusable Verified Party Graph: reuse legally safe verified UBO/officer/person data across
+related cases.
+- Smart Ongoing Monitoring: scheduled re-screening, review due dates, ownership changes, and
+monitoring alerts.
+- Client-Facing CDD Portal: branded external link for customers to submit CDD, BO, and
+source-of-funds information.
+14. Suggested Client Message
+Hi Daniel,
+Thank you - that feedback is very helpful. I agree that the next step should focus less on
+adding static screens and more on proving wizard-led flows.
+My recommendation is to use the current prototype as a starting point and build a focused first
+paid milestone around one program-side wizard and one transaction/CDD wizard, with Didit-ready
+integration points. The goal would be to show the system identifying the designated service,
+who the service is being provided for, then guiding the user through verification, screening,
+approval/escalation, result capture, PDF/case output, and audit trail.
+For Didit, I would prepare the integration in a way that supports hosted sessions, webhooks,
+result normalization and case attachment. The main items to confirm are sandbox credentials,
+workflow IDs, webhook payloads, PDF/result availability, pricing, and Australia-specific KYB
+coverage.
+Because I already prepared the first prototype before the engagement, I can keep the first paid
+milestone lean and fixed. My suggested first milestone is US$2,500, focused only on validating
+the wizard-led flow and Didit integration model, not the full production platform.
+Best regards,
+Ahmed
+15. Appendix - Upwork Scope Language
+The following language can be adapted into the Upwork milestone description so the scope is
+clear before Daniel funds the work.
+Milestone title
+Integrity Solve AML/CTF Portal - Wizard-led Flow + Didit-ready Integration Proof
+Page 6 of 8
+Milestone description
+Use the existing prototype as a foundation and build a focused proof of one program-side wizard
+flow and one transaction/CDD wizard flow. The milestone will demonstrate guided question flow,
+conditional routing, recommended verification/screening steps, Didit-ready check
+request/session handling, webhook/result capture pattern, a simple case summary/PDF output, and
+audit trail events.
+Deliverables to list on Upwork
+- One program-side wizard proof for business profile and designated service applicability.
+- One transaction/CDD wizard proof for designated service, party type, risk triggers,
+recommended checks, and escalation path.
+- Minimal backend/data layer for cases, wizard progress, check requests, webhook events,
+normalized results, audit logs, and case outputs.
+- Didit-ready integration shell using mock mode first, with configuration for sandbox/live
+mode when credentials are provided.
+- Webhook receiver pattern with signature verification, duplicate protection, result
+normalization, and case update logic.
+- Readable case summary and basic PDF/case output foundation.
+- Short handover note listing what is done, what is mocked, and what needs Daniel/Didit
+confirmation.
+Acceptance wording
+Milestone is complete when Daniel can review a working guided program flow and a working guided
+transaction/CDD flow, see a mock or sandbox Didit-style result return into the case, view the
+audit trail, and generate a basic case summary/PDF output.
+Out-of-scope wording
+- This milestone does not include the full production platform.
+- This milestone does not include final AML/CTF legal advice or legal responsibility for
+rule wording.
+- This milestone does not include full Stripe billing/subscription implementation.
+- This milestone does not include complete role/permission coverage for every user type.
+- This milestone does not include production Didit launch unless Daniel provides all
+required credentials, workflow IDs, payload samples, and approvals.
+- This milestone does not include full document template production, evidence retention
+policy, penetration testing, or security audit.
+Change control wording
+Any request outside the listed deliverables should be handled as a written scope change or a
+new milestone. This keeps the first paid stage focused, reviewable, and fair for both sides.
+16. Source Notes
+- Source project documents reviewed: scope/wireframe spec, technical architecture, provider
+integration matrix, permissions matrix, workflow transition matrix, developer backlog/data
+model, previous implementation plan, first paid milestone draft, and Daniel’s written
+feedback.
+- Didit official documentation reviewed: API full flow, webhooks, KYB integration guide, and
+pricing.
+- Upwork pricing context reviewed: fixed-price versus hourly contracts, general web
+developer rates, and full-stack developer rate ranges.
+- The follow-up meeting PDF appears to be visual/outlined text and was not reliably text-
+extractable without OCR.
+Links
+- Didit API full flow: https://docs.didit.me/integration/api-full-flow
+Page 7 of 8
+- Didit webhooks: https://docs.didit.me/integration/webhooks
+- Didit KYB integration guide: https://docs.didit.me/business-verification/integration-guide
+- Didit pricing: https://docs.didit.me/getting-started/pricing
+- Upwork fixed vs hourly: https://support.upwork.com/hc/en-us/articles/211063418-Hourly-vs-
+Fixed-Price-Projects
+- Upwork web developer rates: https://research.upwork.com/hire/web-developers/cost/
+- Upwork full-stack developer rates: https://www.upwork.com/hire/full-stack-developers/

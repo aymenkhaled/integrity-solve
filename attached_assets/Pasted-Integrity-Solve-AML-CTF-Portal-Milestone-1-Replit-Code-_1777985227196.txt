@@ -1,0 +1,2084 @@
+Integrity Solve AML/CTF Portal - Milestone 1 Replit Code Pack
+
+Detailed implementation specification and reference code for Wizard-led Flow + Didit-ready Integration Proof.
+
+1. Purpose
+
+This pack turns Daniel's feedback into a buildable first paid milestone. It is intentionally scoped to prove working wizard-led flows and Didit-ready integration points. It is not the full production portal.
+
+2. Milestone 1 Acceptance Criteria
+
+- A user can create a case.
+
+- A user can start, save, resume, and complete a program-side wizard proof.
+
+- A user can start, save, resume, and complete a transaction/CDD wizard proof.
+
+- The transaction wizard routes from designated service and party type to recommended VOI/KYC/KYB/AML checks.
+
+- The backend can create a Didit check request in mock mode and later sandbox/live mode.
+
+- Didit webhooks can be received, signature-checked, deduplicated, normalized, and attached to the case.
+
+- A case summary endpoint returns service, party, checks, results, decision, and audit timeline.
+
+- A simple PDF case pack can be generated for demo/review.
+
+- Audit logs are written for wizard progress, check creation, webhook processing, result update, and decisions.
+
+3. Replit Setup
+
+Use the current MVP codebase if available. If the actual codebase is not available, use the included reference scaffold as the Milestone 1 backend layer. Add the secrets below through Replit Secrets, never hardcode provider secrets in source.
+
+DATABASE_URL=postgresql://user:password@host:5432/integrity_solve
+
+APP_URL=https://your-replit-deployment-url.replit.app
+
+DIDIT_MODE=mock
+
+DIDIT_API_KEY=
+
+DIDIT_WEBHOOK_SECRET=
+
+DIDIT_WORKFLOW_ID_KYC=
+
+DIDIT_WORKFLOW_ID_KYB=
+
+PORT=3000
+
+4. API Surface
+
+Endpoint
+
+Purpose
+
+POST /api/cases
+
+Create a program setup or transaction/CDD case.
+
+POST /api/wizard/start
+
+Start a wizard run for an existing case.
+
+PATCH /api/wizard/:id/step
+
+Save a wizard step, merge answers, and calculate route result.
+
+POST /api/didit/session
+
+Create or reuse a Didit check request and return hosted verification URL.
+
+POST /api/webhooks/didit
+
+Receive Didit status/data events, verify signature, deduplicate, normalize, and update case.
+
+GET /api/cases/:id/summary
+
+Return case, check requests, results, and audit trail.
+
+GET /api/cases/:id/pdf
+
+Return a simple case summary PDF.
+
+5. Routing Rules
+
+- Program wizard proves business profile and designated service applicability.
+
+- Transaction wizard starts with designated service and who the service is provided for.
+
+- Individual or beneficial owner routes to KYC and AML screening.
+
+- Company or trust routes to KYB and company AML.
+
+- Unknown beneficial owners, complex ownership, PEP, adverse media, high-risk jurisdiction, or source-of-funds triggers route to reviewer/compliance officer.
+
+- Two or more escalation signals produce high risk; one signal produces medium risk; no signal produces low risk.
+
+6. Didit Integration Rules
+
+- Use hosted sessions for user-facing KYC/KYB where possible.
+
+- Use vendor_data = check_request_id so webhooks can map back to the portal record.
+
+- Include workspace_id, case_id, and capability in Didit metadata.
+
+- Support DIDIT_MODE=mock until Daniel provides sandbox credentials.
+
+- Use DIDIT_WORKFLOW_ID_KYC for kyc/aml_screening and DIDIT_WORKFLOW_ID_KYB for kyb/company_aml.
+
+- For webhooks, try X-Signature-V2 first, then X-Signature-Simple fallback.
+
+- Reject stale timestamps older than 5 minutes unless running explicit mock/local tests.
+
+- Deduplicate webhook events by provider + external_event_id and return 200 no-op for duplicates.
+
+- Normalize Didit statuses into passed, failed, review_required, processing, or error.
+
+- Do not bill, approve, or legally clear a customer solely from a raw provider payload without client-approved rules.
+
+7. Database Schema
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+
+CREATE TABLE IF NOT EXISTS cases (
+
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  workspace_id UUID NOT NULL,
+
+  case_type TEXT NOT NULL CHECK (case_type IN ('program_setup', 'transaction_cdd')),
+
+  status TEXT NOT NULL DEFAULT 'draft',
+
+  title TEXT NOT NULL,
+
+  designated_service TEXT,
+
+  party_type TEXT,
+
+  risk_level TEXT DEFAULT 'not_assessed',
+
+  recommendation TEXT,
+
+  created_by UUID,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+);
+
+
+CREATE TABLE IF NOT EXISTS wizard_runs (
+
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  workspace_id UUID NOT NULL,
+
+  case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+
+  wizard_type TEXT NOT NULL CHECK (wizard_type IN ('program_setup', 'transaction_cdd')),
+
+  status TEXT NOT NULL DEFAULT 'in_progress',
+
+  current_step TEXT NOT NULL,
+
+  answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  route_result JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  created_by UUID,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  completed_at TIMESTAMPTZ
+
+);
+
+
+CREATE TABLE IF NOT EXISTS wizard_steps (
+
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  wizard_run_id UUID NOT NULL REFERENCES wizard_runs(id) ON DELETE CASCADE,
+
+  step_key TEXT NOT NULL,
+
+  status TEXT NOT NULL DEFAULT 'completed',
+
+  answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE (wizard_run_id, step_key)
+
+);
+
+
+CREATE TABLE IF NOT EXISTS check_requests (
+
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  workspace_id UUID NOT NULL,
+
+  case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+
+  provider TEXT NOT NULL DEFAULT 'didit',
+
+  capability TEXT NOT NULL CHECK (capability IN ('kyc', 'kyb', 'aml_screening', 'company_aml')),
+
+  status TEXT NOT NULL DEFAULT 'queued',
+
+  idempotency_key TEXT NOT NULL,
+
+  provider_request_id TEXT,
+
+  session_url TEXT,
+
+  workflow_id TEXT,
+
+  vendor_data TEXT,
+
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  created_by UUID,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE (workspace_id, idempotency_key)
+
+);
+
+
+CREATE TABLE IF NOT EXISTS check_results (
+
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  check_request_id UUID NOT NULL REFERENCES check_requests(id) ON DELETE CASCADE,
+
+  provider_request_id TEXT,
+
+  status TEXT NOT NULL,
+
+  decision TEXT NOT NULL,
+
+  normalized_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  completed_at TIMESTAMPTZ,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+);
+
+
+CREATE TABLE IF NOT EXISTS webhook_events (
+
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  provider TEXT NOT NULL DEFAULT 'didit',
+
+  external_event_id TEXT NOT NULL,
+
+  event_type TEXT NOT NULL,
+
+  provider_request_id TEXT,
+
+  signature_valid BOOLEAN NOT NULL DEFAULT false,
+
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+  processed_at TIMESTAMPTZ,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE (provider, external_event_id)
+
+);
+
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  workspace_id UUID NOT NULL,
+
+  actor_user_id UUID,
+
+  entity_type TEXT NOT NULL,
+
+  entity_id UUID,
+
+  action TEXT NOT NULL,
+
+  detail TEXT,
+
+  before_json JSONB,
+
+  after_json JSONB,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+);
+
+
+CREATE TABLE IF NOT EXISTS case_outputs (
+
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+  workspace_id UUID NOT NULL,
+
+  case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+
+  output_type TEXT NOT NULL CHECK (output_type IN ('summary', 'pdf')),
+
+  content TEXT NOT NULL,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+);
+
+8. Replit Files
+
+.replit
+
+run = "npm run dev"
+
+entrypoint = "src/server/app.ts"
+
+
+[nix]
+
+channel = "stable-24_05"
+
+
+[deployment]
+
+run = ["sh", "-c", "npm run start"]
+
+deploymentTarget = "cloudrun"
+
+replit.nix
+
+{ pkgs }: {
+
+  deps = [
+
+    pkgs.nodejs_20
+
+    pkgs.nodePackages.npm
+
+    pkgs.postgresql
+
+  ];
+
+}
+
+package.json
+
+{
+
+  "name": "integrity-solve-milestone1-reference",
+
+  "version": "1.0.0",
+
+  "private": true,
+
+  "type": "module",
+
+  "scripts": {
+
+    "dev": "tsx watch src/server/app.ts",
+
+    "start": "node dist/server/app.js",
+
+    "build": "tsc -p tsconfig.json",
+
+    "db:migrate": "psql \"$DATABASE_URL\" -f src/server/db/schema.sql",
+
+    "test:webhook": "tsx scripts/test-didit-webhook.ts",
+
+    "test:routing": "tsx scripts/test-routing.ts"
+
+  },
+
+  "dependencies": {
+
+    "cors": "^2.8.5",
+
+    "dotenv": "^16.4.5",
+
+    "express": "^4.19.2",
+
+    "pg": "^8.12.0",
+
+    "zod": "^3.23.8"
+
+  },
+
+  "devDependencies": {
+
+    "@types/cors": "^2.8.17",
+
+    "@types/express": "^4.17.21",
+
+    "@types/node": "^20.14.10",
+
+    "@types/pg": "^8.11.6",
+
+    "tsx": "^4.16.2",
+
+    "typescript": "^5.5.3"
+
+  }
+
+}
+
+9. Core Server Code
+
+src/server/db/db.ts
+
+import pg from 'pg';
+
+
+const { Pool } = pg;
+
+
+export const pool = new Pool({
+
+  connectionString: process.env.DATABASE_URL
+
+});
+
+
+export async function query<T = any>(text: string, params: unknown[] = []): Promise<T[]> {
+
+  const result = await pool.query(text, params);
+
+  return result.rows as T[];
+
+}
+
+
+export async function one<T = any>(text: string, params: unknown[] = []): Promise<T | null> {
+
+  const rows = await query<T>(text, params);
+
+  return rows[0] ?? null;
+
+}
+
+
+export async function audit(input: {
+
+  workspaceId: string;
+
+  actorUserId?: string;
+
+  entityType: string;
+
+  entityId?: string;
+
+  action: string;
+
+  detail?: string;
+
+  before?: unknown;
+
+  after?: unknown;
+
+}) {
+
+  await query(
+
+    `INSERT INTO audit_logs
+
+      (workspace_id, actor_user_id, entity_type, entity_id, action, detail, before_json, after_json)
+
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
+
+    [
+
+      input.workspaceId,
+
+      input.actorUserId ?? null,
+
+      input.entityType,
+
+      input.entityId ?? null,
+
+      input.action,
+
+      input.detail ?? null,
+
+      input.before ? JSON.stringify(input.before) : null,
+
+      input.after ? JSON.stringify(input.after) : null
+
+    ]
+
+  );
+
+}
+
+src/server/services/workflow-router.service.ts
+
+export type ProgramAnswers = {
+
+  industryPathway?: string;
+
+  businessStructure?: string;
+
+  staffCount?: number;
+
+  locations?: string[];
+
+  designatedServices?: string[];
+
+  existingAmlProgram?: boolean;
+
+  complianceOfficerNamed?: boolean;
+
+};
+
+
+export type TransactionAnswers = {
+
+  designatedService?: string;
+
+  providedFor?: 'individual' | 'company' | 'trust' | 'beneficial_owner';
+
+  customerIsNew?: boolean;
+
+  beneficialOwnersKnown?: boolean;
+
+  highRiskJurisdiction?: boolean;
+
+  politicallyExposedPerson?: boolean;
+
+  adverseMedia?: boolean;
+
+  complexOwnership?: boolean;
+
+  sourceOfFundsRequired?: boolean;
+
+};
+
+
+export function routeProgramWizard(answers: ProgramAnswers) {
+
+  const missing: string[] = [];
+
+  if (!answers.industryPathway) missing.push('industry pathway');
+
+  if (!answers.designatedServices?.length) missing.push('designated services');
+
+  if (!answers.complianceOfficerNamed) missing.push('compliance officer appointment');
+
+
+  const riskSignals = [
+
+    (answers.designatedServices?.length ?? 0) > 1 ? 'multiple designated services' : null,
+
+    (answers.locations?.length ?? 0) > 1 ? 'multiple office locations' : null,
+
+    answers.existingAmlProgram === false ? 'no existing AML/CTF program' : null
+
+  ].filter(Boolean) as string[];
+
+
+  return {
+
+    completionStatus: missing.length ? 'incomplete' : 'ready_for_summary',
+
+    missing,
+
+    recommendedNextStep: missing.length ? 'continue_program_setup' : 'generate_program_routing_summary',
+
+    riskSignals,
+
+    outputs: [
+
+      'business profile summary',
+
+      'designated service applicability summary',
+
+      'initial AML/CTF program setup checklist'
+
+    ]
+
+  };
+
+}
+
+
+export function routeTransactionWizard(answers: TransactionAnswers) {
+
+  const checks: string[] = [];
+
+  const escalations: string[] = [];
+
+
+  if (answers.providedFor === 'individual' || answers.providedFor === 'beneficial_owner') {
+
+    checks.push('kyc', 'aml_screening');
+
+  }
+
+
+  if (answers.providedFor === 'company' || answers.providedFor === 'trust') {
+
+    checks.push('kyb', 'company_aml');
+
+    if (answers.beneficialOwnersKnown === false || answers.complexOwnership) {
+
+      escalations.push('beneficial ownership review required');
+
+    }
+
+  }
+
+
+  if (answers.politicallyExposedPerson) escalations.push('PEP review required');
+
+  if (answers.adverseMedia) escalations.push('adverse media review required');
+
+  if (answers.highRiskJurisdiction) escalations.push('high-risk jurisdiction review required');
+
+  if (answers.sourceOfFundsRequired) escalations.push('source of funds/source of wealth evidence required');
+
+
+  const riskLevel =
+
+    escalations.length >= 2 ? 'high' :
+
+    escalations.length === 1 ? 'medium' :
+
+    'low';
+
+
+  return {
+
+    riskLevel,
+
+    recommendedChecks: [...new Set(checks)],
+
+    approvalPath: escalations.length ? 'reviewer_or_compliance_officer_required' : 'standard_cdd_can_proceed',
+
+    escalations,
+
+    caseSummaryInputs: [
+
+      'designated service',
+
+      'party type',
+
+      'recommended checks',
+
+      'risk triggers',
+
+      'reviewer decision',
+
+      'audit timeline'
+
+    ]
+
+  };
+
+}
+
+src/server/services/didit.service.ts
+
+export type DiditCapability = 'kyc' | 'kyb' | 'aml_screening' | 'company_aml';
+
+
+export type CreateDiditSessionInput = {
+
+  capability: DiditCapability;
+
+  checkRequestId: string;
+
+  workspaceId: string;
+
+  caseId: string;
+
+  callbackUrl: string;
+
+  contactDetails?: {
+
+    email?: string;
+
+    phone?: string;
+
+  };
+
+};
+
+
+export type DiditSessionResult = {
+
+  providerRequestId: string;
+
+  verificationUrl: string;
+
+  workflowId: string;
+
+  raw: unknown;
+
+};
+
+
+const DIDIT_BASE_URL = 'https://verification.didit.me';
+
+
+function workflowIdFor(capability: DiditCapability) {
+
+  if (capability === 'kyb' || capability === 'company_aml') {
+
+    return process.env.DIDIT_WORKFLOW_ID_KYB;
+
+  }
+
+  return process.env.DIDIT_WORKFLOW_ID_KYC;
+
+}
+
+
+export async function createDiditSession(input: CreateDiditSessionInput): Promise<DiditSessionResult> {
+
+  const mode = process.env.DIDIT_MODE ?? 'mock';
+
+  const workflowId = workflowIdFor(input.capability);
+
+
+  if (mode === 'mock') {
+
+    return {
+
+      providerRequestId: `mock_${input.checkRequestId}`,
+
+      verificationUrl: `${process.env.APP_URL ?? 'http://localhost:3000'}/mock-didit/${input.checkRequestId}`,
+
+      workflowId: workflowId ?? `mock_${input.capability}_workflow`,
+
+      raw: {
+
+        mode,
+
+        status: 'Not Started',
+
+        session_id: `mock_${input.checkRequestId}`,
+
+        verification_url: `${process.env.APP_URL ?? 'http://localhost:3000'}/mock-didit/${input.checkRequestId}`
+
+      }
+
+    };
+
+  }
+
+
+  if (!process.env.DIDIT_API_KEY) throw new Error('Missing DIDIT_API_KEY');
+
+  if (!workflowId) throw new Error(`Missing Didit workflow ID for ${input.capability}`);
+
+
+  const response = await fetch(`${DIDIT_BASE_URL}/v3/session/`, {
+
+    method: 'POST',
+
+    headers: {
+
+      'Content-Type': 'application/json',
+
+      'x-api-key': process.env.DIDIT_API_KEY
+
+    },
+
+    body: JSON.stringify({
+
+      workflow_id: workflowId,
+
+      callback: input.callbackUrl,
+
+      vendor_data: input.checkRequestId,
+
+      metadata: {
+
+        workspace_id: input.workspaceId,
+
+        case_id: input.caseId,
+
+        capability: input.capability
+
+      },
+
+      contact_details: input.contactDetails
+
+    })
+
+  });
+
+
+  const body = await response.json().catch(async () => ({ raw: await response.text() }));
+
+  if (!response.ok) {
+
+    throw new Error(`Didit session failed: ${response.status} ${JSON.stringify(body)}`);
+
+  }
+
+
+  return {
+
+    providerRequestId: body.session_id,
+
+    verificationUrl: body.verification_url,
+
+    workflowId,
+
+    raw: body
+
+  };
+
+}
+
+src/server/services/diditWebhook.service.ts
+
+import crypto from 'crypto';
+
+
+function timingSafeEqualHex(a: string, b: string) {
+
+  const aa = Buffer.from(a, 'utf8');
+
+  const bb = Buffer.from(b, 'utf8');
+
+  return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+
+}
+
+
+function sortKeys(value: any): any {
+
+  if (Array.isArray(value)) return value.map(sortKeys);
+
+  if (value && typeof value === 'object') {
+
+    return Object.keys(value).sort().reduce((acc: Record<string, any>, key) => {
+
+      acc[key] = sortKeys(value[key]);
+
+      return acc;
+
+    }, {});
+
+  }
+
+  return value;
+
+}
+
+
+function shortenFloats(value: any): any {
+
+  if (Array.isArray(value)) return value.map(shortenFloats);
+
+  if (value && typeof value === 'object') {
+
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shortenFloats(v)]));
+
+  }
+
+  if (typeof value === 'number' && !Number.isInteger(value) && value % 1 === 0) return Math.trunc(value);
+
+  return value;
+
+}
+
+
+export function verifyDiditWebhookV2(jsonBody: any, signature: string | undefined, timestamp: string | undefined) {
+
+  if (!signature || !timestamp || !process.env.DIDIT_WEBHOOK_SECRET) return false;
+
+  const now = Math.floor(Date.now() / 1000);
+
+  const incoming = Number.parseInt(timestamp, 10);
+
+  if (!Number.isFinite(incoming) || Math.abs(now - incoming) > 300) return false;
+
+
+  const canonicalJson = JSON.stringify(sortKeys(shortenFloats(jsonBody)));
+
+  const expected = crypto.createHmac('sha256', process.env.DIDIT_WEBHOOK_SECRET).update(canonicalJson, 'utf8').digest('hex');
+
+  return timingSafeEqualHex(expected, signature);
+
+}
+
+
+export function verifyDiditWebhookSimple(jsonBody: any, signature: string | undefined, timestamp: string | undefined) {
+
+  if (!signature || !timestamp || !process.env.DIDIT_WEBHOOK_SECRET) return false;
+
+  const now = Math.floor(Date.now() / 1000);
+
+  const incoming = Number.parseInt(timestamp, 10);
+
+  if (!Number.isFinite(incoming) || Math.abs(now - incoming) > 300) return false;
+
+
+  const canonical = [
+
+    jsonBody.timestamp ?? '',
+
+    jsonBody.session_id ?? '',
+
+    jsonBody.status ?? '',
+
+    jsonBody.webhook_type ?? ''
+
+  ].join(':');
+
+  const expected = crypto.createHmac('sha256', process.env.DIDIT_WEBHOOK_SECRET).update(canonical).digest('hex');
+
+  return timingSafeEqualHex(expected, signature);
+
+}
+
+
+export function verifyDiditWebhook(jsonBody: any, headers: Record<string, string | string[] | undefined>) {
+
+  const timestamp = header(headers, 'x-timestamp');
+
+  if (verifyDiditWebhookV2(jsonBody, header(headers, 'x-signature-v2'), timestamp)) return { valid: true, method: 'v2' };
+
+  if (verifyDiditWebhookSimple(jsonBody, header(headers, 'x-signature-simple'), timestamp)) return { valid: true, method: 'simple' };
+
+  return { valid: false, method: 'none' };
+
+}
+
+
+function header(headers: Record<string, string | string[] | undefined>, name: string) {
+
+  const value = headers[name] ?? headers[name.toLowerCase()];
+
+  return Array.isArray(value) ? value[0] : value;
+
+}
+
+src/server/services/normalizeDidit.ts
+
+export type NormalizedDiditDecision = {
+
+  status: 'passed' | 'failed' | 'review_required' | 'processing' | 'error';
+
+  decision: 'clear' | 'not_verified' | 'matched' | 'unresolved' | 'pending';
+
+  summary: string;
+
+  riskSignals: string[];
+
+};
+
+
+export function normalizeDiditDecision(payload: any): NormalizedDiditDecision {
+
+  const status = String(payload?.decision?.status ?? payload?.status ?? '').toLowerCase();
+
+  const aml = payload?.decision?.aml ?? payload?.decision?.company_aml;
+
+  const amlHits = Number(aml?.total_hits ?? aml?.hits?.length ?? 0);
+
+  const sessionKind = payload?.session_kind ?? payload?.data?.session_kind;
+
+
+  if (status.includes('approved')) {
+
+    if (amlHits > 0) {
+
+      return {
+
+        status: 'review_required',
+
+        decision: 'matched',
+
+        summary: `Didit approved identity/business verification but AML returned ${amlHits} possible hit(s).`,
+
+        riskSignals: ['aml_possible_match']
+
+      };
+
+    }
+
+    return {
+
+      status: 'passed',
+
+      decision: 'clear',
+
+      summary: sessionKind === 'business' ? 'Didit business verification returned approved/clear.' : 'Didit verification returned approved/clear.',
+
+      riskSignals: []
+
+    };
+
+  }
+
+
+  if (status.includes('review') || status.includes('resub')) {
+
+    return {
+
+      status: 'review_required',
+
+      decision: 'unresolved',
+
+      summary: 'Didit result requires manual review or resubmission.',
+
+      riskSignals: ['manual_review_required']
+
+    };
+
+  }
+
+
+  if (status.includes('declined') || status.includes('rejected') || status.includes('failed')) {
+
+    return {
+
+      status: 'failed',
+
+      decision: 'not_verified',
+
+      summary: 'Didit verification failed or was declined.',
+
+      riskSignals: ['verification_failed']
+
+    };
+
+  }
+
+
+  return {
+
+    status: 'processing',
+
+    decision: 'pending',
+
+    summary: 'Didit session is still pending or in progress.',
+
+    riskSignals: []
+
+  };
+
+}
+
+src/server/routes/cases.routes.ts
+
+import { Router } from 'express';
+
+import { z } from 'zod';
+
+import { audit, one, query } from '../db/db.js';
+
+
+export const casesRouter = Router();
+
+
+const CreateCaseSchema = z.object({
+
+  workspaceId: z.string().uuid(),
+
+  actorUserId: z.string().uuid().optional(),
+
+  caseType: z.enum(['program_setup', 'transaction_cdd']),
+
+  title: z.string().min(2),
+
+  designatedService: z.string().optional(),
+
+  partyType: z.string().optional()
+
+});
+
+
+casesRouter.post('/api/cases', async (req, res, next) => {
+
+  try {
+
+    const input = CreateCaseSchema.parse(req.body);
+
+    const created = await one<any>(
+
+      `INSERT INTO cases (workspace_id, created_by, case_type, title, designated_service, party_type)
+
+       VALUES ($1, $2, $3, $4, $5, $6)
+
+       RETURNING *`,
+
+      [input.workspaceId, input.actorUserId ?? null, input.caseType, input.title, input.designatedService ?? null, input.partyType ?? null]
+
+    );
+
+    await audit({
+
+      workspaceId: input.workspaceId,
+
+      actorUserId: input.actorUserId,
+
+      entityType: 'case',
+
+      entityId: created.id,
+
+      action: 'case_created',
+
+      detail: `Case created: ${input.title}`,
+
+      after: created
+
+    });
+
+    res.status(201).json(created);
+
+  } catch (error) {
+
+    next(error);
+
+  }
+
+});
+
+
+casesRouter.get('/api/cases/:id/summary', async (req, res, next) => {
+
+  try {
+
+    const caseRow = await one<any>('SELECT * FROM cases WHERE id = $1', [req.params.id]);
+
+    if (!caseRow) return res.status(404).json({ error: 'Case not found' });
+
+
+    const checks = await query<any>('SELECT * FROM check_requests WHERE case_id = $1 ORDER BY created_at', [req.params.id]);
+
+    const results = await query<any>(
+
+      `SELECT cr.id AS check_request_id, r.*
+
+       FROM check_requests cr
+
+       JOIN check_results r ON r.check_request_id = cr.id
+
+       WHERE cr.case_id = $1
+
+       ORDER BY r.created_at`,
+
+      [req.params.id]
+
+    );
+
+    const auditRows = await query<any>(
+
+      `SELECT * FROM audit_logs
+
+       WHERE entity_id = $1 OR detail ILIKE $2
+
+       ORDER BY created_at`,
+
+      [req.params.id, `%${req.params.id}%`]
+
+    );
+
+
+    res.json({
+
+      case: caseRow,
+
+      checks,
+
+      results,
+
+      audit: auditRows
+
+    });
+
+  } catch (error) {
+
+    next(error);
+
+  }
+
+});
+
+src/server/routes/wizard.routes.ts
+
+import { Router } from 'express';
+
+import { z } from 'zod';
+
+import { audit, one, query } from '../db/db.js';
+
+import { routeProgramWizard, routeTransactionWizard } from '../services/workflow-router.service.js';
+
+
+export const wizardRouter = Router();
+
+
+const StartWizardSchema = z.object({
+
+  workspaceId: z.string().uuid(),
+
+  actorUserId: z.string().uuid().optional(),
+
+  caseId: z.string().uuid(),
+
+  wizardType: z.enum(['program_setup', 'transaction_cdd'])
+
+});
+
+
+const SaveStepSchema = z.object({
+
+  actorUserId: z.string().uuid().optional(),
+
+  stepKey: z.string().min(2),
+
+  answers: z.record(z.any()),
+
+  complete: z.boolean().default(false)
+
+});
+
+
+wizardRouter.post('/api/wizard/start', async (req, res, next) => {
+
+  try {
+
+    const input = StartWizardSchema.parse(req.body);
+
+    const run = await one<any>(
+
+      `INSERT INTO wizard_runs (workspace_id, case_id, wizard_type, current_step, created_by)
+
+       VALUES ($1, $2, $3, $4, $5)
+
+       RETURNING *`,
+
+      [input.workspaceId, input.caseId, input.wizardType, 'start', input.actorUserId ?? null]
+
+    );
+
+    await audit({
+
+      workspaceId: input.workspaceId,
+
+      actorUserId: input.actorUserId,
+
+      entityType: 'wizard_run',
+
+      entityId: run.id,
+
+      action: 'wizard_started',
+
+      detail: `${input.wizardType} wizard started for case ${input.caseId}`
+
+    });
+
+    res.status(201).json(run);
+
+  } catch (error) {
+
+    next(error);
+
+  }
+
+});
+
+
+wizardRouter.patch('/api/wizard/:id/step', async (req, res, next) => {
+
+  try {
+
+    const input = SaveStepSchema.parse(req.body);
+
+    const run = await one<any>('SELECT * FROM wizard_runs WHERE id = $1', [req.params.id]);
+
+    if (!run) return res.status(404).json({ error: 'Wizard run not found' });
+
+
+    const mergedAnswers = { ...(run.answers ?? {}), [input.stepKey]: input.answers };
+
+    const flattened = Object.assign({}, ...Object.values(mergedAnswers).filter(Boolean));
+
+    const routeResult = run.wizard_type === 'program_setup'
+
+      ? routeProgramWizard(flattened as any)
+
+      : routeTransactionWizard(flattened as any);
+
+
+    await query(
+
+      `INSERT INTO wizard_steps (wizard_run_id, step_key, answers)
+
+       VALUES ($1, $2, $3::jsonb)
+
+       ON CONFLICT (wizard_run_id, step_key)
+
+       DO UPDATE SET answers = EXCLUDED.answers, updated_at = NOW()`,
+
+      [run.id, input.stepKey, JSON.stringify(input.answers)]
+
+    );
+
+
+    const updated = await one<any>(
+
+      `UPDATE wizard_runs
+
+       SET answers = $1::jsonb,
+
+           route_result = $2::jsonb,
+
+           current_step = $3,
+
+           status = CASE WHEN $4 THEN 'completed' ELSE status END,
+
+           completed_at = CASE WHEN $4 THEN NOW() ELSE completed_at END,
+
+           updated_at = NOW()
+
+       WHERE id = $5
+
+       RETURNING *`,
+
+      [JSON.stringify(mergedAnswers), JSON.stringify(routeResult), input.stepKey, input.complete, run.id]
+
+    );
+
+
+    await audit({
+
+      workspaceId: run.workspace_id,
+
+      actorUserId: input.actorUserId,
+
+      entityType: 'wizard_run',
+
+      entityId: run.id,
+
+      action: input.complete ? 'wizard_completed' : 'wizard_step_saved',
+
+      detail: `Wizard step saved: ${input.stepKey}`,
+
+      after: { step: input.stepKey, routeResult }
+
+    });
+
+
+    res.json(updated);
+
+  } catch (error) {
+
+    next(error);
+
+  }
+
+});
+
+src/server/routes/didit.routes.ts
+
+import { Router } from 'express';
+
+import { z } from 'zod';
+
+import crypto from 'crypto';
+
+import { audit, one, query } from '../db/db.js';
+
+import { createDiditSession } from '../services/didit.service.js';
+
+import { verifyDiditWebhook } from '../services/diditWebhook.service.js';
+
+import { normalizeDiditDecision } from '../services/normalizeDidit.js';
+
+
+export const diditRouter = Router();
+
+
+const CreateCheckSchema = z.object({
+
+  workspaceId: z.string().uuid(),
+
+  actorUserId: z.string().uuid().optional(),
+
+  caseId: z.string().uuid(),
+
+  capability: z.enum(['kyc', 'kyb', 'aml_screening', 'company_aml']),
+
+  subjectId: z.string().optional(),
+
+  contactDetails: z.object({
+
+    email: z.string().email().optional(),
+
+    phone: z.string().optional()
+
+  }).optional()
+
+});
+
+
+function idempotencyKey(input: z.infer<typeof CreateCheckSchema>) {
+
+  return crypto
+
+    .createHash('sha256')
+
+    .update([input.workspaceId, input.caseId, input.capability, input.subjectId ?? 'primary'].join(':'))
+
+    .digest('hex');
+
+}
+
+
+diditRouter.post('/api/didit/session', async (req, res, next) => {
+
+  try {
+
+    const input = CreateCheckSchema.parse(req.body);
+
+    const key = idempotencyKey(input);
+
+
+    let check = await one<any>(
+
+      `INSERT INTO check_requests (workspace_id, case_id, capability, idempotency_key, vendor_data, created_by, metadata)
+
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+
+       ON CONFLICT (workspace_id, idempotency_key)
+
+       DO UPDATE SET updated_at = NOW()
+
+       RETURNING *`,
+
+      [
+
+        input.workspaceId,
+
+        input.caseId,
+
+        input.capability,
+
+        key,
+
+        'pending',
+
+        input.actorUserId ?? null,
+
+        JSON.stringify({ subject_id: input.subjectId ?? null })
+
+      ]
+
+    );
+
+
+    if (check.provider_request_id && check.session_url) {
+
+      return res.json({ checkRequest: check, reused: true, verificationUrl: check.session_url });
+
+    }
+
+
+    const session = await createDiditSession({
+
+      capability: input.capability,
+
+      checkRequestId: check.id,
+
+      workspaceId: input.workspaceId,
+
+      caseId: input.caseId,
+
+      callbackUrl: `${process.env.APP_URL}/verification-complete`,
+
+      contactDetails: input.contactDetails
+
+    });
+
+
+    check = await one<any>(
+
+      `UPDATE check_requests
+
+       SET status = 'processing',
+
+           provider_request_id = $1,
+
+           session_url = $2,
+
+           workflow_id = $3,
+
+           vendor_data = $4,
+
+           metadata = metadata || $5::jsonb,
+
+           updated_at = NOW()
+
+       WHERE id = $6
+
+       RETURNING *`,
+
+      [
+
+        session.providerRequestId,
+
+        session.verificationUrl,
+
+        session.workflowId,
+
+        check.id,
+
+        JSON.stringify({ didit_raw: session.raw }),
+
+        check.id
+
+      ]
+
+    );
+
+
+    await audit({
+
+      workspaceId: input.workspaceId,
+
+      actorUserId: input.actorUserId,
+
+      entityType: 'check_request',
+
+      entityId: check.id,
+
+      action: 'didit_session_created',
+
+      detail: `Didit ${input.capability} session created for case ${input.caseId}`,
+
+      after: check
+
+    });
+
+
+    res.status(201).json({ checkRequest: check, verificationUrl: session.verificationUrl });
+
+  } catch (error) {
+
+    next(error);
+
+  }
+
+});
+
+
+diditRouter.post('/api/webhooks/didit', async (req, res, next) => {
+
+  try {
+
+    const payload = req.body;
+
+    const verification = verifyDiditWebhook(payload, req.headers);
+
+    if (!verification.valid && process.env.DIDIT_MODE !== 'mock') {
+
+      return res.status(401).json({ error: 'Invalid Didit webhook signature' });
+
+    }
+
+
+    const externalEventId = payload.webhook_id ?? payload.event_id ?? `${payload.session_id}:${payload.webhook_type}:${payload.status}`;
+
+    const providerRequestId = payload.session_id ?? payload.business_session_id ?? payload?.decision?.session_id;
+
+
+    const event = await one<any>(
+
+      `INSERT INTO webhook_events (provider, external_event_id, event_type, provider_request_id, signature_valid, payload)
+
+       VALUES ('didit', $1, $2, $3, $4, $5::jsonb)
+
+       ON CONFLICT (provider, external_event_id)
+
+       DO NOTHING
+
+       RETURNING *`,
+
+      [externalEventId, payload.webhook_type ?? payload.event_type ?? 'unknown', providerRequestId ?? null, verification.valid, JSON.stringify(payload)]
+
+    );
+
+
+    if (!event) {
+
+      return res.status(200).json({ duplicate: true });
+
+    }
+
+
+    const check = await one<any>(
+
+      `SELECT * FROM check_requests
+
+       WHERE provider = 'didit'
+
+       AND (provider_request_id = $1 OR id::text = $2 OR vendor_data = $2)
+
+       LIMIT 1`,
+
+      [providerRequestId ?? null, payload.vendor_data ?? '']
+
+    );
+
+
+    if (!check) {
+
+      await query('UPDATE webhook_events SET processed_at = NOW() WHERE id = $1', [event.id]);
+
+      return res.status(202).json({ received: true, unresolved: true });
+
+    }
+
+
+    const normalized = normalizeDiditDecision(payload);
+
+    await query(
+
+      `INSERT INTO check_results
+
+       (check_request_id, provider_request_id, status, decision, normalized_payload, raw_payload, completed_at)
+
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, CASE WHEN $3 IN ('passed','failed','review_required') THEN NOW() ELSE NULL END)`,
+
+      [check.id, providerRequestId ?? null, normalized.status, normalized.decision, JSON.stringify(normalized), JSON.stringify(payload)]
+
+    );
+
+
+    await query('UPDATE check_requests SET status = $1, updated_at = NOW() WHERE id = $2', [normalized.status, check.id]);
+
+    await query('UPDATE webhook_events SET processed_at = NOW() WHERE id = $1', [event.id]);
+
+
+    await audit({
+
+      workspaceId: check.workspace_id,
+
+      entityType: 'check_request',
+
+      entityId: check.id,
+
+      action: 'didit_webhook_processed',
+
+      detail: normalized.summary,
+
+      after: normalized
+
+    });
+
+
+    res.json({ processed: true, normalized });
+
+  } catch (error) {
+
+    next(error);
+
+  }
+
+});
+
+src/server/routes/pdf.routes.ts
+
+import { Router } from 'express';
+
+import { query, one } from '../db/db.js';
+
+
+export const pdfRouter = Router();
+
+
+function escapePdf(text: string) {
+
+  return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+
+}
+
+
+function simplePdf(lines: string[]) {
+
+  const objects: string[] = [];
+
+  const pageText = lines.map((line, i) => `BT /F1 10 Tf 50 ${740 - i * 16} Td (${escapePdf(line)}) Tj ET`).join('\n');
+
+  const stream = pageText;
+
+  objects.push('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj');
+
+  objects.push('2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj');
+
+  objects.push('3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj');
+
+  objects.push(`4 0 obj << /Length ${Buffer.byteLength(stream)} >> stream\n${stream}\nendstream endobj`);
+
+  objects.push('5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj');
+
+  let pdf = '%PDF-1.4\n';
+
+  const offsets = [0];
+
+  for (const object of objects) {
+
+    offsets.push(Buffer.byteLength(pdf));
+
+    pdf += object + '\n';
+
+  }
+
+  const xref = Buffer.byteLength(pdf);
+
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+
+  for (const offset of offsets.slice(1)) pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+
+  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+
+  return Buffer.from(pdf);
+
+}
+
+
+pdfRouter.get('/api/cases/:id/pdf', async (req, res, next) => {
+
+  try {
+
+    const caseRow = await one<any>('SELECT * FROM cases WHERE id = $1', [req.params.id]);
+
+    if (!caseRow) return res.status(404).json({ error: 'Case not found' });
+
+    const checks = await query<any>('SELECT * FROM check_requests WHERE case_id = $1 ORDER BY created_at', [req.params.id]);
+
+    const results = await query<any>(
+
+      `SELECT r.* FROM check_requests cr JOIN check_results r ON r.check_request_id = cr.id WHERE cr.case_id = $1 ORDER BY r.created_at`,
+
+      [req.params.id]
+
+    );
+
+    const auditRows = await query<any>('SELECT action, detail, created_at FROM audit_logs WHERE workspace_id = $1 ORDER BY created_at DESC LIMIT 15', [caseRow.workspace_id]);
+
+
+    const lines = [
+
+      'Integrity Solve - Case Summary Pack',
+
+      `Case: ${caseRow.title}`,
+
+      `Status: ${caseRow.status}`,
+
+      `Designated service: ${caseRow.designated_service ?? 'not set'}`,
+
+      `Party type: ${caseRow.party_type ?? 'not set'}`,
+
+      `Risk level: ${caseRow.risk_level ?? 'not assessed'}`,
+
+      '',
+
+      'Checks',
+
+      ...checks.map((c) => `${c.capability}: ${c.status} (${c.provider_request_id ?? 'no provider id yet'})`),
+
+      '',
+
+      'Results',
+
+      ...results.map((r) => `${r.status}: ${r.decision}`),
+
+      '',
+
+      'Audit timeline',
+
+      ...auditRows.map((a) => `${a.created_at}: ${a.action} - ${a.detail ?? ''}`)
+
+    ].slice(0, 42);
+
+
+    res.setHeader('Content-Type', 'application/pdf');
+
+    res.setHeader('Content-Disposition', `attachment; filename="case-${caseRow.id}.pdf"`);
+
+    res.send(simplePdf(lines));
+
+  } catch (error) {
+
+    next(error);
+
+  }
+
+});
+
+src/server/app.ts
+
+import 'dotenv/config';
+
+import express from 'express';
+
+import cors from 'cors';
+
+import { casesRouter } from './routes/cases.routes.js';
+
+import { wizardRouter } from './routes/wizard.routes.js';
+
+import { diditRouter } from './routes/didit.routes.js';
+
+import { pdfRouter } from './routes/pdf.routes.js';
+
+
+const app = express();
+
+
+app.use(cors());
+
+app.use(express.json({ limit: '2mb' }));
+
+
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
+app.use(casesRouter);
+
+app.use(wizardRouter);
+
+app.use(diditRouter);
+
+app.use(pdfRouter);
+
+
+app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+
+  console.error(error);
+
+  res.status(400).json({
+
+    error: error?.message ?? 'Request failed',
+
+    issues: error?.issues
+
+  });
+
+});
+
+
+const port = Number(process.env.PORT ?? 3000);
+
+app.listen(port, '0.0.0.0', () => {
+
+  console.log(`Integrity Solve Milestone 1 API listening on ${port}`);
+
+});
+
+10. Test Scripts
+
+scripts/test-routing.ts
+
+import { routeProgramWizard, routeTransactionWizard } from '../src/server/services/workflow-router.service.js';
+
+
+const program = routeProgramWizard({
+
+  industryPathway: 'real_estate',
+
+  designatedServices: ['property_sale'],
+
+  existingAmlProgram: false,
+
+  complianceOfficerNamed: true
+
+});
+
+
+const transaction = routeTransactionWizard({
+
+  designatedService: 'property_sale',
+
+  providedFor: 'company',
+
+  beneficialOwnersKnown: false,
+
+  highRiskJurisdiction: true
+
+});
+
+
+console.log(JSON.stringify({ program, transaction }, null, 2));
+
+if (transaction.riskLevel !== 'high') throw new Error('Expected high-risk transaction route');
+
+if (!transaction.recommendedChecks.includes('kyb')) throw new Error('Expected KYB check');
+
+scripts/test-didit-webhook.ts
+
+import crypto from 'crypto';
+
+import { verifyDiditWebhookV2, verifyDiditWebhookSimple } from '../src/server/services/diditWebhook.service.js';
+
+import { normalizeDiditDecision } from '../src/server/services/normalizeDidit.js';
+
+
+process.env.DIDIT_WEBHOOK_SECRET = process.env.DIDIT_WEBHOOK_SECRET || 'test_secret';
+
+
+const timestamp = String(Math.floor(Date.now() / 1000));
+
+const payload = {
+
+  timestamp: Number(timestamp),
+
+  session_id: 'session_123',
+
+  status: 'Approved',
+
+  webhook_type: 'status.updated',
+
+  vendor_data: 'check_request_uuid',
+
+  decision: {
+
+    status: 'Approved',
+
+    aml: { total_hits: 0 }
+
+  }
+
+};
+
+
+function sortKeys(value: any): any {
+
+  if (Array.isArray(value)) return value.map(sortKeys);
+
+  if (value && typeof value === 'object') {
+
+    return Object.keys(value).sort().reduce((acc: Record<string, any>, key) => {
+
+      acc[key] = sortKeys(value[key]);
+
+      return acc;
+
+    }, {});
+
+  }
+
+  return value;
+
+}
+
+
+const v2Body = JSON.stringify(sortKeys(payload));
+
+const v2 = crypto.createHmac('sha256', process.env.DIDIT_WEBHOOK_SECRET).update(v2Body).digest('hex');
+
+const simpleBase = [payload.timestamp, payload.session_id, payload.status, payload.webhook_type].join(':');
+
+const simple = crypto.createHmac('sha256', process.env.DIDIT_WEBHOOK_SECRET).update(simpleBase).digest('hex');
+
+
+if (!verifyDiditWebhookV2(payload, v2, timestamp)) throw new Error('V2 signature should pass');
+
+if (!verifyDiditWebhookSimple(payload, simple, timestamp)) throw new Error('Simple signature should pass');
+
+
+console.log(normalizeDiditDecision(payload));
+
+11. Manual Test Scenarios
+
+- Create a transaction case for an individual. Save wizard answers. Confirm recommended checks include kyc and aml_screening.
+
+- Create a transaction case for a company with unknown beneficial owners and high-risk jurisdiction. Confirm recommended checks include kyb and company_aml, risk is high, and review is required.
+
+- Create a Didit session in mock mode. Confirm a check_request is created with vendor_data equal to the check request ID.
+
+- Send a valid mock webhook payload. Confirm check_results, check_requests status, webhook_events, and audit_logs are updated.
+
+- Send the same webhook twice. Confirm the second call returns duplicate true and does not create another result.
+
+- Send an invalid signature in sandbox/live mode. Confirm the endpoint returns 401 and no result is created.
+
+- Open the case summary endpoint. Confirm it includes service, party, checks, results, and audit timeline.
+
+- Open the PDF endpoint. Confirm the generated PDF contains the readable case summary.
+
+12. Build Tasks
+
+Block
+
+Work
+
+Estimate
+
+1
+
+Import current MVP into Replit, confirm stack, install dependencies, configure secrets, connect database.
+
+0.5-1 day
+
+2
+
+Add minimal data model and migration for cases, wizard runs, checks, webhooks, results, outputs, and audit.
+
+1 day
+
+3
+
+Build program-side wizard proof and routing summary.
+
+2-3 days
+
+4
+
+Build transaction/CDD wizard proof and recommended-check routing.
+
+2-3 days
+
+5
+
+Build Didit mock/sandbox shell, session creation, webhook endpoint, signature verification, dedupe, normalizer.
+
+2-3 days
+
+6
+
+Build summary/PDF output and demo polish.
+
+1-2 days
+
+7
+
+Run tests, prepare handover notes, list unresolved client/Didit questions.
+
+1 day
+
+13. Exclusions
+
+- No full Stripe billing implementation in Milestone 1.
+
+- No final legal responsibility for AML/CTF interpretation.
+
+- No complete RBAC matrix across every role.
+
+- No production Didit unless Daniel provides credentials, workflow IDs, webhook samples, and the workflow is simple.
+
+- No full document template library.
+
+- No penetration test or formal compliance/security audit.
+
+14. Source Links
+
+- Didit API full flow: https://docs.didit.me/integration/api-full-flow
+
+- Didit webhooks: https://docs.didit.me/integration/webhooks
+
+- Didit KYB integration guide: https://docs.didit.me/business-verification/integration-guide
+
+- Didit pricing: https://docs.didit.me/getting-started/pricing
+
+- Upwork fixed vs hourly: https://support.upwork.com/hc/en-us/articles/211063418-Hourly-vs-Fixed-Price-Projects
+
+- Upwork web developer rates: https://research.upwork.com/hire/web-developers/cost/
+
+- Upwork full-stack developer rates: https://www.upwork.com/hire/full-stack-developers/
