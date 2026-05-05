@@ -1,0 +1,136 @@
+Replit Agent Prompt - Verify and Finish Milestone 1 After Codex Push
+Paste this into Replit Agent inside the existing integrity-solve Replit project after pulling the latest GitHub commit.
+
+Goal
+Continue from the latest GitHub code pushed by Codex. Do not rebuild the project from scratch. Do not add unrelated static screens. Finish Milestone 1 by verifying and tightening the connected workflow:
+
+Case -> Wizard -> Customer/Program -> Didit session -> Webhook/mock result -> Check request/result -> Reviewer decision -> Task/escalation -> Evidence pack/PDF -> Audit trail.
+
+First Actions
+Pull latest code from GitHub.
+Run npm install.
+Confirm Replit Secrets exist:
+DATABASE_URL
+SESSION_SECRET
+APP_URL
+DIDIT_MODE
+DIDIT_API_KEY if using sandbox/live
+DIDIT_WORKFLOW_ID_KYC if using sandbox/live KYC
+DIDIT_WORKFLOW_ID_KYB if using sandbox/live KYB
+DIDIT_WEBHOOK_SECRET if using sandbox/live webhooks
+Optional: DIDIT_BASE_URL, default https://verification.didit.me
+Run npm run db:push.
+Run all verification commands:
+npm run typecheck
+npm run build
+node scripts/test-api.mjs
+node scripts/test-milestone1.mjs
+Do not stop after one failing command. Diagnose, fix, rerun, and report exact final results.
+
+What Codex Already Implemented
+Added DIDIT provider enum and validator support.
+Added didit_sessions.session_token.
+Added indexes for didit_results.didit_session_id, didit_results.provider_request_id, and case_outputs.case_id.
+Added unique guard for case_outputs(case_id, output_type).
+Fixed program case completion so the short case wizard creates/links a valid full AML program form with currentStep between 0 and 12, not 13.
+Stored 5-step case intake in program_forms.formData.case_intake.
+Added Case Detail button to continue to /programs/:id/wizard.
+Added customer creation from transaction case details.
+Blocks Didit sessions until a transaction case has a linked customer.
+Didit session now creates linked check_requests with provider DIDIT.
+Didit webhook/mock completion creates linked check_results.
+Added safe GET /api/providers/didit/config-status.
+Case Detail now reads Didit mode from backend instead of hardcoded mock mode.
+Mock Complete is only shown in mock mode.
+Sandbox/live mode shows hosted Didit verification link when verificationUrl exists.
+Added /verification-complete frontend route.
+Reviewer decision is role-gated and supports:
+approve_proceed
+request_more_info
+escalate_officer
+request_more_info creates a linked case task.
+escalate_officer creates or links an escalation.
+Evidence pack and PDF now include customer, program form, wizard runs, Didit sessions/results, check requests/results, reviewer decision, tasks, escalation, and audit.
+Cases list now has search/filter behavior for large lists.
+Milestone 1 test script was extended for the connected workflow.
+Must Verify Manually In Browser
+Create Program Setup case.
+Complete the 5-step case program wizard.
+Confirm Case Detail shows linked AML program.
+Click Continue Full AML Program Wizard.
+Confirm it opens /programs/:id/wizard.
+Create Transaction/CDD case.
+Complete the transaction wizard.
+Confirm Checks tab blocks Didit with: Link or create customer before starting Didit checks.
+Create customer from case.
+Start recommended Didit check.
+In mock mode, use Mock Complete.
+In sandbox/live mode, open hosted Didit verification link.
+Confirm result appears in the case summary.
+Record request_more_info and confirm task creation.
+Record escalate_officer and confirm escalation is linked.
+Generate evidence pack.
+Download PDF and confirm all important sections are readable.
+Didit Sandbox/Live Setup
+Use hosted Didit sessions as the primary integration path.
+
+Create or log in to Didit business console.
+Create organization.
+Create one KYC workflow:
+identity verification
+liveness/face match if available
+AML screening if included in workflow
+Create one KYB workflow:
+business verification
+company screening
+UBO/officer collection or screening if available
+Copy:
+API key
+KYC workflow ID
+KYB workflow ID
+webhook secret
+Add Replit Secrets:
+DIDIT_MODE=sandbox or DIDIT_MODE=live
+DIDIT_API_KEY=...
+DIDIT_WORKFLOW_ID_KYC=...
+DIDIT_WORKFLOW_ID_KYB=...
+DIDIT_WEBHOOK_SECRET=...
+APP_URL=https://actual-replit-deployment-url
+DIDIT_BASE_URL=https://verification.didit.me
+Configure Didit webhook URL:
+https://actual-replit-deployment-url/api/providers/didit/webhook
+Never expose the Didit API key in frontend code, logs, PDF, audit output, or test output.
+
+Webhook Requirements To Verify
+X-Signature-V2 is verified first.
+X-Signature-Simple is fallback.
+Sandbox/live rejects invalid or stale signatures.
+Mock mode can process unsigned mock events only.
+Duplicate webhook events return 200 no-op.
+Raw webhook event is stored.
+Result statuses normalize safely:
+Approved -> passed / clear
+Declined -> failed / not_verified
+In Review -> review_required / unresolved
+Abandoned, Expired, Cancelled, Timeout -> failed / not_verified unless official Didit payload requires different policy
+Important Constraints
+Keep existing auth/session/workspace model.
+Keep existing 13-step AML program wizard.
+Keep existing customer, escalation, task, audit, and provider architecture.
+No Stripe/billing work in this milestone.
+No new unrelated diamond features until Milestone 1 is fully green.
+All tenant data must remain workspace-scoped.
+Every mutation must write audit where appropriate.
+Final Response Required
+When finished, report:
+
+Exact files changed.
+Exact commands run.
+Whether npm run db:push succeeded.
+Whether npm run typecheck succeeded.
+Whether npm run build succeeded.
+Exact result of node scripts/test-api.mjs.
+Exact result of node scripts/test-milestone1.mjs.
+Didit mode tested: mock, sandbox, or live.
+Remaining limitations.
+Any Didit credentials/workflow IDs still missing.

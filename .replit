@@ -46,3 +46,10 @@ externalPort = 3001
 deploymentTarget = "autoscale"
 run = ["node", "./dist/index.cjs"]
 build = ["npm", "run", "build"]
+
+[userenv]
+
+[userenv.shared]
+DIDIT_MODE = "sandbox"
+DIDIT_BASE_URL = "https://verification.didit.me"
+APP_URL = "https://c0d7f3e1-64ac-489b-bd32-76c16fd58912-00-2d385rpt57bk1.riker.replit.dev"

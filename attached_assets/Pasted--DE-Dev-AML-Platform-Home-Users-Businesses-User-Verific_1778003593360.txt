@@ -1,0 +1,1246 @@
+
+
+DE
+Dev AML Platform
+Home
+Users
+Businesses
+
+User Verifications
+
+Business Verifications
+
+Transactions
+Workflows
+Customization
+Questionnaires
+Lists
+Reports
+
+Developers
+App Info
+App Labels
+API Keys
+Webhooks
+Notifications
+Data Retention
+
+Settings
+Business Console
+
+Toggle Sidebar
+Webhooks
+Configure endpoints to receive real-time event notifications.
+
+
+
+
+Help
+
+DE
+Dev AML Platform
+$0.00
+Webhook destinations
+Manage destinations, events, and monitor delivery performance.
+
+Test Webhook
+Add destination
+Type	Destination	Status	Webhook Version	Listening to	Activity	Response time	Error rate	
+No destinations yet
+
+Add a destination to start receiving event notifications.
+
+Didit - Business Console - App Settings
+
+Apollo
+1Password menu is available. Press down arrow to select.
+Test Webhook
+Send a test webhook to verify your integration
+
+Configuration
+
+status.updated
+
+status.updated
+
+Approved
+
+Approved
+
+All Features
+
+All Features
+Approved with all features (ID, Liveness, Face Match, AML, POA, IP Analysis)
+
+
+v3.0
+Recommended
+
+v3.0Recommended
+https://example.com/webhook
+Payload Preview
+20361 bytes
+webhook-payload.json
+JSON
+
+{
+  "created_at": 1641038400,
+  "decision": {
+    "aml_screenings": [
+      {
+        "entity_type": "person",
+        "hits": [
+          {
+            "id": "abc123xyz789",
+            "url": "https://www.example-database.org/entity/abc123",
+            "match": false,
+            "score": 0.92,
+            "target": null,
+            "caption": "John Doe Smith",
+            "datasets": [
+              "PEP"
+            ],
+            "features": null,
+            "rca_name": "",
+            "last_seen": "2025-06-13T00:00:00",
+            "risk_view": {
+              "crimes": {
+                "score": 0,
+                "weightage": 20,
+                "risk_level": "Low",
+                "risk_scores": {}
+              },
+              "countries": {
+                "score": 9.64,
+                "weightage": 30,
+                "risk_level": "Low",
+                "risk_scores": {
+                  "United States": 25.71
+                }
+              },
+              "categories": {
+                "score": 62.5,
+                "weightage": 50,
+                "risk_level": "High",
+                "risk_scores": {
+                  "PEP": 100
+                }
+              },
+              "custom_list": {}
+            },
+            "first_seen": "2025-01-18T00:00:00",
+            "properties": {
+              "name": [
+                "John Doe Smith"
+              ],
+              "alias": [
+                "John Doe Smith",
+                "J.D. Smith"
+              ],
+              "notes": [
+                "Example person for documentation"
+              ],
+              "title": null,
+              "gender": [
+                "male"
+              ],
+              "height": null,
+              "topics": null,
+              "weight": null,
+              "address": null,
+              "country": [
+                "United States"
+              ],
+              "website": null,
+              "eyeColor": null,
+              "keywords": null,
+              "lastName": [
+                "Doe Smith"
+              ],
+              "position": [
+                "Example Position"
+              ],
+              "religion": null,
+              "birthDate": [
+                "1990-01-15"
+              ],
+              "education": [],
+              "ethnicity": null,
+              "firstName": [
+                "John"
+              ],
+              "hairColor": null,
+              "weakAlias": null,
+              "birthPlace": [
+                "New York, NY"
+              ],
+              "modifiedAt": null,
+              "wikidataId": null,
+              "citizenship": null,
+              "nationality": [
+                "US"
+              ]
+            },
+            "match_score": 92,
+            "risk_score": 73,
+            "review_status": "False Positive",
+            "score_breakdown": {
+              "name_score": 90,
+              "name_weight": 60,
+              "name_weight_normalized": 80,
+              "name_contribution": 72,
+              "dob_score": 100,
+              "dob_weight": 25,
+              "dob_weight_normalized": 0,
+              "dob_contribution": 0,
+              "country_score": 100,
+              "country_weight": 15,
+              "country_weight_normalized": 20,
+              "country_contribution": 20,
+              "document_number_match_type": "NEUTRAL",
+              "document_number_effect": "Hit has no document number data",
+              "total_score": 92
+            },
+            "pep_matches": [
+              {
+                "aliases": [
+                  "John Doe Smith"
+                ],
+                "education": [],
+                "list_name": "Example PEP List",
+                "publisher": "Example Publisher",
+                "source_url": "https://example.com/pep-database",
+                "description": "Example PEP database for documentation purposes.",
+                "matched_name": "John Doe Smith",
+                "pep_position": "Example Position",
+                "date_of_birth": "1990-01-15",
+                "other_sources": [],
+                "place_of_birth": "New York, NY"
+              }
+            ],
+            "linked_entities": [],
+            "warning_matches": [],
+            "sanction_matches": [],
+            "adverse_media_details": null,
+            "adverse_media_matches": [],
+            "additional_information": {
+              "flag_summary": []
+            }
+          }
+        ],
+        "is_ongoing_monitoring_enabled": true,
+        "next_ongoing_monitoring_bill_date": null,
+        "node_id": "feature_aml",
+        "score": 0,
+        "screened_data": {
+          "date_of_birth": "1990-01-15",
+          "document_number": "ABC123456789",
+          "full_name": "John Doe Smith",
+          "nationality": "US"
+        },
+        "status": "Approved",
+        "total_hits": 1,
+        "warnings": []
+      }
+    ],
+    "callback": "https://your-webhook-endpoint.com/callback",
+    "contact_details": null,
+    "created_at": "2022-01-01T12:00:00Z",
+    "database_validations": [
+      {
+        "node_id": "feature_database_validation",
+        "issuing_state": "BRA",
+        "validation_type": "one_by_one",
+        "screened_data": {
+          "last_name": "Doe Smith",
+          "first_name": "John",
+          "tax_number": "01234567890",
+          "date_of_birth": "1990-01-15",
+          "document_type": "ID",
+          "expiration_date": "2035-11-26"
+        },
+        "validations": [
+          {
+            "validation": {
+              "full_name": "full_match",
+              "date_of_birth": "full_match",
+              "identification_number": "full_match"
+            },
+            "source_data": {
+              "identification_number": "01234567890",
+              "first_name": "JOHN",
+              "last_name": "DOE SMITH",
+              "date_of_birth": "1990-01-15",
+              "gender": "M",
+              "nationality": "BRA"
+            }
+          }
+        ],
+        "match_type": "full_match",
+        "status": "Approved",
+        "warnings": []
+      }
+    ],
+    "email_verifications": [
+      {
+        "breaches": [],
+        "email": "john.doe@example.com",
+        "is_breached": false,
+        "is_disposable": false,
+        "is_undeliverable": false,
+        "lifecycle": [
+          {
+            "details": {
+              "reason": null,
+              "status": "Success"
+            },
+            "fee": 0.03,
+            "timestamp": "2022-01-01T12:00:00+00:00",
+            "type": "EMAIL_VERIFICATION_MESSAGE_SENT"
+          },
+          {
+            "details": {
+              "code_tried": "123456",
+              "status": "Approved"
+            },
+            "fee": 0,
+            "timestamp": "2022-01-01T12:00:00+00:00",
+            "type": "VALID_CODE_ENTERED"
+          },
+          {
+            "details": null,
+            "fee": 0,
+            "timestamp": "2022-01-01T12:00:00+00:00",
+            "type": "EMAIL_VERIFICATION_APPROVED"
+          }
+        ],
+        "node_id": "feature_email_verification",
+        "status": "Approved",
+        "verification_attempts": 1,
+        "verified_at": "2022-01-01T12:00:00Z",
+        "warnings": []
+      }
+    ],
+    "expected_details": null,
+    "face_matches": [
+      {
+        "node_id": "feature_face_match",
+        "score": 95.26,
+        "source_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/source-image.jpeg",
+        "source_image_session_id": null,
+        "status": "Approved",
+        "target_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-portrait-pol.jpeg",
+        "warnings": []
+      }
+    ],
+    "features": [
+      "ID_VERIFICATION",
+      "NFC",
+      "LIVENESS",
+      "FACE_MATCH",
+      "POA",
+      "QUESTIONNAIRE",
+      "EMAIL_VERIFICATION",
+      "PHONE",
+      "DATABASE_VALIDATION",
+      "AML",
+      "IP_ANALYSIS"
+    ],
+    "id_verifications": [
+      {
+        "address": "123 Main Street, Apt 4B, New York, NY 10001",
+        "age": 24,
+        "back_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-back-pol.jpeg",
+        "back_image_camera_front": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/source-image.jpeg",
+        "back_image_camera_front_face_match_score": 98.5,
+        "back_image_quality_score": {
+          "brightness_issue": "ok",
+          "brightness_score": 92.6,
+          "focus_score": 100,
+          "is_document_fully_visible": true,
+          "overall_score": 83,
+          "resolution_score": 40.9
+        },
+        "back_video": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/video.webm",
+        "date_of_birth": "1990-01-15",
+        "date_of_issue": null,
+        "document_number": "ABC123456789",
+        "document_type": "Identity Card",
+        "expiration_date": "2035-11-26",
+        "extra_fields": {
+          "first_surname": "Doe",
+          "second_surname": "Smith"
+        },
+        "extra_files": [],
+        "first_name": "John",
+        "formatted_address": "123 Main Street, New York, NY 10001, USA",
+        "front_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-front-pol.jpeg",
+        "front_image_camera_front": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/source-image.jpeg",
+        "front_image_camera_front_face_match_score": 98.5,
+        "front_image_quality_score": {
+          "brightness_issue": "ok",
+          "brightness_score": 97.9,
+          "focus_score": 100,
+          "is_document_fully_visible": true,
+          "overall_score": 84.6,
+          "resolution_score": 40.9
+        },
+        "front_video": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/video.webm",
+        "full_back_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-back-pol.jpeg",
+        "full_front_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-front-pol.jpeg",
+        "full_name": "John Doe Smith",
+        "gender": "M",
+        "issuing_state": "ESP",
+        "issuing_state_name": "Spain",
+        "last_name": "Doe Smith",
+        "marital_status": "UNKNOWN",
+        "matches": [],
+        "nationality": "ESP",
+        "node_id": "feature_ocr",
+        "parsed_address": {
+          "address_type": "Street",
+          "category": "Residential",
+          "city": "New York",
+          "country": "US",
+          "document_location": {
+            "latitude": 40.7575,
+            "longitude": -73.986
+          },
+          "formatted_address": "123 Main Street, New York, NY 10001, USA",
+          "is_verified": true,
+          "label": "Spain Identity Card Address",
+          "postal_code": "10001",
+          "raw_results": {
+            "address_components": [
+              {
+                "long_name": "123",
+                "short_name": "123",
+                "types": [
+                  "street_number"
+                ]
+              },
+              {
+                "long_name": "Main Street",
+                "short_name": "Main St",
+                "types": [
+                  "route"
+                ]
+              },
+              {
+                "long_name": "Manhattan",
+                "short_name": "Manhattan",
+                "types": [
+                  "sublocality",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "New York",
+                "short_name": "New York",
+                "types": [
+                  "locality",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "New York County",
+                "short_name": "New York County",
+                "types": [
+                  "administrative_area_level_2",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "New York",
+                "short_name": "NY",
+                "types": [
+                  "administrative_area_level_1",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "United States",
+                "short_name": "US",
+                "types": [
+                  "country",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "10001",
+                "short_name": "10001",
+                "types": [
+                  "postal_code"
+                ]
+              }
+            ],
+            "formatted_address": "123 Main Street, New York, NY 10001, USA",
+            "geometry": {
+              "bounds": {
+                "northeast": {
+                  "lat": 40.758,
+                  "lng": -73.9855
+                },
+                "southwest": {
+                  "lat": 40.757,
+                  "lng": -73.9865
+                }
+              },
+              "location": {
+                "lat": 40.7575,
+                "lng": -73.986
+              },
+              "location_type": "ROOFTOP",
+              "viewport": {
+                "northeast": {
+                  "lat": 40.759,
+                  "lng": -73.9845
+                },
+                "southwest": {
+                  "lat": 40.756,
+                  "lng": -73.9875
+                }
+              }
+            },
+            "navigation_points": [
+              {
+                "location": {
+                  "latitude": 40.7575,
+                  "longitude": -73.986
+                }
+              }
+            ],
+            "partial_match": false,
+            "place_id": "ChIJExample123456789",
+            "types": [
+              "street_address"
+            ]
+          },
+          "region": "New York",
+          "street_1": "123 Main Street",
+          "street_2": null
+        },
+        "personal_number": "123456789X",
+        "place_of_birth": "New York, NY",
+        "portrait_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-portrait-pol.jpeg",
+        "status": "Approved",
+        "warnings": []
+      }
+    ],
+    "ip_analyses": [
+      {
+        "browser_family": "Chrome",
+        "device_brand": "Desktop",
+        "device_fingerprint": null,
+        "device_model": null,
+        "id_document": {
+          "distance_from_ip": {
+            "direction": "NE",
+            "distance": 4125.5
+          },
+          "distance_from_poa_document": {
+            "direction": "N",
+            "distance": 0
+          },
+          "location": {
+            "latitude": 40.7575,
+            "longitude": -73.986
+          }
+        },
+        "ip": {
+          "distance_from_id_document": {
+            "direction": "SW",
+            "distance": 4125.5
+          },
+          "distance_from_poa_document": {
+            "direction": "SW",
+            "distance": 4125.5
+          },
+          "location": {
+            "latitude": 37.7749,
+            "longitude": -122.4194
+          }
+        },
+        "ip_address": "203.0.113.42",
+        "ip_city": "San Francisco",
+        "ip_country": "United States",
+        "ip_country_code": "US",
+        "ip_state": "California",
+        "is_data_center": false,
+        "is_vpn_or_tor": false,
+        "isp": "Example ISP Inc.",
+        "latitude": 37.7749,
+        "longitude": -122.4194,
+        "node_id": "feature_ip_analysis",
+        "organization": "Example Organization",
+        "os_family": "Windows",
+        "platform": "Windows 10",
+        "poa_document": {
+          "distance_from_id_document": {
+            "direction": "S",
+            "distance": 0
+          },
+          "distance_from_ip": {
+            "direction": "NE",
+            "distance": 4125.5
+          },
+          "location": {
+            "latitude": 40.7575,
+            "longitude": -73.986
+          }
+        },
+        "status": "Approved",
+        "time_zone": "America/Los_Angeles",
+        "time_zone_offset": -8,
+        "warnings": []
+      }
+    ],
+    "liveness_checks": [
+      {
+        "age_estimation": 27.33,
+        "face_luminance": null,
+        "face_quality": null,
+        "matches": [],
+        "method": "FLASHING",
+        "node_id": "feature_liveness",
+        "reference_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/source-image.jpeg",
+        "score": 99.03,
+        "status": "Approved",
+        "video_url": null,
+        "warnings": []
+      }
+    ],
+    "metadata": null,
+    "nfc_verifications": [
+      {
+        "authenticity": {
+          "dg_integrity": true,
+          "sod_integrity": true
+        },
+        "certificate_summary": {
+          "issuer": "Common Name: CSCA SPAIN, Serial Number: 3, Organization: DIRECCION GENERAL DE LA POLICIA, Country: ES",
+          "not_valid_after": "2031-02-18 10:21:11",
+          "not_valid_before": "2020-11-18 10:21:11",
+          "serial_number": 1.1812083616449413e+38,
+          "subject": "Common Name: DS n-eID SPAIN 2, Organizational Unit: PASSPORT, Organization: DIRECCION GENERAL DE LA POLICIA, Country: ES"
+        },
+        "chip_data": {
+          "address": "123 MAIN STREET, APT 4B, NEW YORK, NY 10001",
+          "birth_date": "1990-01-15",
+          "birth_date_hash": "0",
+          "country": "ESP",
+          "dgs": [
+            "DG1",
+            "DG2",
+            "DG7",
+            "DG11"
+          ],
+          "document_number": "ABC123456789",
+          "document_number_hash": "5",
+          "document_type": "ID",
+          "expiry_date": "2035-11-26",
+          "expiry_date_hash": "6",
+          "final_hash": "7",
+          "mrz_string": "IDUSAABC123456789123456789X<<<<<<9001150M3512315USA<<<<<<<<<<<0DOE<SMITH<<JOHN<<<<<<<<<<<<<",
+          "mrz_type": "TD1",
+          "name": "JOHN",
+          "nationality": "ESP",
+          "optional_data": "123456789X",
+          "optional_data_hash": "",
+          "place_of_birth": "NEW YORK, NY",
+          "sex": "M",
+          "surname": "DOE SMITH"
+        },
+        "node_id": "feature_nfc",
+        "portrait_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-portrait-pol.jpeg",
+        "signature_image": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-portrait-pol.jpeg",
+        "status": "Approved",
+        "warnings": []
+      }
+    ],
+    "phone_verifications": [
+      {
+        "carrier": {
+          "name": "John Doe Smith",
+          "type": "mobile"
+        },
+        "country_code": "ES",
+        "country_name": "Spain",
+        "full_number": "+15551234567",
+        "is_disposable": false,
+        "is_virtual": false,
+        "lifecycle": [
+          {
+            "details": {
+              "actual_channel": "whatsapp",
+              "channel": "whatsapp",
+              "reason": null,
+              "status": "Success"
+            },
+            "fee": 0.0595,
+            "timestamp": "2022-01-01T12:00:00+00:00",
+            "type": "PHONE_VERIFICATION_MESSAGE_SENT"
+          },
+          {
+            "details": {
+              "channel": "whatsapp",
+              "status": "delivered"
+            },
+            "fee": 0,
+            "timestamp": "2022-01-01T12:00:00+00:00",
+            "type": "PHONE_DELIVERY_DELIVERED"
+          },
+          {
+            "details": {
+              "code_tried": "123456",
+              "status": "Approved"
+            },
+            "fee": 0,
+            "timestamp": "2022-01-01T12:00:00+00:00",
+            "type": "VALID_CODE_ENTERED"
+          },
+          {
+            "details": null,
+            "fee": 0,
+            "timestamp": "2022-01-01T12:00:00+00:00",
+            "type": "PHONE_VERIFICATION_APPROVED"
+          }
+        ],
+        "node_id": "feature_phone_verification",
+        "phone_number": "5551234567",
+        "phone_number_prefix": "+1",
+        "status": "Approved",
+        "verification_attempts": 1,
+        "verification_method": "whatsapp",
+        "verified_at": "2022-01-01T12:00:00Z",
+        "warnings": []
+      }
+    ],
+    "poa_verifications": [
+      {
+        "document_file": "https://didit-public-assets.s3.eu-west-1.amazonaws.com/webhooks/id-front-pol.jpeg",
+        "document_language": "es",
+        "document_metadata": {
+          "content_type": "application/pdf",
+          "creation_date": "2021-12-16T14:08:53-06:00",
+          "file_size": 416698,
+          "modified_date": "2021-12-16T14:08:53-06:00"
+        },
+        "document_type": "UTILITY_BILL",
+        "expected_details_address": null,
+        "expected_details_formatted_address": null,
+        "expected_details_parsed_address": null,
+        "expiration_date": "2021-12-27",
+        "extra_fields": {
+          "additional_names": [],
+          "bank_account_number": null,
+          "bank_branch_address": null,
+          "bank_branch_name": null,
+          "bank_iban": null,
+          "bank_routing_number": null,
+          "bank_sort_code": null,
+          "bank_swift_bic": null,
+          "document_phone_number": null
+        },
+        "extra_files": [],
+        "issue_date": "2021-12-16",
+        "issuer": "Comisión Federal de Electricidad",
+        "issuing_state": "MEX",
+        "name_match_score_expected_details": null,
+        "name_match_score_id_verification": 36.8421052631579,
+        "name_on_document": "JOHN DOE SMITH",
+        "node_id": "feature_proof_of_address",
+        "poa_address": "123 Main Street, Apt 4B, New York, NY 10001",
+        "poa_formatted_address": "123 Main Street, New York, NY 10001, USA",
+        "poa_parsed_address": {
+          "address_type": "Street",
+          "category": "Residential",
+          "city": "New York",
+          "country": "US",
+          "document_location": {
+            "latitude": 40.7575,
+            "longitude": -73.986
+          },
+          "formatted_address": "123 Main Street, New York, NY 10001, USA",
+          "id": "e182543a-4279-4175-b85c-8d504ac8cc7d",
+          "is_best_match": false,
+          "is_verified": true,
+          "label": "Mexico UTILITY_BILL Address",
+          "postal_code": "10001",
+          "raw_results": {
+            "address_components": [
+              {
+                "long_name": "123",
+                "short_name": "123",
+                "types": [
+                  "street_number"
+                ]
+              },
+              {
+                "long_name": "Main Street",
+                "short_name": "Main St",
+                "types": [
+                  "route"
+                ]
+              },
+              {
+                "long_name": "Manhattan",
+                "short_name": "Manhattan",
+                "types": [
+                  "sublocality",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "New York",
+                "short_name": "New York",
+                "types": [
+                  "locality",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "New York County",
+                "short_name": "New York County",
+                "types": [
+                  "administrative_area_level_2",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "New York",
+                "short_name": "NY",
+                "types": [
+                  "administrative_area_level_1",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "United States",
+                "short_name": "US",
+                "types": [
+                  "country",
+                  "political"
+                ]
+              },
+              {
+                "long_name": "10001",
+                "short_name": "10001",
+                "types": [
+                  "postal_code"
+                ]
+              }
+            ],
+            "formatted_address": "123 Main Street, New York, NY 10001, USA",
+            "geometry": {
+              "bounds": {
+                "northeast": {
+                  "lat": 40.758,
+                  "lng": -73.9855
+                },
+                "southwest": {
+                  "lat": 40.757,
+                  "lng": -73.9865
+                }
+              },
+              "location": {
+                "lat": 40.7575,
+                "lng": -73.986
+              },
+              "location_type": "ROOFTOP",
+              "viewport": {
+                "northeast": {
+                  "lat": 40.759,
+                  "lng": -73.9845
+                },
+                "southwest": {
+                  "lat": 40.756,
+                  "lng": -73.9875
+                }
+              }
+            },
+            "navigation_points": [
+              {
+                "location": {
+                  "latitude": 40.7575,
+                  "longitude": -73.986
+                }
+              }
+            ],
+            "partial_match": false,
+            "place_id": "ChIJExample123456789",
+            "types": [
+              "street_address"
+            ]
+          },
+          "region": "New York",
+          "street_1": "123 Main Street",
+          "street_2": null
+        },
+        "status": "Approved",
+        "warnings": []
+      }
+    ],
+    "questionnaire_responses": [
+      {
+        "default_language": "en",
+        "description": "Reply to this questionnaire to help us understand the source of funds.",
+        "is_active": true,
+        "is_simple_questionnaire": false,
+        "languages": [
+          "en",
+          "es",
+          "ar",
+          "bn",
+          "hy",
+          "bg",
+          "ca",
+          "zh",
+          "zh-CN",
+          "zh-TW",
+          "hr",
+          "cs",
+          "da",
+          "nl",
+          "et",
+          "fi",
+          "fr",
+          "ka",
+          "de",
+          "el",
+          "he",
+          "hi",
+          "hu",
+          "id",
+          "it",
+          "ja",
+          "ko",
+          "ky",
+          "kk",
+          "lv",
+          "lt",
+          "mk",
+          "ms",
+          "cnr",
+          "no",
+          "fa",
+          "pl",
+          "pt",
+          "pt-BR",
+          "ro",
+          "ru",
+          "sr",
+          "sk",
+          "sl",
+          "bs",
+          "so",
+          "sq",
+          "sv",
+          "th",
+          "tr",
+          "uk",
+          "uz",
+          "vi"
+        ],
+        "node_id": "feature_questionnaire",
+        "published_at": null,
+        "questionnaire_group_id": "0c2417a3-50db-4541-bc6a-c94adf2098e8",
+        "questionnaire_id": "0c2417a3-50db-4541-bc6a-c94adf2098e8",
+        "sections": [
+          {
+            "description": null,
+            "items": [
+              {
+                "answer": {
+                  "value": "salary"
+                },
+                "choices": [
+                  {
+                    "label": "Salary",
+                    "value": "salary"
+                  },
+                  {
+                    "label": "Business Income",
+                    "value": "business_income"
+                  },
+                  {
+                    "label": "Savings",
+                    "value": "savings"
+                  },
+                  {
+                    "label": "Investments",
+                    "value": "investments"
+                  },
+                  {
+                    "label": "Sale of Asset",
+                    "value": "sale_of_asset"
+                  },
+                  {
+                    "label": "Inheritance/Gift",
+                    "value": "inheritance_gift"
+                  },
+                  {
+                    "label": "Pension",
+                    "value": "pension"
+                  },
+                  {
+                    "label": "Crypto Proceeds",
+                    "value": "crypto_proceeds"
+                  },
+                  {
+                    "label": "Other",
+                    "requires_text_input": true,
+                    "value": "other"
+                  }
+                ],
+                "description": null,
+                "element_type": "DROPDOWN",
+                "is_required": true,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "What is your primary source of funds?",
+                "uuid": "817cb646-0086-48ba-a36a-53bbf5cdea5b",
+                "value": "primary_source"
+              },
+              {
+                "answer": {
+                  "value": "Test answer"
+                },
+                "choices": null,
+                "description": null,
+                "element_type": "LONG_TEXT",
+                "is_required": true,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "Provide details of the primary source.",
+                "uuid": "1abffe98-9782-4613-b4e1-c1992fa07e79",
+                "value": "source_details"
+              },
+              {
+                "answer": {
+                  "value": "<25k"
+                },
+                "choices": [
+                  {
+                    "label": "Less than $25,000",
+                    "value": "<25k"
+                  },
+                  {
+                    "label": "$25,000 - $50,000",
+                    "value": "25k-50k"
+                  },
+                  {
+                    "label": "$50,001 - $100,000",
+                    "value": "50k-100k"
+                  },
+                  {
+                    "label": "$100,001 - $250,000",
+                    "value": "100k-250k"
+                  },
+                  {
+                    "label": "More than $250,000",
+                    "value": ">250k"
+                  }
+                ],
+                "description": null,
+                "element_type": "DROPDOWN",
+                "is_required": true,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "What is your annual income range (pre-tax)?",
+                "uuid": "eba0dbba-f1de-4f08-bd8a-9bbab68c2be5",
+                "value": "annual_income"
+              },
+              {
+                "answer": {
+                  "value": "<50k"
+                },
+                "choices": [
+                  {
+                    "label": "Less than $50,000",
+                    "value": "<50k"
+                  },
+                  {
+                    "label": "$50,000 - $250,000",
+                    "value": "50k-250k"
+                  },
+                  {
+                    "label": "$250,001 - $1,000,000",
+                    "value": "250k-1m"
+                  },
+                  {
+                    "label": "$1,000,001 - $5,000,000",
+                    "value": "1m-5m"
+                  },
+                  {
+                    "label": "More than $5,000,000",
+                    "value": ">5m"
+                  }
+                ],
+                "description": null,
+                "element_type": "DROPDOWN",
+                "is_required": true,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "What is your approximate net worth (range)?",
+                "uuid": "aade25f8-d048-444d-8c72-0595c4d37b66",
+                "value": "net_worth"
+              },
+              {
+                "answer": {
+                  "value": "Test answer"
+                },
+                "choices": null,
+                "description": null,
+                "element_type": "LONG_TEXT",
+                "is_required": true,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "For your initial deposit/funding, indicate the exact source and amount.",
+                "uuid": "e17eaa3d-4b4d-48ed-8852-8a0d38484c10",
+                "value": "initial_deposit_details"
+              },
+              {
+                "answer": {
+                  "value": "Test answer"
+                },
+                "choices": null,
+                "description": null,
+                "element_type": "LONG_TEXT",
+                "is_required": true,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "Breakdown of sources by percentage.",
+                "uuid": "42b16173-4208-4a1b-9766-e2d1e11c26cd",
+                "value": "sources_breakdown"
+              },
+              {
+                "answer": {
+                  "text": "Additional details",
+                  "value": "yes"
+                },
+                "choices": [
+                  {
+                    "label": "Yes",
+                    "requires_text_input": true,
+                    "value": "yes"
+                  },
+                  {
+                    "label": "No",
+                    "value": "no"
+                  }
+                ],
+                "description": null,
+                "element_type": "SINGLE_CHOICE",
+                "is_required": true,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "Will any funds originate from third parties? If yes, please provide details.",
+                "uuid": "66b171df-b738-41d3-a6ae-ff9dba487c5f",
+                "value": "third_party_funds"
+              },
+              {
+                "answer": {
+                  "text": "Additional details",
+                  "value": "yes"
+                },
+                "choices": [
+                  {
+                    "label": "Yes",
+                    "requires_text_input": true,
+                    "value": "yes"
+                  },
+                  {
+                    "label": "No",
+                    "value": "no"
+                  }
+                ],
+                "description": null,
+                "element_type": "SINGLE_CHOICE",
+                "is_required": true,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "Do you hold or plan to use virtual assets (e.g., crypto) to fund this account? If yes, please provide details.",
+                "uuid": "e5b08058-5347-403a-aca7-9141cda36684",
+                "value": "virtual_assets"
+              },
+              {
+                "answer": {
+                  "files": [
+                    "/media/ocr/",
+                    "/media/ocr/"
+                  ]
+                },
+                "choices": null,
+                "description": null,
+                "element_type": "FILE_UPLOAD",
+                "is_required": true,
+                "max_files": 3,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "Upload a proof of funds document",
+                "uuid": "c4dba41d-5cce-4f85-9d7a-c1d81cddee69",
+                "value": "proof_of_funds"
+              },
+              {
+                "answer": {
+                  "value": "Test answer"
+                },
+                "choices": null,
+                "description": null,
+                "element_type": "LONG_TEXT",
+                "is_required": false,
+                "max_files": null,
+                "placeholder": null,
+                "repeatable_config": null,
+                "required_if": null,
+                "title": "Would you like to add any details to help us expedite our review of the documents you submitted?",
+                "uuid": "f9cadbd5-511f-425f-a22a-751afe76539b",
+                "value": "additional_details"
+              }
+            ],
+            "title": null
+          }
+        ],
+        "status": "Approved",
+        "title": "Source of Funds",
+        "version": 1
+      }
+    ],
+    "reviews": [],
+    "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "session_number": 1,
+    "session_url": "https://verify.didit.me/session/abc123xyz",
+    "status": "Approved",
+    "vendor_data": "your-vendor-reference-id",
+    "workflow_id": "f0e1d2c3-b4a5-6789-0123-456789abcdef"
+  },
+  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "Approved",
+  "timestamp": 1641038400,
+  "vendor_data": "your-vendor-reference-id",
+  "webhook_type": "status.updated",
+  "workflow_id": "f0e1d2c3-b4a5-6789-0123-456789abcdef",
+  "workflow_version": 1
+}
+Close
+Send Webhook
+Close
+Mr E
