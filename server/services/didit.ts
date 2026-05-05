@@ -44,21 +44,15 @@ function getBaseUrl(): string {
 /**
  * Returns the correct workflow ID for each capability.
  *
- * NOTE: The env vars DIDIT_WORKFLOW_ID_KYC and DIDIT_WORKFLOW_ID_KYB were stored swapped
- * by the Replit Secrets UI (alphabetical ordering). The swap is corrected here in code.
- * Current mapping:
- *   DIDIT_WORKFLOW_ID_KYB env var → holds 327d9e74 (KYC+AML workflow)
- *   DIDIT_WORKFLOW_ID_KYC env var → holds fa8e7700 (KYB workflow)
- *
  * IMPORTANT: For free-tier sandbox testing (no credits required), create a KYC-ONLY
  * workflow in business.didit.me that uses ONLY: ID Verification + Liveness + Face Match.
  * Do NOT include AML Screening in that workflow — AML requires purchased credits.
  */
 function workflowIdFor(capability: DiditCapability): string {
   if (capability === 'kyb' || capability === 'company_aml') {
-    return process.env['DIDIT_WORKFLOW_ID_KYC'] ?? 'mock_kyb_workflow';
+    return process.env['DIDIT_WORKFLOW_ID_KYB'] ?? 'mock_kyb_workflow';
   }
-  return process.env['DIDIT_WORKFLOW_ID_KYB'] ?? 'mock_kyc_workflow';
+  return process.env['DIDIT_WORKFLOW_ID_KYC'] ?? 'mock_kyc_workflow';
 }
 
 function firstString(...values: unknown[]): string | null {

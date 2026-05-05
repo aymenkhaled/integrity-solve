@@ -3,12 +3,26 @@
  * Supports mock mode (DIDIT_MODE=mock) and sandbox/live mode.
  * Uses vendor_data = diditSession.id for webhook mapping.
  *
- * Bug 7 fix (Option A): mock mode returns null verificationUrl.
- * The "Mock Complete" button on case detail is the correct mechanism in mock mode.
+ * Free tier (500/mo via Workflows): kyc — ID Verification, Liveness, Face Match, IP Analysis.
+ * Paid (requires credits): aml_screening, company_aml, kyb, NFC, Database Validation.
  */
+/** Capabilities that require purchased Didit credits (not covered by free 500/mo plan) */
+export const PAID_CAPABILITIES = ['aml_screening', 'company_aml', 'kyb'];
+/** Capabilities covered by Didit's free 500 checks/month plan (KYC workflow only) */
+export const FREE_CAPABILITIES = ['kyc'];
+export function isCapabilityPaid(cap) {
+    return PAID_CAPABILITIES.includes(cap);
+}
 function getBaseUrl() {
     return process.env['DIDIT_BASE_URL'] ?? 'https://verification.didit.me';
 }
+/**
+ * Returns the correct workflow ID for each capability.
+ *
+ * IMPORTANT: For free-tier sandbox testing (no credits required), create a KYC-ONLY
+ * workflow in business.didit.me that uses ONLY: ID Verification + Liveness + Face Match.
+ * Do NOT include AML Screening in that workflow — AML requires purchased credits.
+ */
 function workflowIdFor(capability) {
     if (capability === 'kyb' || capability === 'company_aml') {
         return process.env['DIDIT_WORKFLOW_ID_KYB'] ?? 'mock_kyb_workflow';
@@ -22,6 +36,18 @@ function firstString(...values) {
     }
     return null;
 }
+/** Build a user-friendly error for "not enough credits" responses from Didit */
+function buildCreditsError(capability) {
+    if (PAID_CAPABILITIES.includes(capability)) {
+        return (`"${capability}" is a premium Didit feature that requires purchased credits. ` +
+            `Free tier only covers core KYC (ID Verification, Liveness, Face Match). ` +
+            `Top up at https://business.didit.me or set DIDIT_MODE=mock to test locally.`);
+    }
+    return (`Your KYC workflow includes paid steps (e.g. AML Screening). ` +
+        `Create a KYC-only workflow in business.didit.me → Workflows → New Workflow, ` +
+        `adding only: ID Verification + Passive Liveness + Face Match (no AML). ` +
+        `Or set DIDIT_MODE=mock to test the full flow locally without credits.`);
+}
 export async function createDiditSession(input) {
     const mode = process.env['DIDIT_MODE'] ?? 'mock';
     const workflowId = workflowIdFor(input.capability);
@@ -29,13 +55,14 @@ export async function createDiditSession(input) {
     if (mode === 'mock') {
         return {
             providerRequestId: `mock_${input.sessionId}`,
-            verificationUrl: null, // Bug 7: no fake URL — use Mock Complete button
+            verificationUrl: null,
             sessionToken: null,
             workflowId,
             raw: {
                 mode: 'mock',
                 status: 'Not Started',
                 session_id: `mock_${input.sessionId}`,
+                capability: input.capability,
                 note: 'Use the Mock Complete button in the case detail to simulate a webhook result.',
             },
         };
@@ -74,7 +101,12 @@ export async function createDiditSession(input) {
         return { error: text };
     });
     if (!response.ok) {
-        throw new Error(`Didit session creation failed: ${response.status} — ${JSON.stringify(body)}`);
+        const detail = String(body['detail'] ?? JSON.stringify(body));
+        // Detect insufficient credits and return a helpful, actionable message
+        if (detail.toLowerCase().includes('credit') || detail.toLowerCase().includes('top up')) {
+            throw new Error(`DIDIT_NO_CREDITS: ${buildCreditsError(input.capability)}`);
+        }
+        throw new Error(`Didit session creation failed: ${response.status} — ${detail}`);
     }
     const data = (body['data'] ?? {});
     return {

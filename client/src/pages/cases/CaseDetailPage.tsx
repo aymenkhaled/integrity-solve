@@ -82,6 +82,9 @@ interface DiditConfig {
   hasKycWorkflowId: boolean;
   hasKybWorkflowId: boolean;
   baseUrl: string;
+  freeCapabilities?: string[];
+  paidCapabilities?: string[];
+  consoleUrl?: string;
 }
 
 interface DiditResult {
@@ -390,6 +393,10 @@ export default function CaseDetailPage() {
   const diditMode         = diditConfig?.mode ?? 'mock';
   const isMockMode        = diditMode === 'mock';
   const canStartChecks    = !isTransaction || Boolean(customer);
+  const paidCapabilities  = diditConfig?.paidCapabilities ?? ['aml_screening', 'company_aml', 'kyb'];
+  const freeCapabilities  = diditConfig?.freeCapabilities ?? ['kyc'];
+  const isPaidCapability  = (cap: string) => !isMockMode && paidCapabilities.includes(cap);
+  const isFreeCapability  = (cap: string) => !isMockMode && freeCapabilities.includes(cap);
   const customerTypeForCase =
     caseRow.partyType === 'company' ? 'COMPANY' :
     caseRow.partyType === 'trust' ? 'TRUST' : 'INDIVIDUAL';
@@ -924,7 +931,8 @@ export default function CaseDetailPage() {
                 <div className="flex flex-wrap gap-2">
                   {recommendedChecks.map(cap => {
                     const alreadyDone = checks.some(ch => ch.capability === cap);
-                    const isPaid = !isMockMode && ['aml_screening', 'company_aml', 'kyb'].includes(cap);
+                    const isPaid = isPaidCapability(cap);
+                    const isFree = isFreeCapability(cap);
                     return (
                       <div key={cap} className="flex flex-col items-start gap-0.5">
                         <Button
@@ -941,6 +949,7 @@ export default function CaseDetailPage() {
                           <Shield className="h-3.5 w-3.5" />
                           {startingCheck === cap && createCheckMutation.isPending ? 'Starting...' : cap}
                           {alreadyDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+                          {isFree && !alreadyDone && <Badge variant="outline" className="text-[10px] px-1 py-0">free</Badge>}
                           {isPaid && !alreadyDone && <span className="text-amber-600 font-bold text-xs">$</span>}
                         </Button>
                         {isPaid && !alreadyDone && (
