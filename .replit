@@ -1,4 +1,4 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
 [nix]
 channel = "stable-25_05"
 
@@ -50,6 +50,6 @@ build = ["npm", "run", "build"]
 [userenv]
 
 [userenv.shared]
-DIDIT_MODE = "sandbox"
+DIDIT_MODE = "mock"
 DIDIT_BASE_URL = "https://verification.didit.me"
 APP_URL = "https://c0d7f3e1-64ac-489b-bd32-76c16fd58912-00-2d385rpt57bk1.riker.replit.dev"

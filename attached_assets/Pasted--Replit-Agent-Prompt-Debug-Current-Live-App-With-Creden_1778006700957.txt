@@ -1,0 +1,135 @@
+# Replit Agent Prompt - Debug Current Live App With Credentials Already Added
+
+The latest GitHub code is already pulled. The app is already running. Credentials/secrets are already added.
+
+I manually created mock data in the running app:
+- company
+- customer
+- case
+- checks
+
+Both checks failed. I need you to debug the current running app state, inspect logs and database records, find the exact root cause, fix it, and retest until the Milestone 1 workflow works correctly.
+
+Do not pull again unless needed. Do not rebuild from scratch. Do not add random static screens.
+
+## Current Goal
+
+Fix the connected flow:
+
+Case -> Wizard -> Customer/Program -> Didit session -> Webhook/mock result -> Check request/result -> Reviewer decision -> Task/escalation -> Evidence pack/PDF -> Audit trail.
+
+## Start With Evidence
+
+First inspect:
+
+- Replit console/server logs.
+- Browser console errors.
+- Network responses for failed check APIs.
+- Current Replit Secrets/config values safely, without printing secrets.
+- Database records for the failed case.
+
+Check these tables:
+
+- `cases`
+- `customers`
+- `wizard_runs`
+- `wizard_steps`
+- `didit_sessions`
+- `didit_results`
+- `check_requests`
+- `check_results`
+- `case_outputs`
+- `audit_log`
+- `tasks`
+- `escalations`
+
+Find the failed case and answer internally:
+
+- Is the case linked to the customer?
+- Is the customer individual or company?
+- Did the wizard recommend the correct checks?
+- Did a Didit session get created?
+- Did it create a linked `check_requests` row?
+- Did webhook/mock completion create `didit_results`?
+- Did webhook/mock completion create `check_results`?
+- Did status mapping mark something failed incorrectly?
+- Is `DIDIT_MODE` mock, sandbox, or live?
+- If sandbox/live, did Didit return a real error?
+- Is the frontend showing failed because backend returned failed, or because UI mapping is wrong?
+
+## Debug The Two Failed Checks
+
+For each failed check, identify:
+
+- case ID
+- customer ID
+- Didit session ID
+- capability: `kyc`, `kyb`, `aml_screening`, or `company_aml`
+- check request ID
+- check result ID if any
+- raw provider/mock response
+- normalized result
+- frontend status shown
+- exact error message
+
+Do not guess. Use logs, API responses, and DB state.
+
+## Required Fix Areas
+
+Fix whatever is actually broken, but especially verify:
+
+### Company / KYB Routing
+
+If the customer or party is company, the transaction wizard should recommend:
+
+- `kyb`
+- `company_aml`
+
+It should not only recommend individual `kyc` unless the flow is verifying a beneficial owner/controller person.
+
+### Individual / KYC Routing
+
+If the customer or party is individual, the transaction wizard should recommend:
+
+- `kyc`
+- `aml_screening` when AML screening is required
+
+### Didit Session Linkage
+
+Every Didit session started from a linked case must create:
+
+- `didit_sessions`
+- linked `check_requests` with provider `DIDIT`
+- later linked `didit_results`
+- later linked `check_results`
+
+### Mock Mode
+
+If `DIDIT_MODE=mock`:
+
+- Mock Complete must be visible.
+- Mock Complete must update the session.
+- Mock Complete must create result rows.
+- Mock Complete must not mark normal approved mock checks as failed.
+
+### Sandbox / Live Mode
+
+If `DIDIT_MODE=sandbox` or `live`:
+
+- Mock Complete must be hidden.
+- Didit hosted verification URL must appear when returned.
+- API key must never be exposed in frontend.
+- Webhook must require valid signature.
+- Failed Didit API calls must show clear safe error messages.
+- If Didit credentials/workflow IDs are wrong, report exactly which config is missing or invalid without printing secrets.
+
+## Run Required Commands
+
+After fixing, run:
+
+```bash
+npm run db:push
+npm run typecheck
+npm run build
+node scripts/test-api.mjs
+node scripts/test-milestone1.mjs
