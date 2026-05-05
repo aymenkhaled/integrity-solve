@@ -251,6 +251,46 @@ export const riskApi = {
   signals:   () => api.get('/risk/signals'),
 };
 
+// ─── Cases (Milestone 1) ──────────────────────────────────────────────────────
+
+export const casesApi = {
+  list:    ()                  => api.get('/cases'),
+  create:  (data: unknown)     => api.post('/cases', data),
+  summary: (id: string)        => api.get(`/cases/${id}/summary`),
+  pdf:     (id: string)        => `/api/cases/${id}/pdf`, // direct download URL
+};
+
+// ─── Wizard (Milestone 1) ─────────────────────────────────────────────────────
+
+export const wizardApi = {
+  start:    (data: { caseId: string; wizardType: 'PROGRAM_SETUP' | 'TRANSACTION_CDD' }) =>
+    api.post('/wizard/start', data),
+  saveStep: (id: string, data: { stepKey: string; answers: Record<string, unknown>; complete: boolean }) =>
+    api.patch(`/wizard/${id}/step`, data),
+  get:      (id: string)       => api.get(`/wizard/${id}`),
+  forCase:  (caseId: string)   => api.get(`/wizard/case/${caseId}`),
+};
+
+// ─── Didit (Milestone 1) ──────────────────────────────────────────────────────
+
+export const diditApi = {
+  createSession: (data: {
+    caseId: string;
+    capability: 'kyc' | 'kyb' | 'aml_screening' | 'company_aml';
+    subjectId?: string;
+    contactDetails?: { email?: string; phone?: string };
+    reason: string;
+  }) => api.post('/providers/didit/session', data),
+
+  sessions:     (caseId?: string) =>
+    api.get(`/providers/didit/sessions${caseId ? `?caseId=${caseId}` : ''}`),
+
+  session:      (id: string)     => api.get(`/providers/didit/sessions/${id}`),
+
+  mockComplete: (sessionId: string, outcome = 'Approved') =>
+    api.post(`/providers/didit/mock-complete/${sessionId}`, { outcome }),
+};
+
 // ─── Reviews ──────────────────────────────────────────────────────────────────
 
 export const reviewApi = {

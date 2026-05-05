@@ -12,6 +12,8 @@ import { db } from '../db.js';
 import { eq, desc, and } from 'drizzle-orm';
 import { cases, wizardRuns, diditSessions, diditResults, auditLog } from '../../shared/schema.js';
 import { createId } from '@paralleldrive/cuid2';
+import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';
+import { requireWorkspace } from '../lib/auth-session.js';
 
 export const casesRouter = Router();
 
@@ -23,17 +25,6 @@ const CreateCaseSchema = z.object({
   designatedService: z.string().optional(),
   partyType:        z.enum(['individual', 'company', 'trust', 'beneficial_owner']).optional(),
 });
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function getWorkspaceId(req: Request): string {
-  const ws = (req as unknown as Record<string, unknown>)['workspaceId'] as string | undefined;
-  return ws ?? (req.session as Record<string, unknown>)?.['workspaceId'] as string ?? '';
-}
-
-function getUserId(req: Request): string | undefined {
-  return (req.session as Record<string, unknown>)?.['userId'] as string | undefined;
-}
 
 function escapePdf(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
@@ -72,7 +63,7 @@ function buildPdf(lines: string[]): Buffer {
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 // POST /api/cases
-casesRouter.post('/api/cases', async (req: Request, res: Response, next: NextFunction) => {
+casesRouter.post('/api/cases', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const userId      = getUserId(req);
@@ -95,12 +86,14 @@ casesRouter.post('/api/cases', async (req: Request, res: Response, next: NextFun
     await db.insert(auditLog).values({
       id:          createId(),
       workspaceId,
-      actorId:     userId,
+      actorUserId: userId,
       entityType:  'case',
       entityId:    created.id,
       action:      'case_created',
-      detail:      `Case created: ${body.title} (${body.caseType})`,
-      after:       created,
+      reason:      `Case created: ${body.title} (${body.caseType})`,
+      newValue:    created,
+      requestId:   req.requestId,
+      ipAddress:   req.ip,
     });
 
     res.status(201).json({ ok: true, data: created });
@@ -108,7 +101,7 @@ casesRouter.post('/api/cases', async (req: Request, res: Response, next: NextFun
 });
 
 // GET /api/cases
-casesRouter.get('/api/cases', async (req: Request, res: Response, next: NextFunction) => {
+casesRouter.get('/api/cases', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
     if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
@@ -124,7 +117,7 @@ casesRouter.get('/api/cases', async (req: Request, res: Response, next: NextFunc
 });
 
 // GET /api/cases/:id/summary
-casesRouter.get('/api/cases/:id/summary', async (req: Request, res: Response, next: NextFunction) => {
+casesRouter.get('/api/cases/:id/summary', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
     if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });
@@ -181,7 +174,7 @@ casesRouter.get('/api/cases/:id/summary', async (req: Request, res: Response, ne
 });
 
 // GET /api/cases/:id/pdf
-casesRouter.get('/api/cases/:id/pdf', async (req: Request, res: Response, next: NextFunction) => {
+casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = getWorkspaceId(req);
     if (!workspaceId) return void res.status(401).json({ error: 'Not authenticated' });

@@ -56,6 +56,13 @@ export const env = {
   REFINITIV_API_KEY: optional('REFINITIV_API_KEY'),
   TRULIOO_API_KEY:   optional('TRULIOO_API_KEY'),
 
+  // Didit (KYC / KYB / AML verification)
+  DIDIT_MODE:             optional('DIDIT_MODE', 'mock'),         // mock | sandbox | live
+  DIDIT_API_KEY:          optional('DIDIT_API_KEY'),
+  DIDIT_WEBHOOK_SECRET:   optional('DIDIT_WEBHOOK_SECRET'),
+  DIDIT_WORKFLOW_ID_KYC:  optional('DIDIT_WORKFLOW_ID_KYC'),
+  DIDIT_WORKFLOW_ID_KYB:  optional('DIDIT_WORKFLOW_ID_KYB'),
+
   // Anthropic (AI features)
   ANTHROPIC_API_KEY: optional('ANTHROPIC_API_KEY'),
 

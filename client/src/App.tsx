@@ -34,6 +34,12 @@ import ApiGatewayPage        from '@/pages/gateway/ApiGatewayPage';
 import WhiteLabelPage        from '@/pages/whitelabel/WhiteLabelPage';
 import GroupWorkspacesPage   from '@/pages/groups/GroupWorkspacesPage';
 
+// Cases — Milestone 1
+import CasesPage                  from '@/pages/cases/CasesPage';
+import CaseDetailPage             from '@/pages/cases/CaseDetailPage';
+import CaseProgramWizardPage      from '@/pages/cases/ProgramWizardPage';
+import CaseTransactionWizardPage  from '@/pages/cases/TransactionWizardPage';
+
 // Diamond features
 import ComplianceHealthPage  from '@/pages/compliance/ComplianceHealthPage';
 import ComplianceCalendarPage from '@/pages/compliance/ComplianceCalendarPage';
@@ -113,6 +119,28 @@ export default function App() {
       <Route path="/customers">
         <ProtectedRoute>
           <AppLayout><CustomersPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Cases — Milestone 1 */}
+      <Route path="/cases/:caseId/wizard/program/:runId">
+        <ProtectedRoute>
+          <AppLayout><CaseProgramWizardPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/cases/:caseId/wizard/transaction/:runId">
+        <ProtectedRoute>
+          <AppLayout><CaseTransactionWizardPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/cases/:id">
+        <ProtectedRoute>
+          <AppLayout><CaseDetailPage /></AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/cases">
+        <ProtectedRoute>
+          <AppLayout><CasesPage /></AppLayout>
         </ProtectedRoute>
       </Route>
 

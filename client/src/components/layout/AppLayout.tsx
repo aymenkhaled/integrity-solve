@@ -8,7 +8,7 @@ import {
   Shield, LogOut, ChevronDown, CreditCard,
   BookOpen, GraduationCap, CalendarCheck, ShieldAlert,
   ChevronRight, Brain, BarChart2, ShoppingBag, Key, Palette, Network,
-  HeartPulse, CalendarDays, Activity,
+  HeartPulse, CalendarDays, Activity, FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,6 +23,7 @@ const NAV_GROUPS = [
     label: 'Core',
     items: [
       { href: '/dashboard',   label: 'Dashboard',        icon: LayoutDashboard },
+      { href: '/cases',       label: 'Cases',             icon: FolderOpen },
       { href: '/customers',   label: 'Customers',         icon: Users },
       { href: '/programs',    label: 'AML Program',       icon: FileText },
     ],
