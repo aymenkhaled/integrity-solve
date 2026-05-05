@@ -1,0 +1,271 @@
+Goal
+Implement the first paid client milestone based on Daniel's feedback:
+
+Milestone 1 - Transaction Wizard + Didit Integration Proof
+
+The existing prototype already includes:
+
+React 18 + Vite + Wouter frontend.
+Express + TypeScript backend.
+Drizzle/PostgreSQL schema in shared/schema.ts.
+Auth/session/workspace foundation.
+13-step AML program wizard.
+Customer records and beneficial owners.
+Mock check engine.
+Audit log.
+Escalations/SMR flow.
+Documents area.
+Billing stubs.
+Provider marketplace.
+Do not rebuild those from scratch. Work with the existing architecture.
+
+Client Context
+Daniel gave positive feedback but asked for less static screen expansion and more wizard-led proof. His key requirements are:
+
+Use a wizard as much as practical.
+Prove core compliance and transaction workflows.
+For transactions, identify the designated service.
+Identify who the service is being provided for.
+Guide the user through verification, screening, approval, and escalation.
+Investigate whether Didit can fit the portal flows for:
+VOI / identity verification
+KYC / AML screening
+KYB / company verification
+The portal should trigger checks, receive API/webhook results into the case, support PDF/result generation, and preserve an audit trail.
+Non-Negotiable Rules
+Keep the existing stack: React/Vite/Wouter frontend, Express backend, Drizzle schema.
+Do not introduce Next.js, NestJS, Prisma, Clerk, or a new backend framework.
+Do not rebuild existing pages unless a small adjustment is needed.
+All tenant data must remain workspace-scoped.
+All mutations must write audit logs.
+All review/approval/manual decisions must include a reason with minimum 10 characters.
+Didit must be provider-mode driven: mock | sandbox | live.
+Default to mock mode unless real Didit credentials are present.
+Do not hardcode secrets.
+Do not claim live production Didit is complete unless sandbox/live credentials and payloads are provided.
+Keep changes focused on this milestone.
+Files To Read First
+Read these before editing:
+
+replit.md
+package.json
+shared/schema.ts
+shared/enums.ts
+shared/validators.ts
+server/app.ts
+server/env.ts
+server/routes/customers.ts
+server/routes/checks.ts
+server/services/check-engine.ts
+server/routes/providers.ts
+server/routes/documents.ts
+server/lib/audit.ts
+server/lib/auth-session.ts
+server/lib/workspace-guard.ts
+client/src/App.tsx
+client/src/lib/api.ts
+client/src/pages/customers/CustomerDetailPage.tsx
+client/src/pages/customers/NewCustomerPage.tsx
+client/src/pages/programs/ProgramWizardPage.tsx
+client/src/pages/providers/ProvidersPage.tsx
+Build Scope
+1. Add Didit Provider Support
+Update the provider model/config so Didit is available without breaking existing providers.
+
+Required behavior:
+
+Add Didit provider support for:
+kyc
+kyb
+aml_screening
+company_aml
+Add environment variables in server/env.ts:
+DIDIT_MODE
+DIDIT_API_KEY
+DIDIT_WEBHOOK_SECRET
+DIDIT_WORKFLOW_ID_KYC
+DIDIT_WORKFLOW_ID_KYB
+Add Didit to provider marketplace display.
+If existing Drizzle enums block lowercase capability names, use the repo's current enum style and map internally.
+Acceptance:
+
+/api/providers shows Didit as configurable.
+Didit appears unavailable/in mock mode unless credentials are configured.
+2. Transaction/CDD Wizard
+Create a guided transaction wizard that can be reached from the customer flow or customer detail page.
+
+The wizard must ask:
+
+What designated service is being provided?
+Who is the service being provided for?
+individual
+company
+trust
+beneficial owner/controller
+Is the customer new or existing?
+Are beneficial owners known?
+Are there risk triggers?
+PEP
+adverse media
+high-risk jurisdiction
+complex ownership
+source of funds/source of wealth required
+What checks are recommended?
+Is approval/escalation required?
+Routing rules:
+
+Individual or beneficial owner -> recommend identity/KYC + AML screening.
+Company or trust -> recommend KYB + company AML.
+Unknown beneficial owners or complex ownership -> reviewer/compliance review.
+PEP, adverse media, high-risk jurisdiction, or SOF/SOW required -> reviewer/compliance review.
+Two or more risk triggers -> high risk.
+One risk trigger -> medium risk.
+No risk triggers -> low risk / standard CDD.
+Acceptance:
+
+User can complete the wizard.
+Wizard output clearly shows recommended checks and approval path.
+Wizard output is stored against the customer/case using existing schema where practical.
+Wizard actions create audit entries.
+3. Didit Session Creation
+Add a backend route for creating a Didit verification session.
+
+Preferred route:
+
+POST /api/providers/didit/session
+
+Request should include:
+
+customer ID
+capability
+optional beneficial owner/person ID if applicable
+reason
+Required logic:
+
+Validate workspace/customer ownership.
+Create or reuse a check request.
+Set vendor_data or equivalent metadata to the internal check request ID.
+In DIDIT_MODE=mock, return a fake hosted verification URL and mock provider reference.
+In sandbox/live, call Didit session creation endpoint using configured workflow ID.
+Use KYC workflow ID for identity/KYC/AML individual flows.
+Use KYB workflow ID for company/KYB flows.
+Write audit log.
+Acceptance:
+
+In mock mode, the route works without Didit credentials.
+A check request/result trace can be seen from customer detail.
+Duplicate session creation for the same customer/capability should not create accidental duplicate billable checks.
+4. Didit Webhook Handling
+Add a backend route:
+
+POST /api/providers/didit/webhook
+
+Required logic:
+
+Verify Didit webhook signature pattern.
+Try X-Signature-V2 first.
+Fall back to X-Signature-Simple.
+Reject stale timestamps older than 5 minutes outside mock/local mode.
+Deduplicate webhook events using a provider event ID/session ID.
+Return HTTP 200 no-op for duplicate webhooks.
+Map Didit session/provider reference back to internal check request using vendor_data or session/provider reference.
+Normalize status into existing check result/status model.
+Store raw payload in existing webhookEvents or check result structures.
+Write audit log.
+Acceptance:
+
+Valid mock webhook updates a check result.
+Duplicate webhook does not create duplicate result.
+Invalid signature is rejected outside mock mode.
+Unmapped webhook is stored or safely acknowledged without corrupting data.
+5. Customer Detail UI Integration
+Update existing customer detail/check UI so Daniel can see the proof clearly.
+
+Required UI:
+
+Button or action: "Start Transaction/CDD Wizard".
+Wizard result summary on the customer or case view.
+Recommended checks list.
+Didit session/check status.
+Webhook/result status.
+Audit/result timeline, even if simple.
+Do not redesign the entire customer page.
+
+Acceptance:
+
+Daniel can demo the flow from a customer record.
+The screen proves the service -> party -> checks -> result -> audit story.
+6. Case Summary Output
+Use existing documents/output foundation where possible.
+
+Create a simple case summary output that includes:
+
+customer name/entity
+designated service
+party type
+risk triggers
+recommended checks
+Didit/check status
+result/decision
+audit timeline
+reviewer/escalation requirement
+This can be text/PDF foundation for this milestone. Full DOCX/PDF template production is not required.
+
+Acceptance:
+
+User can generate or view a readable case summary.
+Output is good enough to show Daniel how result/PDF generation will work.
+Out Of Scope
+Do not build these in this milestone:
+
+Full Stripe production billing.
+Full production Didit launch without credentials.
+Complete document template library.
+Full RBAC redesign.
+Full evidence retention/storage hardening.
+New landing page.
+New unrelated diamond features.
+Full legal/compliance rule authorship.
+Suggested Implementation Approach
+Use the existing repo patterns:
+
+Server routes live under server/routes.
+Services live under server/services.
+Shared schema/enums/validators live under shared.
+Frontend API methods live in client/src/lib/api.ts.
+Frontend pages live under client/src/pages.
+Use writeAudit from server/lib/audit.ts.
+Use requireWorkspace, getWorkspaceId, getUserId, and ownership helpers.
+Use existing checkRequests, checkResults, webhookEvents, and providerConnections tables if possible.
+Only add new tables if the existing schema cannot represent the wizard output cleanly.
+If a schema change is needed:
+
+Keep it small.
+Use Drizzle schema style already in shared/schema.ts.
+Update validators/types/API client accordingly.
+Testing
+Run or create tests/smoke checks for:
+
+Transaction routing:
+individual -> identity/KYC + AML
+company -> KYB + company AML
+PEP/high-risk jurisdiction -> review required
+complex ownership -> review required
+Didit mock session creation.
+Didit missing credentials in sandbox/live mode.
+Didit webhook valid signature.
+Didit webhook invalid signature.
+Didit duplicate webhook event.
+Customer ownership/workspace isolation.
+Audit entry created for wizard save/session creation/webhook processing.
+At minimum, provide a manual test checklist if automated tests cannot be completed in the timebox.
+
+Final Response Expected From Replit Agent
+When done, provide:
+
+What changed.
+Files changed.
+How to test in Replit.
+Which parts are mock mode.
+Which Didit details Daniel still needs to provide.
+Any known limitations.
