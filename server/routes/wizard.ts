@@ -1,10 +1,10 @@
 /**
- * server/routes/wizard.ts — Milestone 1 wizard-run endpoints.
+ * server/routes/wizard.ts - Milestone 1 wizard-run endpoints.
  *
- * POST  /api/wizard/start         — start a wizard run for a case
- * PATCH /api/wizard/:id/step      — save a wizard step + get route result
- * GET   /api/wizard/:id           — get full wizard run state
- * GET   /api/wizard/case/:caseId  — get all wizard runs for a case
+ * POST  /api/wizard/start         - start a wizard run for a case
+ * PATCH /api/wizard/:id/step      - save a wizard step + get route result
+ * GET   /api/wizard/:id           - get full wizard run state
+ * GET   /api/wizard/case/:caseId  - get all wizard runs for a case
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
@@ -18,11 +18,11 @@ import {
 } from '../services/workflowRouter.js';
 import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';
 import { requireWorkspace } from '../lib/auth-session.js';
-import { NotFoundError, UnauthenticatedError } from '../lib/errors.js';
+import { ForbiddenError, NotFoundError, UnauthenticatedError } from '../lib/errors.js';
 
 export const wizardRouter = Router();
 
-// ─── Schemas ────────────────────────────────────────────────────────────────
+// --- Schemas ----------------------------------------------------------------
 
 const StartWizardSchema = z.object({
   caseId:     z.string().min(1),
@@ -35,7 +35,7 @@ const SaveStepSchema = z.object({
   complete: z.boolean().default(false),
 });
 
-// ─── Routes ─────────────────────────────────────────────────────────────────
+// --- Routes -----------------------------------------------------------------
 
 // POST /api/wizard/start
 wizardRouter.post('/api/wizard/start', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
@@ -53,6 +53,28 @@ wizardRouter.post('/api/wizard/start', requireWorkspace, async (req: Request, re
       .where(and(eq(cases.id, body.caseId), eq(cases.workspaceId, workspaceId)));
 
     if (!caseRow) return void next(new NotFoundError('Case'));
+    if (caseRow.caseType !== body.wizardType) {
+      throw new ForbiddenError(`Wizard type ${body.wizardType} does not match case type ${caseRow.caseType}`);
+    }
+
+    const initialAnswers = body.wizardType === 'TRANSACTION_CDD'
+      ? {
+          service: { designatedService: caseRow.designatedService ?? '' },
+          party: {
+            providedFor: caseRow.partyType ?? 'individual',
+            customerIsNew: !caseRow.customerId,
+            beneficialOwnersKnown: true,
+          },
+          risk: {
+            politicallyExposedPerson: false,
+            adverseMedia: false,
+            highRiskJurisdiction: false,
+            complexOwnership: false,
+            sourceOfFundsRequired: false,
+          },
+          transaction: { transactionValue: 0, currency: 'AUD' },
+        }
+      : {};
 
     const [run] = await db.insert(wizardRuns).values({
       id:          createId(),
@@ -61,7 +83,7 @@ wizardRouter.post('/api/wizard/start', requireWorkspace, async (req: Request, re
       wizardType:  body.wizardType,
       status:      'IN_PROGRESS',
       currentStep: 'start',
-      answers:     {},
+      answers:     initialAnswers,
       routeResult: {},
       createdBy:   userId,
     }).returning();
@@ -152,15 +174,16 @@ wizardRouter.patch('/api/wizard/:id/step', requireWorkspace, async (req: Request
       .where(eq(wizardRuns.id, run.id))
       .returning();
 
-    // ── On completion: update case + optionally create programForms row ──
+    // -- On completion: update case + optionally create programForms row --
 
     if (body.complete && run.wizardType === 'TRANSACTION_CDD') {
       const txResult = routeResult as ReturnType<typeof routeTransactionWizard>;
+      const [caseRow] = await db.select().from(cases).where(eq(cases.id, run.caseId)).limit(1);
       await db.update(cases)
         .set({
           riskLevel:      txResult.riskLevel,
           recommendation: txResult.approvalPath,
-          status:         'COMPLETED',
+          status:         caseRow?.customerId ? 'AWAITING_CHECKS' : 'AWAITING_CUSTOMER',
           updatedAt:      new Date(),
         })
         .where(eq(cases.id, run.caseId));

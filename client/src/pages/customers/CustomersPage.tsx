@@ -96,7 +96,7 @@ export default function CustomersPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search customers…"
+            placeholder="Search customers..."
             className="pl-9"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
@@ -111,11 +111,11 @@ export default function CustomersPage() {
           >
             <Filter className="h-3.5 w-3.5" />
             {riskFilter} risk
-            <span className="ml-1">×</span>
+            <span className="ml-1">x</span>
           </Button>
         )}
         <div className="ml-auto text-sm text-muted-foreground">
-          {isLoading ? '…' : `${total} customer${total !== 1 ? 's' : ''}`}
+          {isLoading ? '...' : `${total} customer${total !== 1 ? 's' : ''}`}
         </div>
       </div>
 
@@ -168,7 +168,7 @@ export default function CustomersPage() {
                     {items.map((customer) => {
                       const name = customer.entityName
                         || `${customer.givenNames ?? ''} ${customer.familyName ?? ''}`.trim()
-                        || '—';
+                        || '-';
                       return (
                         <tr key={customer.id} className="hover:bg-muted/30 transition-colors group">
                           <td className="px-4 py-3">
@@ -189,7 +189,7 @@ export default function CustomersPage() {
                           </td>
                           <td className="px-4 py-3">
                             <span className="text-xs text-muted-foreground capitalize">
-                              {customer.customerType?.toLowerCase().replace(/_/g, ' ') ?? '—'}
+                              {customer.customerType?.toLowerCase().replace(/_/g, ' ') ?? '-'}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -218,7 +218,7 @@ export default function CustomersPage() {
               <div className="flex items-center justify-between px-5 py-4 border-t">
                 <div className="text-sm text-muted-foreground">
                   {total} customer{total !== 1 ? 's' : ''}
-                  {riskFilter && ` · ${riskFilter} risk filter active`}
+                  {riskFilter && ` - ${riskFilter} risk filter active`}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button

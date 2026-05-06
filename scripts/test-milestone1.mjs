@@ -1,6 +1,6 @@
 /**
- * scripts/test-milestone1.mjs — Milestone 1 end-to-end API test suite.
- * Tests: Cases · Program wizard · Transaction/CDD wizard · Didit mock sessions
+ * scripts/test-milestone1.mjs - Milestone 1 end-to-end API test suite.
+ * Tests: Cases - Program wizard - Transaction/CDD wizard - Didit mock sessions
  * Run: node scripts/test-milestone1.mjs
  */
 
@@ -8,7 +8,7 @@ const BASE  = 'http://localhost:3000/api';
 const EMAIL = 'testadmin2@integritysolver.com';
 const PASS  = 'TestPass1234!';
 
-// ─── Cookie jar ──────────────────────────────────────────────────────────────
+// --- Cookie jar --------------------------------------------------------------
 const jar = new Map();
 function parseCookies(headers) {
   const raw = headers.getSetCookie?.() ?? [];
@@ -22,7 +22,7 @@ function cookieHeader() {
   return [...jar.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
 }
 
-// ─── HTTP helper ─────────────────────────────────────────────────────────────
+// --- HTTP helper -------------------------------------------------------------
 async function req(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -38,21 +38,21 @@ async function req(method, path, body) {
   return { status: res.status, data };
 }
 
-// ─── Assertions ───────────────────────────────────────────────────────────────
+// --- Assertions ---------------------------------------------------------------
 let passCount = 0, failCount = 0;
 const failures = [];
-function pass(label)         { passCount++; console.log(`  ✓ ${label}`); }
-function fail(label, detail) { failCount++; const m = `  ✗ ${label}  ↳  ${JSON.stringify(detail ?? '').slice(0,200)}`; failures.push(m); console.log(m); }
-function section(t)          { console.log(`\n${'─'.repeat(64)}\n  ${t}\n${'─'.repeat(64)}`); }
+function pass(label)         { passCount++; console.log(`  OK ${label}`); }
+function fail(label, detail) { failCount++; const m = `  FAIL ${label}  ->  ${JSON.stringify(detail ?? '').slice(0,200)}`; failures.push(m); console.log(m); }
+function section(t)          { console.log(`\n${'-'.repeat(64)}\n  ${t}\n${'-'.repeat(64)}`); }
 function ok2xx(r)            { return r.status >= 200 && r.status < 300; }
 function assert2xx(r, label) { ok2xx(r) ? pass(`${label} (HTTP ${r.status})`) : fail(label, r.data?.error ?? r.data); return ok2xx(r); }
 function idOf(r)             { return r.data?.data?.id ?? r.data?.id ?? null; }
 
-// ─── 0. Auth ─────────────────────────────────────────────────────────────────
+// --- 0. Auth -----------------------------------------------------------------
 async function testAuth() {
-  section('0. AUTH — login');
+  section('0. AUTH - login');
 
-  // Try register first (idempotent — ignore if already exists)
+  // Try register first (idempotent - ignore if already exists)
   await req('POST', '/auth/register', {
     email:         EMAIL,
     password:      PASS,
@@ -63,35 +63,43 @@ async function testAuth() {
 
   const login = await req('POST', '/auth/login', { email: EMAIL, password: PASS });
   if (!assert2xx(login, 'POST /auth/login')) {
-    console.log('\n  ⛔ Cannot proceed without auth. Aborting.\n');
+    console.log('\n  STOP Cannot proceed without auth. Aborting.\n');
     process.exit(1);
   }
   assert2xx(await req('GET', '/auth/me'), 'GET /auth/me');
 }
 
-// ─── 1. Cases CRUD ──────────────────────────────────────────────────────────
+// --- 1. Cases CRUD ----------------------------------------------------------
 let programCaseId    = null;
 let transactionCaseId = null;
 let transactionCustomerId = null;
 
 async function testCases() {
-  section('1. CASES — create, list');
+  section('1. CASES - create, list');
 
   const c1 = await req('POST', '/cases', {
     caseType: 'PROGRAM_SETUP',
-    title:    'AML Program — M1 Test Entity Pty Ltd',
+    title:    'AML Program - M1 Test Entity Pty Ltd',
   });
   assert2xx(c1, 'POST /cases (PROGRAM_SETUP)');
   programCaseId = idOf(c1);
 
   const c2 = await req('POST', '/cases', {
     caseType:          'TRANSACTION_CDD',
-    title:             'CDD — John Smith residential sale',
+    title:             'CDD - John Smith residential sale',
     designatedService: 'Real estate agency',
     partyType:         'individual',
   });
   assert2xx(c2, 'POST /cases (TRANSACTION_CDD)');
   transactionCaseId = idOf(c2);
+
+  const invalidTx = await req('POST', '/cases', {
+    caseType: 'TRANSACTION_CDD',
+    title:    'Invalid transaction case without routing inputs',
+  });
+  invalidTx.status === 422 && invalidTx.data?.error?.code === 'VALIDATION_ERROR'
+    ? pass('Transaction case requires service and party type')
+    : fail('Transaction case without service/party should be rejected', { status: invalidTx.status, data: invalidTx.data });
 
   const list = await req('GET', '/cases');
   assert2xx(list, 'GET /cases');
@@ -108,18 +116,18 @@ async function testCases() {
   // Error envelope test: case not found must return proper error shape
   const notFound = await req('GET', '/cases/nonexistent-id-xyz/summary');
   notFound.status === 404
-    ? pass('GET /cases/nonexistent → 404 with proper envelope')
+    ? pass('GET /cases/nonexistent -> 404 with proper envelope')
     : fail('GET /cases/nonexistent should 404', { status: notFound.status, data: notFound.data });
   notFound.data?.error?.code === 'NOT_FOUND'
     ? pass('404 error.code = NOT_FOUND')
     : fail('404 error.code missing or wrong', notFound.data?.error);
 }
 
-// ─── 2. Program wizard ───────────────────────────────────────────────────────
+// --- 2. Program wizard -------------------------------------------------------
 let programRunId = null;
 
 async function testProgramWizard() {
-  section('2. PROGRAM WIZARD — start & all 5 steps');
+  section('2. PROGRAM WIZARD - start & all 5 steps');
   if (!programCaseId) return fail('Program wizard', 'no caseId');
 
   const start = await req('POST', '/wizard/start', {
@@ -130,39 +138,39 @@ async function testProgramWizard() {
   programRunId = idOf(start);
   if (!programRunId) return fail('programRunId', start.data);
 
-  // Step 1 — industry
+  // Step 1 - industry
   const s1 = await req('PATCH', `/wizard/${programRunId}/step`, {
     stepKey:  'industry',
     answers:  { industryPathway: 'real_estate' },
     complete: false,
   });
-  assert2xx(s1, 'PATCH wizard/step — industry');
+  assert2xx(s1, 'PATCH wizard/step - industry');
 
-  // Step 2 — services
+  // Step 2 - services
   const s2 = await req('PATCH', `/wizard/${programRunId}/step`, {
     stepKey:  'services',
     answers:  { designatedServices: ['Real estate agency', 'International funds transfer'] },
     complete: false,
   });
-  assert2xx(s2, 'PATCH wizard/step — services');
+  assert2xx(s2, 'PATCH wizard/step - services');
 
-  // Step 3 — structure
+  // Step 3 - structure
   const s3 = await req('PATCH', `/wizard/${programRunId}/step`, {
     stepKey:  'structure',
     answers:  { businessStructure: 'company_pty', staffCount: 12, abn: '12 345 678 901' },
     complete: false,
   });
-  assert2xx(s3, 'PATCH wizard/step — structure');
+  assert2xx(s3, 'PATCH wizard/step - structure');
 
-  // Step 4 — locations
+  // Step 4 - locations
   const s4 = await req('PATCH', `/wizard/${programRunId}/step`, {
     stepKey:  'locations',
     answers:  { locations: ['Sydney NSW', 'Melbourne VIC'] },
     complete: false,
   });
-  assert2xx(s4, 'PATCH wizard/step — locations');
+  assert2xx(s4, 'PATCH wizard/step - locations');
 
-  // Step 5 — program (final)
+  // Step 5 - program (final)
   const s5 = await req('PATCH', `/wizard/${programRunId}/step`, {
     stepKey:  'program',
     answers:  {
@@ -172,7 +180,7 @@ async function testProgramWizard() {
     },
     complete: true,
   });
-  assert2xx(s5, 'PATCH wizard/step — program (complete=true)');
+  assert2xx(s5, 'PATCH wizard/step - program (complete=true)');
 
   if (ok2xx(s5)) {
     // Bug 1 fix verification: response is at res.routeResult not res.data.routeResult
@@ -224,11 +232,11 @@ async function testProgramWizard() {
   }
 }
 
-// ─── 3. Transaction wizard ───────────────────────────────────────────────────
+// --- 3. Transaction wizard ---------------------------------------------------
 let txRunId = null;
 
 async function testTransactionWizard() {
-  section('3. TRANSACTION/CDD WIZARD — start & all 4 steps');
+  section('3. TRANSACTION/CDD WIZARD - start & all 4 steps');
   if (!transactionCaseId) return fail('Transaction wizard', 'no caseId');
 
   const start = await req('POST', '/wizard/start', {
@@ -239,23 +247,23 @@ async function testTransactionWizard() {
   txRunId = idOf(start);
   if (!txRunId) return fail('txRunId', start.data);
 
-  // Step 1 — service
+  // Step 1 - service
   const s1 = await req('PATCH', `/wizard/${txRunId}/step`, {
     stepKey:  'service',
     answers:  { designatedService: 'Real estate agency' },
     complete: false,
   });
-  assert2xx(s1, 'PATCH wizard/step — service');
+  assert2xx(s1, 'PATCH wizard/step - service');
 
-  // Step 2 — party
+  // Step 2 - party
   const s2 = await req('PATCH', `/wizard/${txRunId}/step`, {
     stepKey:  'party',
     answers:  { providedFor: 'individual', customerIsNew: true, beneficialOwnersKnown: true },
     complete: false,
   });
-  assert2xx(s2, 'PATCH wizard/step — party');
+  assert2xx(s2, 'PATCH wizard/step - party');
 
-  // Step 3 — risk (PEP flagged)
+  // Step 3 - risk (PEP flagged)
   const s3 = await req('PATCH', `/wizard/${txRunId}/step`, {
     stepKey:  'risk',
     answers:  {
@@ -267,15 +275,15 @@ async function testTransactionWizard() {
     },
     complete: false,
   });
-  assert2xx(s3, 'PATCH wizard/step — risk (PEP=true)');
+  assert2xx(s3, 'PATCH wizard/step - risk (PEP=true)');
 
-  // Step 4 — transaction (final, >$10k triggers TTR signal)
+  // Step 4 - transaction (final, >$10k triggers TTR signal)
   const s4 = await req('PATCH', `/wizard/${txRunId}/step`, {
     stepKey:  'transaction',
     answers:  { transactionValue: 950000, currency: 'AUD' },
     complete: true,
   });
-  assert2xx(s4, 'PATCH wizard/step — transaction (complete=true, $950k)');
+  assert2xx(s4, 'PATCH wizard/step - transaction (complete=true, $950k)');
 
   if (ok2xx(s4)) {
     const rr = s4.data?.data?.routeResult;
@@ -293,11 +301,109 @@ async function testTransactionWizard() {
       : fail('approvalPath wrong', rr?.approvalPath);
     Array.isArray(rr?.escalations) && rr.escalations.length >= 2
       ? pass(`escalations: ${rr.escalations.length} items (PEP + source of funds + TTR)`)
-      : fail('expected ≥2 escalations', rr?.escalations);
+      : fail('expected >=2 escalations', rr?.escalations);
   }
 }
 
-// ─── 4. Case summary ─────────────────────────────────────────────────────────
+// --- 4. Case summary ---------------------------------------------------------
+async function runTransactionScenario({ label, partyType, risk = {}, value = 500, expectedChecks = [], expectedRisk = 'low', expectPartyRequirements = false }) {
+  const c = await req('POST', '/cases', {
+    caseType:          'TRANSACTION_CDD',
+    title:             `Scenario - ${label}`,
+    designatedService: 'Real estate agency',
+    partyType,
+  });
+  if (!assert2xx(c, `Scenario ${label}: create case`)) return;
+  const caseId = idOf(c);
+
+  const start = await req('POST', '/wizard/start', {
+    caseId,
+    wizardType: 'TRANSACTION_CDD',
+  });
+  if (!assert2xx(start, `Scenario ${label}: start wizard`)) return;
+  const runId = idOf(start);
+
+  await req('PATCH', `/wizard/${runId}/step`, {
+    stepKey: 'service',
+    answers: { designatedService: 'Real estate agency' },
+    complete: false,
+  });
+  await req('PATCH', `/wizard/${runId}/step`, {
+    stepKey: 'party',
+    answers: { providedFor: partyType, customerIsNew: true, beneficialOwnersKnown: partyType !== 'trust' },
+    complete: false,
+  });
+  await req('PATCH', `/wizard/${runId}/step`, {
+    stepKey: 'risk',
+    answers: {
+      politicallyExposedPerson: false,
+      adverseMedia: false,
+      highRiskJurisdiction: false,
+      complexOwnership: false,
+      sourceOfFundsRequired: false,
+      ...risk,
+    },
+    complete: false,
+  });
+  const final = await req('PATCH', `/wizard/${runId}/step`, {
+    stepKey: 'transaction',
+    answers: { transactionValue: value, currency: 'AUD' },
+    complete: true,
+  });
+  if (!assert2xx(final, `Scenario ${label}: complete wizard`)) return;
+
+  const rr = final.data?.data?.routeResult;
+  rr?.riskLevel === expectedRisk
+    ? pass(`Scenario ${label}: riskLevel=${expectedRisk}`)
+    : fail(`Scenario ${label}: expected riskLevel=${expectedRisk}`, rr);
+  expectedChecks.every(check => rr?.recommendedChecks?.includes(check))
+    ? pass(`Scenario ${label}: recommended checks include ${expectedChecks.join(', ')}`)
+    : fail(`Scenario ${label}: missing expected checks`, rr?.recommendedChecks);
+  if (expectPartyRequirements) {
+    Array.isArray(rr?.requiredPartyChecks) && rr.requiredPartyChecks.length >= 2
+      ? pass(`Scenario ${label}: people-behind-entity requirements present`)
+      : fail(`Scenario ${label}: missing requiredPartyChecks`, rr);
+  }
+
+  const run = await req('GET', `/wizard/${runId}`);
+  if (ok2xx(run)) {
+    run.data?.data?.run?.answers?.service?.designatedService === 'Real estate agency'
+      ? pass(`Scenario ${label}: wizard resume answers persisted`)
+      : fail(`Scenario ${label}: wizard resume answers missing`, run.data?.data?.run?.answers);
+  }
+}
+
+async function testTransactionScenarios() {
+  section('3B. TRANSACTION SCENARIOS - low risk, company, trust, beneficial owner');
+  await runTransactionScenario({
+    label: 'individual low risk',
+    partyType: 'individual',
+    expectedChecks: ['kyc', 'aml_screening'],
+    expectedRisk: 'low',
+  });
+  await runTransactionScenario({
+    label: 'company',
+    partyType: 'company',
+    risk: { complexOwnership: true },
+    expectedChecks: ['kyb', 'company_aml'],
+    expectedRisk: 'medium',
+    expectPartyRequirements: true,
+  });
+  await runTransactionScenario({
+    label: 'trust',
+    partyType: 'trust',
+    expectedChecks: ['kyb', 'company_aml'],
+    expectedRisk: 'medium',
+    expectPartyRequirements: true,
+  });
+  await runTransactionScenario({
+    label: 'beneficial owner',
+    partyType: 'beneficial_owner',
+    expectedChecks: ['kyc', 'aml_screening'],
+    expectedRisk: 'low',
+  });
+}
+
 async function testCaseSummary() {
   section('4. CASE SUMMARY');
   if (!programCaseId) return fail('Case summary', 'no programCaseId');
@@ -322,17 +428,17 @@ async function testCaseSummary() {
       const hasDetail = data.audit.some(e => e.detail !== undefined);
       hasDetail
         ? fail('audit entries use .detail instead of .reason (Bug 5 not fixed)', data.audit[0])
-        : pass('audit entries use .reason (not .detail) — Bug 5 OK');
+        : pass('audit entries use .reason (not .detail) - Bug 5 OK');
     }
   }
 }
 
-// ─── 5. Didit sessions ───────────────────────────────────────────────────────
+// --- 5. Didit sessions -------------------------------------------------------
 let diditSessionId  = null;
 let diditSession2Id = null;
 
 async function testDidit() {
-  section('5. DIDIT — create session, list, mock-complete, multiple results, idempotency');
+  section('5. DIDIT - create session, list, mock-complete, multiple results, idempotency');
   if (!transactionCaseId) return fail('Didit session', 'no transactionCaseId');
 
   const config = await req('GET', '/providers/didit/config-status');
@@ -345,6 +451,12 @@ async function testDidit() {
     d?.apiKey === undefined && d?.webhookSecret === undefined && d?.DIDIT_API_KEY === undefined
       ? pass('Didit config-status does not expose secrets')
       : fail('Didit config-status leaked secret-looking fields', d);
+    Array.isArray(d?.freeCapabilities) && d.freeCapabilities.includes('kyc')
+      ? pass('Didit config marks KYC as free-capable')
+      : fail('Didit config missing free KYC capability', d);
+    Array.isArray(d?.paidCapabilities) && d.paidCapabilities.includes('kyb') && d.paidCapabilities.includes('aml_screening')
+      ? pass('Didit config marks AML/KYB as paid-capability checks')
+      : fail('Didit config missing paid capability guidance', d);
   }
 
   const blocked = await req('POST', '/providers/didit/session', {
@@ -378,11 +490,11 @@ async function testDidit() {
     capability: 'kyc',
     subjectId:  'individual-john-smith-001',
     contactDetails: { email: 'john.smith@example.com' },
-    reason:     'CDD — M1 Test — residential sale $950k PEP individual',
+    reason:     'CDD - M1 Test - residential sale $950k PEP individual',
   });
   assert2xx(create, 'POST /providers/didit/session (kyc)');
 
-  // Bug 6 fix: verify response shape — verificationUrl and mode are inside data, not at root
+  // Bug 6 fix: verify response shape - verificationUrl and mode are inside data, not at root
   if (ok2xx(create)) {
     const d = create.data?.data;
     diditSessionId = d?.session?.id ?? idOf(create);
@@ -401,17 +513,17 @@ async function testDidit() {
     // Bug 7 fix: mock mode returns null verificationUrl, not a fake URL
     if (d?.mode === 'mock') {
       d?.verificationUrl === null
-        ? pass('Mock mode: verificationUrl = null (Bug 7 OK — no fake URL)')
+        ? pass('Mock mode: verificationUrl = null (Bug 7 OK - no fake URL)')
         : fail('Mock mode: verificationUrl should be null', d?.verificationUrl);
     }
   }
 
-  // AML screening session (second check — for multiple results test)
+  // AML screening session (second check - for multiple results test)
   const create2 = await req('POST', '/providers/didit/session', {
     caseId:     transactionCaseId,
     capability: 'aml_screening',
     subjectId:  'individual-john-smith-001',
-    reason:     'PEP/Sanctions screening — M1 Test',
+    reason:     'PEP/Sanctions screening - M1 Test',
   });
   assert2xx(create2, 'POST /providers/didit/session (aml_screening)');
   if (ok2xx(create2)) diditSession2Id = create2.data?.data?.session?.id;
@@ -424,10 +536,10 @@ async function testDidit() {
     const sessions = list.data?.data ?? [];
     sessions.length >= 2
       ? pass(`${sessions.length} didit sessions listed for case`)
-      : fail(`Expected ≥2 sessions, got ${sessions.length}`, sessions.map(s => s.capability));
+      : fail(`Expected >=2 sessions, got ${sessions.length}`, sessions.map(s => s.capability));
   }
 
-  // Mock complete first session (KYC — Approved)
+  // Mock complete first session (KYC - Approved)
   if (diditSessionId) {
     const mock = await req('POST', `/providers/didit/mock-complete/${diditSessionId}`, {
       outcome: 'Approved',
@@ -441,12 +553,12 @@ async function testDidit() {
     }
   }
 
-  // Mock complete second session (AML — Review)
+  // Mock complete second session (AML - Review)
   if (diditSession2Id) {
     const mock2 = await req('POST', `/providers/didit/mock-complete/${diditSession2Id}`, {
       outcome: 'Review',
     });
-    assert2xx(mock2, `POST /providers/didit/mock-complete/${diditSession2Id} (Review — AML)`);
+    assert2xx(mock2, `POST /providers/didit/mock-complete/${diditSession2Id} (Review - AML)`);
 
     if (ok2xx(mock2)) {
       mock2.data?.result?.stored
@@ -461,7 +573,7 @@ async function testDidit() {
     const results = summaryWithResults.data?.data?.results ?? [];
     results.length >= 2
       ? pass(`Bug 4 fix: case summary returns ${results.length} results (all sessions)`)
-      : fail(`Bug 4 fix: expected ≥2 results in summary, got ${results.length}`, results);
+      : fail(`Bug 4 fix: expected >=2 results in summary, got ${results.length}`, results);
   }
 
   const connectedSummary = await req('GET', `/cases/${transactionCaseId}/summary`);
@@ -485,7 +597,7 @@ async function testDidit() {
     const sessionDetail = await req('GET', `/providers/didit/sessions/${diditSessionId}`);
     if (ok2xx(sessionDetail)) {
       const provReqId = sessionDetail.data?.data?.session?.providerRequestId;
-      // Send a raw webhook with same webhook_id — should be deduped (duplicate:true)
+      // Send a raw webhook with same webhook_id - should be deduped (duplicate:true)
       const webhookBody = {
         webhook_id:   `dedupe-test-${diditSessionId}`,
         session_id:   provReqId ?? `mock_${diditSessionId}`,
@@ -498,7 +610,7 @@ async function testDidit() {
       const wh1 = await req('POST', '/providers/didit/webhook', webhookBody);
       assert2xx(wh1, 'POST /providers/didit/webhook (first, stores)');
 
-      // Second identical event (same webhook_id) — should deduplicate
+      // Second identical event (same webhook_id) - should deduplicate
       const wh2 = await req('POST', '/providers/didit/webhook', webhookBody);
       if (ok2xx(wh2)) {
         wh2.data?.duplicate === true
@@ -508,15 +620,15 @@ async function testDidit() {
     }
   }
 
-  // Idempotency — try creating same session again (should 200 reuse or 409)
+  // Idempotency - try creating same session again (should 200 reuse or 409)
   const idem = await req('POST', '/providers/didit/session', {
     caseId:     transactionCaseId,
     capability: 'kyc',
     subjectId:  'individual-john-smith-001',
-    reason:     'CDD — M1 Test — residential sale $950k PEP individual',
+    reason:     'CDD - M1 Test - residential sale $950k PEP individual',
   });
   [200, 201, 409].includes(idem.status)
-    ? pass(`Idempotency: POST /session (same key) → HTTP ${idem.status}`)
+    ? pass(`Idempotency: POST /session (same key) -> HTTP ${idem.status}`)
     : fail('Idempotency: unexpected status', { status: idem.status, data: idem.data });
 
   // Verify idempotency reuse response shape (Bug 6 for reuse path)
@@ -531,7 +643,7 @@ async function testDidit() {
   }
 }
 
-// ─── 6. PDF generation ───────────────────────────────────────────────────────
+// --- 6. PDF generation -------------------------------------------------------
 async function testReviewerDecisionAndEvidence() {
   section('6. REVIEWER DECISION, TASKS, ESCALATION, EVIDENCE PACK');
   if (!transactionCaseId) return fail('Reviewer decision', 'no transactionCaseId');
@@ -603,10 +715,10 @@ async function testPdf() {
   const pdfSize = body.byteLength;
   pdfSize > 100
     ? pass(`PDF size ${pdfSize} bytes (non-empty, reason field used correctly)`)
-    : fail('PDF too small — likely crashed on .detail access', pdfSize);
+    : fail('PDF too small - likely crashed on .detail access', pdfSize);
 }
 
-// ─── 7. Case updated from wizard ─────────────────────────────────────────────
+// --- 7. Case updated from wizard ---------------------------------------------
 async function testCaseUpdated() {
   section('7. CASE STATUS AFTER WIZARD');
 
@@ -626,16 +738,17 @@ async function testCaseUpdated() {
   }
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// --- Main ---------------------------------------------------------------------
 (async () => {
-  console.log('\n╔════════════════════════════════════════════════════════════════╗');
-  console.log('║   Integrity Solve — Milestone 1 API Test Suite                ║');
-  console.log('╚════════════════════════════════════════════════════════════════╝');
+  console.log('\n+================================================================+');
+  console.log('|   Integrity Solve - Milestone 1 API Test Suite                |');
+  console.log('+================================================================+');
 
   await testAuth();
   await testCases();
   await testProgramWizard();
   await testTransactionWizard();
+  await testTransactionScenarios();
   await testCaseSummary();
   await testDidit();
   await testReviewerDecisionAndEvidence();
@@ -643,9 +756,9 @@ async function testCaseUpdated() {
   await testCaseUpdated();
 
   const total = passCount + failCount;
-  console.log('\n╔════════════════════════════════════════════════════════════════╗');
-  console.log(`║  RESULTS: ${passCount}/${total} passed, ${failCount} failed${' '.repeat(Math.max(0, 37 - String(passCount).length - String(total).length - String(failCount).length))}║`);
-  console.log('╚════════════════════════════════════════════════════════════════╝');
+  console.log('\n+================================================================+');
+  console.log(`|  RESULTS: ${passCount}/${total} passed, ${failCount} failed${' '.repeat(Math.max(0, 37 - String(passCount).length - String(total).length - String(failCount).length))}|`);
+  console.log('+================================================================+');
   if (failures.length > 0) {
     console.log('\n  Failures:');
     for (const f of failures) console.log(f);

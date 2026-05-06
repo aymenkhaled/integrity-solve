@@ -19,6 +19,7 @@ import {
   FileText, ArrowRight, RefreshCw, AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DESIGNATED_SERVICES } from '@shared/caseWorkflow';
 
 interface Case {
   id: string;
@@ -46,25 +47,19 @@ const RISK_BADGE: Record<string, string> = {
 };
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
-  DRAFT:       <Clock className="h-4 w-4 text-muted-foreground" />,
-  IN_PROGRESS: <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />,
-  COMPLETED:   <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
-  ARCHIVED:    <FileText className="h-4 w-4 text-muted-foreground" />,
+  DRAFT:             <Clock className="h-4 w-4 text-muted-foreground" />,
+  IN_PROGRESS:       <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />,
+  AWAITING_CUSTOMER: <UserAwareIcon />,
+  AWAITING_CHECKS:   <Shield className="h-4 w-4 text-blue-500" />,
+  AWAITING_REVIEW:   <AlertTriangle className="h-4 w-4 text-amber-500" />,
+  EVIDENCE_READY:    <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+  COMPLETED:         <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+  ARCHIVED:          <FileText className="h-4 w-4 text-muted-foreground" />,
 };
 
-const DESIGNATED_SERVICES = [
-  'Account providers',
-  'Bullion dealers',
-  'Digital currency exchange',
-  'Gambling service providers',
-  'International funds transfer',
-  'Loan providers',
-  'Mortgage brokers',
-  'Real estate agents',
-  'Solicitors / Conveyancers',
-  'Superannuation trustees',
-  'Other remittance dealers',
-];
+function UserAwareIcon() {
+  return <AlertCircle className="h-4 w-4 text-amber-500" />;
+}
 
 export default function CasesPage() {
   const qc              = useQueryClient();
@@ -266,7 +261,7 @@ export default function CasesPage() {
         </div>
       )}
 
-      {cases.length > 50 && (
+      {cases.length > 0 && (
         <Card>
           <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
             <Input

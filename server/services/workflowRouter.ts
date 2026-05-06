@@ -1,5 +1,5 @@
 /**
- * server/services/workflowRouter.ts — Milestone 1 wizard routing logic.
+ * server/services/workflowRouter.ts - Milestone 1 wizard routing logic.
  * Routes program-setup and transaction/CDD wizard answers to recommended
  * checks, risk levels, and escalation paths.
  */
@@ -43,6 +43,8 @@ export type TransactionRouteResult = {
   recommendedChecks: string[];
   approvalPath: 'standard_cdd_can_proceed' | 'reviewer_or_compliance_officer_required';
   escalations: string[];
+  requiredPartyChecks: string[];
+  requiredDocuments: string[];
   caseSummaryInputs: string[];
 };
 
@@ -57,7 +59,7 @@ export function routeProgramWizard(answers: ProgramAnswers): ProgramRouteResult 
     (answers.designatedServices?.length ?? 0) > 1 ? 'multiple designated services' : null,
     (answers.locations?.length ?? 0) > 1 ? 'multiple office locations' : null,
     answers.existingAmlProgram === false ? 'no existing AML/CTF program' : null,
-    answers.staffCount && answers.staffCount > 50 ? 'large staff count — training program required' : null,
+    answers.staffCount && answers.staffCount > 50 ? 'large staff count - training program required' : null,
   ].filter(Boolean) as string[];
 
   return {
@@ -78,14 +80,28 @@ export function routeProgramWizard(answers: ProgramAnswers): ProgramRouteResult 
 export function routeTransactionWizard(answers: TransactionAnswers): TransactionRouteResult {
   const checks: string[] = [];
   const escalations: string[] = [];
+  const requiredPartyChecks: string[] = [];
+  const requiredDocuments: string[] = [
+    'designated service evidence',
+    'customer identity or entity details',
+    'transaction purpose and value',
+  ];
 
   // Route checks by party type
   if (answers.providedFor === 'individual' || answers.providedFor === 'beneficial_owner') {
     checks.push('kyc', 'aml_screening');
+    requiredDocuments.push('identity document evidence');
   }
 
   if (answers.providedFor === 'company' || answers.providedFor === 'trust') {
     checks.push('kyb', 'company_aml');
+    requiredDocuments.push('company, trust, or registry evidence');
+    requiredDocuments.push('beneficial owner / controller details');
+    requiredPartyChecks.push(
+      'collect directors, officers, trustees, and controllers',
+      'run person-level identity verification for each required beneficial owner / controller',
+      'run person-level AML screening for each required beneficial owner / controller',
+    );
     if (answers.beneficialOwnersKnown === false || answers.complexOwnership) {
       escalations.push('beneficial ownership review required');
     }
@@ -97,9 +113,11 @@ export function routeTransactionWizard(answers: TransactionAnswers): Transaction
   if (answers.highRiskJurisdiction) escalations.push('high-risk jurisdiction review required');
   if (answers.sourceOfFundsRequired) {
     escalations.push('source of funds / source of wealth evidence required');
+    requiredDocuments.push('source of funds / source of wealth evidence');
   }
   if (answers.transactionValue && answers.transactionValue >= 10000) {
-    escalations.push('threshold transaction report (TTR) may be required — value ≥ $10,000 AUD');
+    escalations.push('threshold transaction report (TTR) may be required - value >= $10,000 AUD');
+    requiredDocuments.push('threshold transaction report assessment');
   }
 
   const riskLevel: 'low' | 'medium' | 'high' =
@@ -114,11 +132,14 @@ export function routeTransactionWizard(answers: TransactionAnswers): Transaction
       ? 'reviewer_or_compliance_officer_required'
       : 'standard_cdd_can_proceed',
     escalations,
+    requiredPartyChecks: [...new Set(requiredPartyChecks)],
+    requiredDocuments: [...new Set(requiredDocuments)],
     caseSummaryInputs: [
       'designated service',
       'party type',
       'recommended checks',
       'risk triggers',
+      'required people and documents',
       'reviewer decision',
       'audit timeline',
     ],

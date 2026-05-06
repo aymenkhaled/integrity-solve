@@ -1,5 +1,5 @@
 /**
- * client/src/lib/api.ts — Typed fetch wrapper for the backend API.
+ * client/src/lib/api.ts - Typed fetch wrapper for the backend API.
  */
 import type { ApiResponse } from '@shared/types';
 
@@ -49,7 +49,7 @@ export const api = {
   delete: <T>(path: string, body?: unknown)  => request<T>('DELETE', path, body),
 };
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
+// --- Auth --------------------------------------------------------------------
 
 export const authApi = {
   register:            (data: unknown) => api.post('/auth/register', data),
@@ -63,7 +63,7 @@ export const authApi = {
   changePassword:      (data: { currentPassword: string; newPassword: string }) => api.post('/auth/change-password', data),
 };
 
-// ─── Workspace ────────────────────────────────────────────────────────────────
+// --- Workspace ----------------------------------------------------------------
 
 export const workspaceApi = {
   current:         ()              => api.get('/workspaces/current'),
@@ -74,7 +74,7 @@ export const workspaceApi = {
   acceptInvitation:(token: string)  => api.post('/workspaces/invitations/accept', { token }),
 };
 
-// ─── Customers ────────────────────────────────────────────────────────────────
+// --- Customers ----------------------------------------------------------------
 
 export const customerApi = {
   list:         (params?: Record<string, unknown>) =>
@@ -89,7 +89,7 @@ export const customerApi = {
   createBO:     (id: string, data: unknown) => api.post(`/customers/${id}/beneficial-owners`, data),
 };
 
-// ─── Checks ───────────────────────────────────────────────────────────────────
+// --- Checks -------------------------------------------------------------------
 
 export const checkApi = {
   run:       (data: unknown)    => api.post('/checks/run', data),
@@ -99,7 +99,7 @@ export const checkApi = {
   override:  (id: string, data: unknown) => api.post(`/checks/${id}/override`, data),
 };
 
-// ─── Escalations / SMR ────────────────────────────────────────────────────────
+// --- Escalations / SMR --------------------------------------------------------
 
 export const escalationApi = {
   list:      ()                => api.get('/escalations'),
@@ -115,7 +115,7 @@ export const escalationApi = {
     api.post(`/escalations/${id}/smr/${smrId}/submit`, { reason }),
 };
 
-// ─── Programs ─────────────────────────────────────────────────────────────────
+// --- Programs -----------------------------------------------------------------
 
 export const programApi = {
   list:    ()                  => api.get('/programs'),
@@ -125,7 +125,7 @@ export const programApi = {
   publish: (id: string, data: unknown) => api.post(`/programs/${id}/publish`, data),
 };
 
-// ─── Tasks ────────────────────────────────────────────────────────────────────
+// --- Tasks --------------------------------------------------------------------
 
 export const taskApi = {
   list:   (params?: Record<string, unknown>) =>
@@ -136,14 +136,14 @@ export const taskApi = {
   delete: (id: string)                 => api.delete(`/tasks/${id}`),
 };
 
-// ─── Audit ────────────────────────────────────────────────────────────────────
+// --- Audit --------------------------------------------------------------------
 
 export const auditApi = {
   list: (params?: Record<string, unknown>) =>
     api.get(`/audit?${new URLSearchParams(params as Record<string, string>).toString()}`),
 };
 
-// ─── Notifications ────────────────────────────────────────────────────────────
+// --- Notifications ------------------------------------------------------------
 
 export const notificationApi = {
   list:    (unreadOnly?: boolean) => api.get(`/notifications${unreadOnly ? '?unread=true' : ''}`),
@@ -151,7 +151,7 @@ export const notificationApi = {
   markAllRead: ()                 => api.post('/notifications/read-all'),
 };
 
-// ─── Billing ──────────────────────────────────────────────────────────────────
+// --- Billing ------------------------------------------------------------------
 
 export const billingApi = {
   overview: ()              => api.get('/billing/overview'),
@@ -160,7 +160,7 @@ export const billingApi = {
   portal:   ()              => api.post('/billing/portal'),
 };
 
-// ─── Documents ────────────────────────────────────────────────────────────────
+// --- Documents ----------------------------------------------------------------
 
 export const documentApi = {
   list:     ()                              => api.get('/documents'),
@@ -168,7 +168,7 @@ export const documentApi = {
   delete:   (id: string)                   => api.delete(`/documents/${id}`),
 };
 
-// ─── Admin ────────────────────────────────────────────────────────────────────
+// --- Admin --------------------------------------------------------------------
 
 export const adminApi = {
   stats:      ()                               => api.get('/admin/stats'),
@@ -182,7 +182,7 @@ export const adminApi = {
     api.get(`/admin/audit?${new URLSearchParams(params as Record<string, string>).toString()}`),
 };
 
-// ─── Training ─────────────────────────────────────────────────────────────────
+// --- Training -----------------------------------------------------------------
 
 export const trainingApi = {
   list:   (params?: Record<string, unknown>) =>
@@ -192,7 +192,7 @@ export const trainingApi = {
   delete: (id: string) => api.delete(`/training/${id}`),
 };
 
-// ─── Alerts ───────────────────────────────────────────────────────────────────
+// --- Alerts -------------------------------------------------------------------
 
 export const alertApi = {
   list:         (params?: Record<string, unknown>) =>
@@ -204,13 +204,13 @@ export const alertApi = {
   falsePositive:(id: string, note: string) => api.post(`/alerts/${id}/false-positive`, { resolutionNote: note }),
 };
 
-// ─── Providers ────────────────────────────────────────────────────────────────
+// --- Providers ----------------------------------------------------------------
 
 export const providersApi = {
   list: () => api.get('/providers'),
 };
 
-// ─── Groups (D2) ──────────────────────────────────────────────────────────────
+// --- Groups (D2) --------------------------------------------------------------
 
 export const groupsApi = {
   list:   () => api.get('/groups'),
@@ -218,7 +218,7 @@ export const groupsApi = {
   unlink: (childId: string) => api.delete(`/groups/link/${childId}`),
 };
 
-// ─── Gateway (D8) ─────────────────────────────────────────────────────────────
+// --- Gateway (D8) -------------------------------------------------------------
 
 export const gatewayApi = {
   listKeys:  () => api.get('/gateway/keys'),
@@ -228,14 +228,14 @@ export const gatewayApi = {
   getUsage:  () => api.get('/gateway/usage'),
 };
 
-// ─── White-label (D5) ─────────────────────────────────────────────────────────
+// --- White-label (D5) ---------------------------------------------------------
 
 export const whitelabelApi = {
   get:    () => api.get('/whitelabel'),
   update: (body: Record<string, unknown>) => api.patch('/whitelabel', body),
 };
 
-// ─── Analytics ────────────────────────────────────────────────────────────────
+// --- Analytics ----------------------------------------------------------------
 
 export const analyticsApi = {
   smr:       () => api.get('/analytics/smr'),
@@ -244,14 +244,14 @@ export const analyticsApi = {
   dashboard: () => api.get('/analytics/dashboard'),
 };
 
-// ─── Risk Intelligence ────────────────────────────────────────────────────────
+// --- Risk Intelligence --------------------------------------------------------
 
 export const riskApi = {
   analytics: () => api.get('/risk/analytics'),
   signals:   () => api.get('/risk/signals'),
 };
 
-// ─── Cases (Milestone 1) ──────────────────────────────────────────────────────
+// --- Cases (Milestone 1) ------------------------------------------------------
 
 export const casesApi = {
   list:    ()                  => api.get('/cases'),
@@ -278,7 +278,7 @@ export const casesApi = {
     api.post(`/cases/${id}/generate-evidence-pack`, {}),
 };
 
-// ─── Wizard (Milestone 1) ─────────────────────────────────────────────────────
+// --- Wizard (Milestone 1) -----------------------------------------------------
 
 export const wizardApi = {
   start:    (data: { caseId: string; wizardType: 'PROGRAM_SETUP' | 'TRANSACTION_CDD' }) =>
@@ -289,7 +289,7 @@ export const wizardApi = {
   forCase:  (caseId: string)   => api.get(`/wizard/case/${caseId}`),
 };
 
-// ─── Didit (Milestone 1) ──────────────────────────────────────────────────────
+// --- Didit (Milestone 1) ------------------------------------------------------
 
 export const diditApi = {
   configStatus: () => api.get('/providers/didit/config-status'),
@@ -311,7 +311,7 @@ export const diditApi = {
     api.post(`/providers/didit/mock-complete/${sessionId}`, { outcome }),
 };
 
-// ─── Reviews ──────────────────────────────────────────────────────────────────
+// --- Reviews ------------------------------------------------------------------
 
 export const reviewApi = {
   list:     (params?: Record<string, unknown>) =>

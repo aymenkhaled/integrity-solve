@@ -1,15 +1,15 @@
 /**
- * server/routes/cases.ts — Case management endpoints.
+ * server/routes/cases.ts - Case management endpoints.
  *
- * POST   /api/cases                          — create a new case
- * GET    /api/cases                          — list cases for workspace
- * PATCH  /api/cases/:id                      — update case fields
- * GET    /api/cases/:id/summary              — full case summary (all linked modules)
- * POST   /api/cases/:id/link-customer        — link a customer to a case
- * POST   /api/cases/:id/reviewer-decision    — record reviewer decision
- * POST   /api/cases/:id/escalation           — create escalation linked to case
- * POST   /api/cases/:id/generate-evidence-pack — generate evidence pack document
- * GET    /api/cases/:id/pdf                  — download case summary PDF
+ * POST   /api/cases                          - create a new case
+ * GET    /api/cases                          - list cases for workspace
+ * PATCH  /api/cases/:id                      - update case fields
+ * GET    /api/cases/:id/summary              - full case summary (all linked modules)
+ * POST   /api/cases/:id/link-customer        - link a customer to a case
+ * POST   /api/cases/:id/reviewer-decision    - record reviewer decision
+ * POST   /api/cases/:id/escalation           - create escalation linked to case
+ * POST   /api/cases/:id/generate-evidence-pack - generate evidence pack document
+ * GET    /api/cases/:id/pdf                  - download case summary PDF
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
@@ -19,6 +19,7 @@ import {
   cases, wizardRuns, diditSessions, diditResults, auditLog, caseOutputs,
   customers, escalations, tasks, checkRequests, checkResults, programForms,
 } from '../../shared/schema.js';
+import { CASE_PARTY_TYPES, CASE_RISK_LEVELS, CASE_STATUSES, DESIGNATED_SERVICES, checkCapabilityLabel } from '../../shared/caseWorkflow.js';
 import { createId } from '@paralleldrive/cuid2';
 import { getWorkspaceId, getUserId } from '../lib/workspace-guard.js';
 import { requireWorkspace } from '../lib/auth-session.js';
@@ -27,22 +28,31 @@ import { writeAudit } from '../lib/audit.js';
 
 export const casesRouter = Router();
 
-// ─── Schemas ────────────────────────────────────────────────────────────────
+// --- Schemas ----------------------------------------------------------------
 
 const CreateCaseSchema = z.object({
   caseType:          z.enum(['PROGRAM_SETUP', 'TRANSACTION_CDD']),
   title:             z.string().min(2).max(200),
-  designatedService: z.string().optional(),
-  partyType:         z.enum(['individual', 'company', 'trust', 'beneficial_owner']).optional(),
+  designatedService: z.enum(DESIGNATED_SERVICES).optional(),
+  partyType:         z.enum(CASE_PARTY_TYPES).optional(),
   customerId:        z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.caseType === 'TRANSACTION_CDD') {
+    if (!data.designatedService) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['designatedService'], message: 'Designated service is required for transaction/CDD cases' });
+    }
+    if (!data.partyType) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['partyType'], message: 'Party type is required for transaction/CDD cases' });
+    }
+  }
 });
 
 const UpdateCaseSchema = z.object({
   title:             z.string().min(2).max(200).optional(),
-  designatedService: z.string().optional(),
-  partyType:         z.string().optional(),
-  status:            z.string().optional(),
-  riskLevel:         z.string().optional(),
+  designatedService: z.enum(DESIGNATED_SERVICES).optional(),
+  partyType:         z.enum(CASE_PARTY_TYPES).optional(),
+  status:            z.enum(CASE_STATUSES).optional(),
+  riskLevel:         z.enum(CASE_RISK_LEVELS).optional(),
   recommendation:    z.string().optional(),
   metadata:          z.record(z.unknown()).optional(),
 });
@@ -97,7 +107,7 @@ function customerTypeFromCase(partyType?: string | null): typeof customers.$infe
   return 'INDIVIDUAL';
 }
 
-// ─── PDF helpers ─────────────────────────────────────────────────────────────
+// --- PDF helpers -------------------------------------------------------------
 
 function escapePdf(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
@@ -149,7 +159,7 @@ function buildPdf(lines: string[]): Buffer {
   return Buffer.from(pdf);
 }
 
-// ─── POST /api/cases ──────────────────────────────────────────────────────────
+// --- POST /api/cases ----------------------------------------------------------
 
 casesRouter.post('/api/cases', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -191,7 +201,7 @@ casesRouter.post('/api/cases', requireWorkspace, async (req: Request, res: Respo
   } catch (err) { next(err); }
 });
 
-// ─── GET /api/cases ───────────────────────────────────────────────────────────
+// --- GET /api/cases -----------------------------------------------------------
 
 casesRouter.get('/api/cases', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -208,7 +218,7 @@ casesRouter.get('/api/cases', requireWorkspace, async (req: Request, res: Respon
   } catch (err) { next(err); }
 });
 
-// ─── PATCH /api/cases/:id ─────────────────────────────────────────────────────
+// --- PATCH /api/cases/:id -----------------------------------------------------
 
 casesRouter.patch('/api/cases/:id', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -239,7 +249,7 @@ casesRouter.patch('/api/cases/:id', requireWorkspace, async (req: Request, res: 
   } catch (err) { next(err); }
 });
 
-// ─── POST /api/cases/:id/link-customer ───────────────────────────────────────
+// --- POST /api/cases/:id/link-customer ---------------------------------------
 
 casesRouter.post('/api/cases/:id/link-customer', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -265,7 +275,11 @@ casesRouter.post('/api/cases/:id/link-customer', requireWorkspace, async (req: R
     if (!cust) throw new NotFoundError('Customer');
 
     const [updated] = await db.update(cases)
-      .set({ customerId: body.customerId, updatedAt: new Date() })
+      .set({
+        customerId: body.customerId,
+        status:     caseRow.status === 'AWAITING_CUSTOMER' ? 'AWAITING_CHECKS' : caseRow.status,
+        updatedAt:  new Date(),
+      })
       .where(eq(cases.id, req.params['id'] as string))
       .returning();
 
@@ -278,7 +292,7 @@ casesRouter.post('/api/cases/:id/link-customer', requireWorkspace, async (req: R
   } catch (err) { next(err); }
 });
 
-// ─── POST /api/cases/:id/reviewer-decision ────────────────────────────────────
+// --- POST /api/cases/:id/reviewer-decision ------------------------------------
 
 // POST /api/cases/:id/create-customer-from-case
 casesRouter.post('/api/cases/:id/create-customer-from-case', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
@@ -323,7 +337,11 @@ casesRouter.post('/api/cases/:id/create-customer-from-case', requireWorkspace, a
     }).returning();
 
     const [updated] = await db.update(cases)
-      .set({ customerId: customer.id, updatedAt: new Date() })
+      .set({
+        customerId: customer.id,
+        status:     caseRow.status === 'AWAITING_CUSTOMER' ? 'AWAITING_CHECKS' : caseRow.status,
+        updatedAt:  new Date(),
+      })
       .where(eq(cases.id, caseRow.id))
       .returning();
 
@@ -364,6 +382,7 @@ casesRouter.post('/api/cases/:id/reviewer-decision', requireWorkspace, async (re
         reviewerDecisionBy: userId,
         reviewerDecisionAt: new Date(),
         reviewerNotes:      body.notes ?? null,
+        status:             body.decision === 'approve_proceed' ? 'EVIDENCE_READY' : 'AWAITING_REVIEW',
         updatedAt:          new Date(),
       })
       .where(eq(cases.id, req.params['id'] as string))
@@ -428,7 +447,7 @@ casesRouter.post('/api/cases/:id/reviewer-decision', requireWorkspace, async (re
   } catch (err) { next(err); }
 });
 
-// ─── POST /api/cases/:id/escalation ──────────────────────────────────────────
+// --- POST /api/cases/:id/escalation ------------------------------------------
 
 casesRouter.post('/api/cases/:id/escalation', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -477,7 +496,7 @@ casesRouter.post('/api/cases/:id/escalation', requireWorkspace, async (req: Requ
   } catch (err) { next(err); }
 });
 
-// ─── POST /api/cases/:id/generate-evidence-pack ──────────────────────────────
+// --- POST /api/cases/:id/generate-evidence-pack ------------------------------
 
 casesRouter.post('/api/cases/:id/generate-evidence-pack', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -586,11 +605,15 @@ casesRouter.post('/api/cases/:id/generate-evidence-pack', requireWorkspace, asyn
       { action: 'case.evidence_pack_generated', entityType: 'case', entityId: caseRow.id, reason: 'Evidence pack generated' },
     );
 
+    await db.update(cases)
+      .set({ status: 'EVIDENCE_READY', updatedAt: new Date() })
+      .where(eq(cases.id, caseRow.id));
+
     res.json({ ok: true, data: { outputId: packOutput.id, generatedAt: now, taskCount: caseTasks.length, sessionCount: sessionRows.length, checkCount: checkReqs.length } });
   } catch (err) { next(err); }
 });
 
-// ─── GET /api/cases/:id/summary ──────────────────────────────────────────────
+// --- GET /api/cases/:id/summary ----------------------------------------------
 
 casesRouter.get('/api/cases/:id/summary', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -694,7 +717,7 @@ casesRouter.get('/api/cases/:id/summary', requireWorkspace, async (req: Request,
   } catch (err) { next(err); }
 });
 
-// ─── GET /api/cases/:id/pdf ───────────────────────────────────────────────────
+// --- GET /api/cases/:id/pdf ---------------------------------------------------
 
 casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -707,6 +730,12 @@ casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res
       .where(and(eq(cases.id, req.params['id'] as string), eq(cases.workspaceId, workspaceId)));
 
     if (!caseRow) return void next(new NotFoundError('Case'));
+
+    const wizardRunsRows = await db
+      .select()
+      .from(wizardRuns)
+      .where(eq(wizardRuns.caseId, caseRow.id))
+      .orderBy(desc(wizardRuns.createdAt));
 
     const sessionRows = await db
       .select()
@@ -780,6 +809,15 @@ casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res
       `Reviewer decision:  ${caseRow.reviewerDecision ?? 'pending'}`,
       `Reviewer notes:     ${caseRow.reviewerNotes ?? 'none'}`,
       '',
+      '-- Wizard Answers and Routing --',
+      ...(wizardRunsRows.length
+        ? wizardRunsRows.flatMap(run => [
+            `  ${run.wizardType} status=${run.status} currentStep=${run.currentStep}`,
+            `  Route result: ${JSON.stringify(run.routeResult ?? {}).slice(0, 900)}`,
+            `  Answers: ${JSON.stringify(run.answers ?? {}).slice(0, 900)}`,
+          ])
+        : ['  No wizard run stored']),
+      '',
       '-- Linked Customer --',
       ...(custRow
         ? [
@@ -814,7 +852,7 @@ casesRouter.get('/api/cases/:id/pdf', requireWorkspace, async (req: Request, res
       '',
       '-- Verification Checks --',
       ...(sessionRows.length
-        ? sessionRows.map(c => `  ${c.capability.padEnd(16)} status=${c.status}  session=${c.providerRequestId ?? 'pending'}`)
+        ? sessionRows.map(c => `  ${checkCapabilityLabel(c.capability).padEnd(32)} status=${c.status}  session=${c.providerRequestId ?? 'pending'}`)
         : ['  No checks initiated yet']),
       '',
       '-- Didit Results --',

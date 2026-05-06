@@ -62,7 +62,7 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
   return (
     <div className="flex items-start gap-2 py-2.5 border-b last:border-0">
       <div className="text-sm text-muted-foreground w-40 flex-shrink-0">{label}</div>
-      <div className="text-sm font-medium flex-1">{value || '—'}</div>
+      <div className="text-sm font-medium flex-1">{value || '-'}</div>
     </div>
   );
 }
@@ -131,7 +131,7 @@ export default function CustomerDetailPage() {
       reason: checkForm.reason,
     }),
     onSuccess: () => {
-      toast.success('Check initiated — results will appear shortly');
+      toast.success('Check initiated - results will appear shortly');
       qc.invalidateQueries({ queryKey: ['checks', params.id] });
       setRunCheckOpen(false);
     },
@@ -264,9 +264,11 @@ export default function CustomerDetailPage() {
             <UserCheck className="h-3.5 w-3.5" />
             Status
           </Button>
-          <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1.5" onClick={() => setRunCheckOpen(true)}>
-            <RefreshCw className="h-3.5 w-3.5" />
-            Run Check
+          <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1.5" asChild>
+            <Link href="/cases">
+              <RefreshCw className="h-3.5 w-3.5" />
+              Open Case Workflow
+            </Link>
           </Button>
         </div>
       </div>
@@ -333,7 +335,7 @@ export default function CustomerDetailPage() {
                         <Users className="h-6 w-6 text-primary" />
                       </div>
                       <p className="text-sm text-muted-foreground max-w-xs">
-                        No beneficial owners recorded. For companies and trusts, you must identify all beneficial owners with ≥25% ownership.
+                        No beneficial owners recorded. For companies and trusts, you must identify all beneficial owners with 25% or more ownership.
                       </p>
                       <Button size="sm" variant="outline" className="mt-4 gap-1.5" onClick={() => setAddOwnerOpen(true)}>
                         <Plus className="h-3.5 w-3.5" /> Add first owner
@@ -348,8 +350,8 @@ export default function CustomerDetailPage() {
                               <div className="font-medium text-sm">{bo.givenNames} {bo.familyName}</div>
                               <div className="text-xs text-muted-foreground mt-0.5">
                                 <span className="font-semibold text-foreground">{bo.ownershipPct}%</span> ownership
-                                {bo.isController ? ' · Controller' : ''}
-                                {bo.roleTitle ? ` · ${bo.roleTitle}` : ''}
+                                {bo.isController ? ' - Controller' : ''}
+                                {bo.roleTitle ? ` - ${bo.roleTitle}` : ''}
                               </div>
                             </div>
                             <StatusBadge status={bo.identityStatus} />
@@ -370,9 +372,11 @@ export default function CustomerDetailPage() {
                     <ShieldAlert className="h-4 w-4 text-primary" />
                     Identity & Screening Checks
                   </CardTitle>
-                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1.5" onClick={() => setRunCheckOpen(true)}>
-                    <Plus className="h-3.5 w-3.5" />
-                    Run check
+                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1.5" asChild>
+                    <Link href="/cases">
+                      <Plus className="h-3.5 w-3.5" />
+                      Open case workflow
+                    </Link>
                   </Button>
                 </CardHeader>
                 <CardContent className={checksLoading || checks.length > 0 ? 'p-0' : undefined}>
@@ -383,10 +387,14 @@ export default function CustomerDetailPage() {
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 mb-3">
                         <ShieldAlert className="h-6 w-6 text-primary" />
                       </div>
-                      <p className="text-sm text-muted-foreground mb-4">No checks run yet. Run identity, sanctions, PEP, and registry checks to verify this customer.</p>
-                      <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0" onClick={() => setRunCheckOpen(true)}>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        For Didit verification, open or create a Case. Cases guide the user through wizard routing, customer linkage, Didit results, review, and evidence.
+                      </p>
+                      <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white border-0" asChild>
+                        <Link href="/cases">
                         <Plus className="h-3.5 w-3.5 mr-1.5" />
-                        Run first check
+                        Open case workflow
+                        </Link>
                       </Button>
                     </div>
                   ) : (
@@ -410,7 +418,7 @@ export default function CustomerDetailPage() {
                               </div>
                               <div className="text-xs text-muted-foreground mt-0.5">
                                 {formatDateTime(check.createdAt)}
-                                {check.completedAt && ` · Completed ${formatDateTime(check.completedAt)}`}
+                                {check.completedAt && ` - Completed ${formatDateTime(check.completedAt)}`}
                               </div>
                             </div>
                             {check.results && check.results.length > 0 && (
@@ -456,7 +464,7 @@ export default function CustomerDetailPage() {
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{doc.fileName ?? doc.documentType}</div>
                             <div className="text-xs text-muted-foreground mt-0.5">
-                              {doc.documentType.replace(/_/g, ' ')} · {formatDate(doc.createdAt)}
+                              {doc.documentType.replace(/_/g, ' ')} - {formatDate(doc.createdAt)}
                             </div>
                           </div>
                           <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
@@ -550,7 +558,7 @@ export default function CustomerDetailPage() {
         </div>
       </div>
 
-      {/* ─── Edit Customer Dialog ─────────────────────────────────────── */}
+      {/* --- Edit Customer Dialog --------------------------------------- */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -601,13 +609,13 @@ export default function CustomerDetailPage() {
             <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               disabled={updateCustomer.isPending}
               onClick={() => updateCustomer.mutate(editForm)}>
-              {updateCustomer.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</> : 'Save changes'}
+              {updateCustomer.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : 'Save changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ─── Risk Rating Dialog ───────────────────────────────────────── */}
+      {/* --- Risk Rating Dialog ----------------------------------------- */}
       <Dialog open={riskOpen} onOpenChange={setRiskOpen}>
         <DialogContent>
           <DialogHeader>
@@ -643,7 +651,7 @@ export default function CustomerDetailPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Risk notes</Label>
-              <Textarea rows={3} placeholder="Reason for this risk classification…"
+              <Textarea rows={3} placeholder="Reason for this risk classification..."
                 value={riskForm.riskNotes} onChange={(e) => setRiskForm((p) => ({ ...p, riskNotes: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
@@ -657,13 +665,13 @@ export default function CustomerDetailPage() {
             <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               disabled={updateRisk.isPending || !riskForm.riskRating || riskForm.reason.trim().length < 10}
               onClick={() => updateRisk.mutate({ riskRating: riskForm.riskRating, cddLevel: riskForm.cddLevel, riskNotes: riskForm.riskNotes, reason: riskForm.reason })}>
-              {updateRisk.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</> : 'Update risk'}
+              {updateRisk.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : 'Update risk'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ─── Status Change Dialog ─────────────────────────────────────── */}
+      {/* --- Status Change Dialog --------------------------------------- */}
       <Dialog open={statusOpen} onOpenChange={setStatusOpen}>
         <DialogContent>
           <DialogHeader>
@@ -695,13 +703,13 @@ export default function CustomerDetailPage() {
             <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               disabled={updateStatus.isPending || !statusForm.status || statusForm.reason.trim().length < 10}
               onClick={() => updateStatus.mutate(statusForm)}>
-              {updateStatus.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</> : 'Update status'}
+              {updateStatus.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : 'Update status'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ─── Run Check Dialog ─────────────────────────────────────────── */}
+      {/* --- Run Check Dialog ------------------------------------------- */}
       <Dialog open={runCheckOpen} onOpenChange={setRunCheckOpen}>
         <DialogContent>
           <DialogHeader>
@@ -749,13 +757,13 @@ export default function CustomerDetailPage() {
             <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               disabled={runCheck.isPending || checkForm.reason.trim().length < 10}
               onClick={() => runCheck.mutate()}>
-              {runCheck.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Running…</> : 'Run check'}
+              {runCheck.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Running...</> : 'Run check'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ─── Add Beneficial Owner Dialog ──────────────────────────────── */}
+      {/* --- Add Beneficial Owner Dialog -------------------------------- */}
       <Dialog open={addOwnerOpen} onOpenChange={setAddOwnerOpen}>
         <DialogContent>
           <DialogHeader>
@@ -798,7 +806,7 @@ export default function CustomerDetailPage() {
               </Label>
             </div>
             <div className="rounded-xl border bg-blue-500/5 border-blue-500/20 px-4 py-3 text-xs text-muted-foreground">
-              Under the AML/CTF Act, you must identify all beneficial owners who hold ≥25% ownership interest or effective control.
+              Under the AML/CTF Act, you must identify all beneficial owners who hold 25% or more ownership interest or effective control.
             </div>
           </div>
           <DialogFooter>
@@ -806,7 +814,7 @@ export default function CustomerDetailPage() {
             <Button className="bg-indigo-600 hover:bg-indigo-500 text-white border-0"
               disabled={addOwner.isPending || !ownerForm.givenNames || !ownerForm.familyName || !ownerForm.ownershipPct}
               onClick={() => addOwner.mutate()}>
-              {addOwner.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Adding…</> : 'Add owner'}
+              {addOwner.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Adding...</> : 'Add owner'}
             </Button>
           </DialogFooter>
         </DialogContent>

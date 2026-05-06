@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { wizardApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import {
   AlertTriangle, Loader2, Building2, Users, MapPin, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DESIGNATED_SERVICES } from '@shared/caseWorkflow';
 
 const INDUSTRY_PATHWAYS = [
   { value: 'real_estate',    label: 'Real Estate Agents / Conveyancers' },
@@ -27,13 +28,6 @@ const INDUSTRY_PATHWAYS = [
   { value: 'bullion',        label: 'Bullion Dealers' },
   { value: 'remittance',     label: 'Remittance / International Transfer' },
   { value: 'other',          label: 'Other Regulated Entity' },
-];
-
-const DESIGNATED_SERVICES_OPTIONS = [
-  'Account providers', 'Bullion dealing', 'Digital currency exchange',
-  'Gambling services', 'International funds transfer', 'Loan provision',
-  'Mortgage broking', 'Real estate agency', 'Remittance dealing',
-  'Superannuation services', 'Solicitor / Conveyancing services',
 ];
 
 const STEPS = [
@@ -50,6 +44,22 @@ type StepAnswers = {
   structure:  { businessStructure: string; staffCount: number; abn: string };
   locations:  { locations: string[] };
   program:    { existingAmlProgram: boolean; complianceOfficerNamed: boolean; riskApproach: string };
+};
+
+interface WizardDetail {
+  run: {
+    status: string;
+    currentStep: string;
+    answers?: Partial<StepAnswers>;
+    routeResult?: Record<string, unknown>;
+  };
+}
+
+const DEFAULT_ANSWERS: Partial<StepAnswers> = {
+  services:  { designatedServices: [] },
+  locations: { locations: [] },
+  structure: { businessStructure: '', staffCount: 1, abn: '' },
+  program:   { existingAmlProgram: false, complianceOfficerNamed: false, riskApproach: '' },
 };
 
 function stepComplete(key: string, answers: Partial<StepAnswers>): boolean {
@@ -72,14 +82,30 @@ export default function ProgramWizardPage() {
   const qc                = useQueryClient();
 
   const [step,    setStep]    = useState(0);
-  const [answers, setAnswers] = useState<Partial<StepAnswers>>({
-    services:  { designatedServices: [] },
-    locations: { locations: [] },
-    structure: { businessStructure: '', staffCount: 1, abn: '' },
-    program:   { existingAmlProgram: false, complianceOfficerNamed: false, riskApproach: '' },
-  });
+  const [answers, setAnswers] = useState<Partial<StepAnswers>>(DEFAULT_ANSWERS);
   const [routeResult, setRouteResult] = useState<Record<string, unknown> | null>(null);
   const [completed,   setCompleted]   = useState(false);
+
+  const { data: wizardDetail, isLoading: wizardLoading } = useQuery<WizardDetail>({
+    queryKey: ['wizard-run', runId],
+    queryFn:  () => wizardApi.get(runId!) as Promise<WizardDetail>,
+    enabled:  !!runId,
+  });
+
+  useEffect(() => {
+    if (!wizardDetail) return;
+    setAnswers({ ...DEFAULT_ANSWERS, ...(wizardDetail.run.answers ?? {}) });
+    if (wizardDetail.run.routeResult && Object.keys(wizardDetail.run.routeResult).length > 0) {
+      setRouteResult(wizardDetail.run.routeResult);
+    }
+    if (wizardDetail.run.status === 'COMPLETED' && wizardDetail.run.routeResult) {
+      setCompleted(true);
+    }
+    const savedStep = STEPS.findIndex(s => s.key === wizardDetail.run.currentStep);
+    if (savedStep >= 0 && wizardDetail.run.status !== 'COMPLETED') {
+      setStep(savedStep);
+    }
+  }, [wizardDetail]);
 
   const saveMutation = useMutation({
     mutationFn: (payload: { stepKey: string; answers: Record<string, unknown>; complete: boolean }) =>
@@ -205,6 +231,10 @@ export default function ProgramWizardPage() {
         </p>
       </div>
 
+      {wizardLoading && (
+        <div className="text-sm text-muted-foreground">Loading saved wizard progress...</div>
+      )}
+
       {/* Progress */}
       <div className="flex gap-1.5">
         {STEPS.map((s, i) => (
@@ -251,7 +281,7 @@ export default function ProgramWizardPage() {
               </Label>
               <p className="text-sm text-muted-foreground">Select all that apply under the AML/CTF Act</p>
               <div className="space-y-2">
-                {DESIGNATED_SERVICES_OPTIONS.map(svc => {
+                {DESIGNATED_SERVICES.map(svc => {
                   const selected   = answers.services?.designatedServices ?? [];
                   const isSelected = selected.includes(svc);
                   return (

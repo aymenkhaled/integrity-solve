@@ -1,9 +1,9 @@
 /**
- * server/services/didit.ts — Didit integration service.
+ * server/services/didit.ts - Didit integration service.
  * Supports mock mode (DIDIT_MODE=mock) and sandbox/live mode.
  * Uses vendor_data = diditSession.id for webhook mapping.
  *
- * Free tier (500/mo via Workflows): kyc — ID Verification, Liveness, Face Match, IP Analysis.
+ * Free tier (500/mo via Workflows): kyc - ID Verification, Liveness, Face Match, IP Analysis.
  * Paid (requires credits): aml_screening, company_aml, kyb, NFC, Database Validation.
  */
 
@@ -21,7 +21,7 @@ export function isCapabilityPaid(cap: DiditCapability): boolean {
 
 export type CreateDiditSessionInput = {
   capability:     DiditCapability;
-  sessionId:      string;       // diditSessions.id — used as vendor_data
+  sessionId:      string;       // diditSessions.id - used as vendor_data
   workspaceId:    string;
   caseId:         string;
   checkRequestId?: string | null;
@@ -46,7 +46,7 @@ function getBaseUrl(): string {
  *
  * IMPORTANT: For free-tier sandbox testing (no credits required), create a KYC-ONLY
  * workflow in business.didit.me that uses ONLY: ID Verification + Liveness + Face Match.
- * Do NOT include AML Screening in that workflow — AML requires purchased credits.
+ * Do NOT include AML Screening in that workflow - AML requires purchased credits.
  */
 function workflowIdFor(capability: DiditCapability): string {
   if (capability === 'kyb' || capability === 'company_aml') {
@@ -73,7 +73,7 @@ function buildCreditsError(capability: DiditCapability): string {
   }
   return (
     `Your KYC workflow includes paid steps (e.g. AML Screening). ` +
-    `Create a KYC-only workflow in business.didit.me → Workflows → New Workflow, ` +
+    `Create a KYC-only workflow in business.didit.me -> Workflows -> New Workflow, ` +
     `adding only: ID Verification + Passive Liveness + Face Match (no AML). ` +
     `Or set DIDIT_MODE=mock to test the full flow locally without credits.`
   );
@@ -85,7 +85,7 @@ export async function createDiditSession(
   const mode       = process.env['DIDIT_MODE'] ?? 'mock';
   const workflowId = workflowIdFor(input.capability);
 
-  // Mock mode: return null verificationUrl — use "Mock Complete" button in UI
+  // Mock mode: return null verificationUrl - use "Mock Complete" button in UI
   if (mode === 'mock') {
     return {
       providerRequestId: `mock_${input.sessionId}`,
@@ -104,12 +104,12 @@ export async function createDiditSession(
 
   // Sandbox / live mode: require credentials
   if (!process.env['DIDIT_API_KEY']) {
-    throw new Error('DIDIT_API_KEY is not set — required for sandbox/live mode');
+    throw new Error('DIDIT_API_KEY is not set - required for sandbox/live mode');
   }
   const wfKey = input.capability === 'kyb' || input.capability === 'company_aml'
     ? 'DIDIT_WORKFLOW_ID_KYB' : 'DIDIT_WORKFLOW_ID_KYC';
   if (!process.env[wfKey]) {
-    throw new Error(`${wfKey} is not set — required for capability: ${input.capability}`);
+    throw new Error(`${wfKey} is not set - required for capability: ${input.capability}`);
   }
 
   const baseUrl  = getBaseUrl();
@@ -144,7 +144,7 @@ export async function createDiditSession(
     if (detail.toLowerCase().includes('credit') || detail.toLowerCase().includes('top up')) {
       throw new Error(`DIDIT_NO_CREDITS: ${buildCreditsError(input.capability)}`);
     }
-    throw new Error(`Didit session creation failed: ${response.status} — ${detail}`);
+    throw new Error(`Didit session creation failed: ${response.status} - ${detail}`);
   }
 
   const data = (body['data'] ?? {}) as Record<string, unknown>;

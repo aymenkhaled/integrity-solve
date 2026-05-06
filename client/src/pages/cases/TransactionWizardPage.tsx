@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { wizardApi } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { casesApi, wizardApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,15 +17,8 @@ import {
   Loader2, Users, Building2, DollarSign, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CHECK_CAPABILITY_COPY, DESIGNATED_SERVICES, checkCapabilityLabel } from '@shared/caseWorkflow';
 
-const DESIGNATED_SERVICES = [
-  'Account providers',          'Bullion dealing',
-  'Digital currency exchange',  'Gambling services',
-  'International funds transfer', 'Loan provision',
-  'Mortgage broking',           'Real estate agency',
-  'Remittance dealing',         'Superannuation services',
-  'Solicitor / Conveyancing services',
-];
 
 const STEPS = [
   { key: 'service',     label: 'Designated Service',   icon: Building2 },
@@ -41,6 +34,28 @@ type TransactionAnswers = {
   transaction: { transactionValue: number; currency: string };
 };
 
+interface CaseSummaryLite {
+  case: {
+    designatedService?: string;
+    partyType?: TransactionAnswers['party']['providedFor'];
+  };
+}
+
+interface WizardDetail {
+  run: {
+    status: string;
+    currentStep: string;
+    answers?: Partial<TransactionAnswers>;
+    routeResult?: Record<string, unknown>;
+  };
+}
+
+const DEFAULT_ANSWERS: Partial<TransactionAnswers> = {
+  party:       { providedFor: 'individual', customerIsNew: true, beneficialOwnersKnown: true },
+  risk:        { politicallyExposedPerson: false, adverseMedia: false, highRiskJurisdiction: false, complexOwnership: false, sourceOfFundsRequired: false },
+  transaction: { transactionValue: 0, currency: 'AUD' },
+};
+
 function stepComplete(key: string, a: Partial<TransactionAnswers>): boolean {
   if (key === 'service')     return !!a.service?.designatedService;
   if (key === 'party')       return !!a.party?.providedFor;
@@ -50,10 +65,10 @@ function stepComplete(key: string, a: Partial<TransactionAnswers>): boolean {
 }
 
 const PARTY_OPTIONS = [
-  { value: 'individual',       label: 'Individual',                    icon: '👤', desc: 'Natural person customer' },
-  { value: 'company',          label: 'Company',                       icon: '🏢', desc: 'Pty Ltd or similar entity' },
-  { value: 'trust',            label: 'Trust',                         icon: '⚖️', desc: 'Discretionary or unit trust' },
-  { value: 'beneficial_owner', label: 'Beneficial Owner / Controller', icon: '🔑', desc: 'UBO or controlling person' },
+  { value: 'individual',       label: 'Individual',                    icon: 'ID', desc: 'Natural person customer' },
+  { value: 'company',          label: 'Company',                       icon: 'CO', desc: 'Pty Ltd or similar entity' },
+  { value: 'trust',            label: 'Trust',                         icon: 'TR', desc: 'Discretionary or unit trust' },
+  { value: 'beneficial_owner', label: 'Beneficial Owner / Controller', icon: 'BO', desc: 'UBO or controlling person' },
 ];
 
 const RISK_FLAGS = [
@@ -75,13 +90,56 @@ export default function TransactionWizardPage() {
   const qc                = useQueryClient();
 
   const [step,    setStep]    = useState(0);
-  const [answers, setAnswers] = useState<Partial<TransactionAnswers>>({
-    party:       { providedFor: 'individual', customerIsNew: true, beneficialOwnersKnown: true },
-    risk:        { politicallyExposedPerson: false, adverseMedia: false, highRiskJurisdiction: false, complexOwnership: false, sourceOfFundsRequired: false },
-    transaction: { transactionValue: 0, currency: 'AUD' },
-  });
+  const [answers, setAnswers] = useState<Partial<TransactionAnswers>>(DEFAULT_ANSWERS);
   const [routeResult, setRouteResult] = useState<Record<string, unknown> | null>(null);
   const [completed,   setCompleted]   = useState(false);
+
+  const { data: caseSummary } = useQuery<CaseSummaryLite>({
+    queryKey: ['case-summary', caseId],
+    queryFn:  () => casesApi.summary(caseId!) as Promise<CaseSummaryLite>,
+    enabled:  !!caseId,
+  });
+
+  const { data: wizardDetail, isLoading: wizardLoading } = useQuery<WizardDetail>({
+    queryKey: ['wizard-run', runId],
+    queryFn:  () => wizardApi.get(runId!) as Promise<WizardDetail>,
+    enabled:  !!runId,
+  });
+
+  useEffect(() => {
+    if (!wizardDetail) return;
+
+    const saved = wizardDetail.run.answers ?? {};
+    const prefilled: Partial<TransactionAnswers> = {
+      ...DEFAULT_ANSWERS,
+      ...saved,
+      service: saved.service ?? (
+        caseSummary?.case.designatedService
+          ? { designatedService: caseSummary.case.designatedService }
+          : undefined
+      ),
+      party: {
+        ...DEFAULT_ANSWERS.party!,
+        ...(saved.party ?? {}),
+        ...(caseSummary?.case.partyType && !saved.party?.providedFor
+          ? { providedFor: caseSummary.case.partyType }
+          : {}),
+      },
+    };
+
+    setAnswers(prefilled);
+    if (wizardDetail.run.routeResult && Object.keys(wizardDetail.run.routeResult).length > 0) {
+      setRouteResult(wizardDetail.run.routeResult);
+    }
+    if (wizardDetail.run.status === 'COMPLETED' && wizardDetail.run.routeResult) {
+      setCompleted(true);
+    }
+
+    const savedStep = STEPS.findIndex(s => s.key === wizardDetail.run.currentStep);
+    if (savedStep >= 0 && wizardDetail.run.status !== 'COMPLETED') {
+      setStep(savedStep);
+    }
+  }, [caseSummary, wizardDetail]);
 
   const saveMutation = useMutation({
     mutationFn: (payload: { stepKey: string; answers: Record<string, unknown>; complete: boolean }) =>
@@ -108,6 +166,8 @@ export default function TransactionWizardPage() {
   if (completed && routeResult) {
     const riskLevel         = (routeResult['riskLevel'] as string) ?? 'low';
     const recommendedChecks = (routeResult['recommendedChecks'] as string[]) ?? [];
+    const requiredPartyChecks = (routeResult['requiredPartyChecks'] as string[]) ?? [];
+    const requiredDocuments = (routeResult['requiredDocuments'] as string[]) ?? [];
     const approvalPath      = (routeResult['approvalPath'] as string) ?? '';
     const escalations       = (routeResult['escalations'] as string[]) ?? [];
 
@@ -149,11 +209,32 @@ export default function TransactionWizardPage() {
             {recommendedChecks.map(check => (
               <div key={check} className="flex items-center gap-2 border rounded-lg p-3">
                 <Zap className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium uppercase">{check}</span>
+                <div>
+                  <span className="text-sm font-medium">{checkCapabilityLabel(check)}</span>
+                  <div className="text-xs text-muted-foreground">
+                    {CHECK_CAPABILITY_COPY[check as keyof typeof CHECK_CAPABILITY_COPY]?.tier === 'paid'
+                      ? 'Requires Didit credits'
+                      : 'KYC-only workflow can use free checks'}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         </div>
+
+        {(requiredPartyChecks.length > 0 || requiredDocuments.length > 0) && (
+          <div>
+            <h3 className="font-semibold mb-3">People and Evidence Required</h3>
+            <div className="space-y-2">
+              {[...requiredPartyChecks, ...requiredDocuments].map(item => (
+                <div key={item} className="flex items-start gap-2 text-sm border rounded-lg p-3">
+                  <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Escalations */}
         {escalations.length > 0 && (
@@ -214,6 +295,10 @@ export default function TransactionWizardPage() {
           Step {step + 1} of {STEPS.length} - {current.label}
         </p>
       </div>
+
+      {wizardLoading && (
+        <div className="text-sm text-muted-foreground">Loading saved wizard progress...</div>
+      )}
 
       {/* Progress */}
       <div className="flex gap-1.5">
@@ -300,17 +385,22 @@ export default function TransactionWizardPage() {
                 </div>
 
                 {(answers.party?.providedFor === 'company' || answers.party?.providedFor === 'trust') && (
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      id="boKnown"
-                      checked={answers.party?.beneficialOwnersKnown ?? true}
-                      onCheckedChange={v => setAnswers(a => ({
-                        ...a, party: { ...a.party!, beneficialOwnersKnown: !!v },
-                      }))}
-                    />
-                    <label htmlFor="boKnown" className="text-sm cursor-pointer">
-                      All beneficial owners (25%+ ownership) are known and identifiable
-                    </label>
+                  <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="boKnown"
+                        checked={answers.party?.beneficialOwnersKnown ?? true}
+                        onCheckedChange={v => setAnswers(a => ({
+                          ...a, party: { ...a.party!, beneficialOwnersKnown: !!v },
+                        }))}
+                      />
+                      <label htmlFor="boKnown" className="text-sm cursor-pointer">
+                        All beneficial owners, controllers, directors/officers, or trustees are known and identifiable
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Company and trust cases require KYB plus person-level identity and AML checks for the people behind the entity.
+                    </p>
                   </div>
                 )}
               </div>

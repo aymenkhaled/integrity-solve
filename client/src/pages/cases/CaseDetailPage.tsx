@@ -20,8 +20,9 @@ import {
   Package, ClipboardCheck, Plus, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { checkCapabilityDescription, checkCapabilityLabel } from '@shared/caseWorkflow';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// --- Types -------------------------------------------------------------------
 
 interface CustomerRecord {
   id: string; referenceNumber: string; customerType: string; status: string;
@@ -66,7 +67,8 @@ interface CaseSummary {
 
 interface WizardRun {
   id: string; wizardType: string; status: string; currentStep: string;
-  routeResult?: Record<string, unknown>; completedAt?: string; createdAt: string;
+  routeResult?: Record<string, unknown>; answers?: Record<string, unknown>;
+  completedAt?: string; createdAt: string;
 }
 
 interface DiditSession {
@@ -104,7 +106,7 @@ interface AuditEntry {
   id: string; action: string; reason?: string; createdAt: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// --- Constants ----------------------------------------------------------------
 
 const RISK_COLOR: Record<string, string> = {
   low:          'text-emerald-600 dark:text-emerald-400',
@@ -144,7 +146,7 @@ const REVIEWER_DECISIONS = [
   { value: 'escalate_officer',   label: 'Escalate to Compliance Officer', icon: ArrowUpCircle },
 ];
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// --- Component ----------------------------------------------------------------
 
 export default function CaseDetailPage() {
   const { id }       = useParams<{ id: string }>();
@@ -178,7 +180,7 @@ export default function CaseDetailPage() {
     subject: '', summary: '', grounds: '', riskRating: 'HIGH',
   });
 
-  // ─── Queries ───────────────────────────────────────────────────────────────
+  // --- Queries ---------------------------------------------------------------
 
   const { data: summary, isLoading, error } = useQuery<CaseSummary>({
     queryKey: ['case-summary', id],
@@ -201,7 +203,7 @@ export default function CaseDetailPage() {
     enabled:  showLinkCustomer,
   });
 
-  // ─── Mutations ─────────────────────────────────────────────────────────────
+  // --- Mutations -------------------------------------------------------------
 
   const startWizardMutation = useMutation<WizardRun, Error, string>({
     mutationFn: (wizardType) =>
@@ -345,7 +347,7 @@ export default function CaseDetailPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // ─── Loading / Error states ────────────────────────────────────────────────
+  // --- Loading / Error states ------------------------------------------------
 
   if (isLoading) {
     return (
@@ -388,6 +390,8 @@ export default function CaseDetailPage() {
   const routeResult      = latestWizard?.routeResult as Record<string, unknown> | undefined;
   const recommendedChecks = (routeResult?.['recommendedChecks'] as string[] | undefined) ?? [];
   const escalationFlags   = (routeResult?.['escalations'] as string[] | undefined) ?? [];
+  const requiredPartyChecks = (routeResult?.['requiredPartyChecks'] as string[] | undefined) ?? [];
+  const requiredDocuments   = (routeResult?.['requiredDocuments'] as string[] | undefined) ?? [];
   const isTransaction     = caseRow.caseType === 'TRANSACTION_CDD';
   const wizardDone        = latestWizard?.status === 'COMPLETED';
   const diditMode         = diditConfig?.mode ?? 'mock';
@@ -403,6 +407,73 @@ export default function CaseDetailPage() {
 
   const openTasks     = tasks.filter(t => t.status !== 'COMPLETE' && t.status !== 'CANCELLED');
   const completeTasks = tasks.filter(t => t.status === 'COMPLETE');
+  const pendingChecks = checks.filter(ch => ['queued', 'processing'].includes(ch.status));
+  const unresolvedChecks = checks.filter(ch => ['failed', 'review_required', 'error'].includes(ch.status));
+  const completedRecommendedChecks = recommendedChecks.filter(cap => checks.some(ch => ch.capability === cap));
+  const missingRecommendedChecks = recommendedChecks.filter(cap => !checks.some(ch => ch.capability === cap));
+  const nextAction = (() => {
+    if (!latestWizard || !wizardDone) {
+      return {
+        title: latestWizard ? 'Continue the guided wizard' : 'Start the guided wizard',
+        body:  'The case needs the wizard result before checks, review, and evidence can be trusted.',
+        tab:   'wizard',
+      };
+    }
+    if (isTransaction && !customer) {
+      return {
+        title: 'Link or create the customer',
+        body:  'Verification evidence must attach to a customer record before Didit checks can start.',
+        tab:   'customer',
+      };
+    }
+    if (!isTransaction && programForm) {
+      return {
+        title: 'Continue the full AML program wizard',
+        body:  'The five-step intake is complete. Continue into the existing full AML program builder for the detailed program record.',
+        tab:   'wizard',
+      };
+    }
+    if (missingRecommendedChecks.length > 0) {
+      return {
+        title: 'Start the recommended checks',
+        body:  `Still needed: ${missingRecommendedChecks.map(checkCapabilityLabel).join(', ')}.`,
+        tab:   'checks',
+      };
+    }
+    if (pendingChecks.length > 0) {
+      return {
+        title: 'Wait for verification results',
+        body:  'One or more Didit sessions are still queued or processing.',
+        tab:   'checks',
+      };
+    }
+    if (unresolvedChecks.length > 0) {
+      return {
+        title: 'Review unresolved check results',
+        body:  'A failed, error, or review-required result needs a reviewer decision before proceeding.',
+        tab:   'checks',
+      };
+    }
+    if (!caseRow.reviewerDecision) {
+      return {
+        title: 'Record reviewer decision',
+        body:  'Approve, request more information, or escalate to the compliance officer.',
+        tab:   'wizard',
+      };
+    }
+    if (!audit.some(a => a.action === 'case.evidence_pack_generated')) {
+      return {
+        title: 'Generate the evidence pack',
+        body:  'Create the final case pack after wizard, checks, and review are complete.',
+        tab:   'audit',
+      };
+    }
+    return {
+      title: 'Case evidence is ready',
+      body:  'The case has wizard output, verification history, reviewer decision, and an evidence trail.',
+      tab:   'audit',
+    };
+  })();
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -424,7 +495,7 @@ export default function CaseDetailPage() {
               </Badge>
               {caseRow.riskLevel && caseRow.riskLevel !== 'not_assessed' && (
                 <span className={cn('text-sm font-semibold capitalize', RISK_COLOR[caseRow.riskLevel])}>
-                  — {caseRow.riskLevel} risk
+                  - {caseRow.riskLevel} risk
                 </span>
               )}
               {isMockMode && (
@@ -486,6 +557,26 @@ export default function CaseDetailPage() {
         ))}
       </div>
 
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <div className="text-sm font-semibold flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-primary" />
+              Next required action: {nextAction.title}
+            </div>
+            <p className="text-sm text-muted-foreground">{nextAction.body}</p>
+            {recommendedChecks.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                Checks started: {completedRecommendedChecks.length}/{recommendedChecks.length}
+              </div>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setActiveTab(nextAction.tab)}>
+            Go to step
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex-wrap h-auto gap-1">
@@ -505,7 +596,7 @@ export default function CaseDetailPage() {
           <TabsTrigger value="audit">Audit</TabsTrigger>
         </TabsList>
 
-        {/* ── Wizard tab ─────────────────────────────────────────────────── */}
+        {/* -- Wizard tab --------------------------------------------------- */}
         <TabsContent value="wizard" className="mt-4 space-y-4">
           {!latestWizard && (
             <Card className="border-dashed">
@@ -555,11 +646,25 @@ export default function CaseDetailPage() {
                     <div className="text-sm font-medium mb-2">Recommended Checks</div>
                     <div className="flex flex-wrap gap-2">
                       {recommendedChecks.map(c => (
-                        <Badge key={c} className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 uppercase text-xs">
-                          {c}
+                        <Badge key={c} className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs">
+                          {checkCapabilityLabel(c)}
                         </Badge>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {(requiredPartyChecks.length > 0 || requiredDocuments.length > 0) && (
+                  <div>
+                    <div className="text-sm font-medium mb-2">People and Evidence Required</div>
+                    <ul className="space-y-1">
+                      {[...requiredPartyChecks, ...requiredDocuments].map(item => (
+                        <li key={item} className="text-sm text-muted-foreground flex items-start gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 
@@ -572,7 +677,7 @@ export default function CaseDetailPage() {
                     <ul className="space-y-1">
                       {escalationFlags.map(e => (
                         <li key={e} className="text-sm text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
-                          <span className="mt-0.5">–</span>{e}
+                          <span className="mt-0.5">-</span>{e}
                         </li>
                       ))}
                     </ul>
@@ -587,7 +692,7 @@ export default function CaseDetailPage() {
                       : 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
                   )}>
                     {caseRow.recommendation === 'standard_cdd_can_proceed'
-                      ? 'Standard CDD — can proceed without reviewer'
+                      ? 'Standard CDD - can proceed without reviewer'
                       : 'Reviewer or Compliance Officer approval required'}
                   </div>
                 )}
@@ -669,7 +774,7 @@ export default function CaseDetailPage() {
           )}
         </TabsContent>
 
-        {/* ── Customer tab ───────────────────────────────────────────────── */}
+        {/* -- Customer tab ------------------------------------------------- */}
         <TabsContent value="customer" className="mt-4 space-y-4">
           {customer ? (
             <Card>
@@ -714,7 +819,7 @@ export default function CaseDetailPage() {
                 </div>
                 <div className="mt-4">
                   <Link href={`/customers/${customer.id}`} className="text-sm text-primary underline">
-                    Open customer record →
+                    Open customer record
                   </Link>
                 </div>
               </CardContent>
@@ -851,7 +956,7 @@ export default function CaseDetailPage() {
                             ? `${c.givenNames ?? ''} ${c.familyName ?? c.entityName ?? ''}`.trim()
                             : 'Unknown'}
                         </div>
-                        <div className="text-xs text-muted-foreground">{c.referenceNumber} · {c.customerType}</div>
+                        <div className="text-xs text-muted-foreground">{c.referenceNumber} - {c.customerType}</div>
                       </div>
                       <Badge variant="outline" className="capitalize text-xs">{c.riskRating.toLowerCase()}</Badge>
                     </button>
@@ -872,7 +977,7 @@ export default function CaseDetailPage() {
           )}
         </TabsContent>
 
-        {/* ── Checks tab ─────────────────────────────────────────────────── */}
+        {/* -- Checks tab --------------------------------------------------- */}
         <TabsContent value="checks" className="mt-4 space-y-4">
           {wizardDone && isTransaction && !customer && recommendedChecks.length > 0 && (
             <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
@@ -900,21 +1005,21 @@ export default function CaseDetailPage() {
             </Card>
           )}
 
-          {/* Sandbox/live billing guidance — only shown when NOT in mock mode */}
+          {/* Sandbox/live billing guidance - only shown when NOT in mock mode */}
           {!isMockMode && (
             <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
               <CardContent className="p-4 space-y-2">
                 <div className="font-medium text-sm flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-blue-600 shrink-0" />
-                  Didit {diditMode} mode — billing notes
+                  Didit {diditMode} mode - billing notes
                 </div>
                 <div className="text-xs text-muted-foreground space-y-1">
-                  <p><span className="font-medium text-emerald-700 dark:text-emerald-400">Free (500/mo):</span> KYC — ID Verification, Passive Liveness, Face Match, IP Analysis</p>
+                  <p><span className="font-medium text-emerald-700 dark:text-emerald-400">Free (500/mo):</span> KYC - ID Verification, Passive Liveness, Face Match, IP Analysis</p>
                   <p><span className="font-medium text-amber-700 dark:text-amber-400">Requires credits ($):</span> AML Screening, KYB / Company verification, NFC, Database Validation</p>
                   <p className="text-blue-700 dark:text-blue-300">
                     For free KYC testing, create a <strong>KYC-only</strong> workflow in{' '}
                     <a href="https://business.didit.me" target="_blank" rel="noreferrer" className="underline">business.didit.me</a>
-                    {' '}→ Workflows → New Workflow, using only: ID Verification + Passive Liveness + Face Match (no AML step).
+                    {' '}then Workflows, then New Workflow, using only: ID Verification + Passive Liveness + Face Match (no AML step).
                     Set that workflow ID as <code className="text-xs bg-muted px-1 rounded">DIDIT_WORKFLOW_ID_KYC</code>.
                   </p>
                 </div>
@@ -943,15 +1048,18 @@ export default function CaseDetailPage() {
                             setStartingCheck(cap);
                             createCheckMutation.mutate(cap);
                           }}
-                          className="gap-2 uppercase text-xs"
-                          title={isPaid ? 'This capability requires Didit credits — top up at business.didit.me' : undefined}
+                          className="gap-2 text-xs"
+                          title={isPaid ? 'This capability requires Didit credits - top up at business.didit.me' : undefined}
                         >
                           <Shield className="h-3.5 w-3.5" />
-                          {startingCheck === cap && createCheckMutation.isPending ? 'Starting...' : cap}
+                          {startingCheck === cap && createCheckMutation.isPending ? 'Starting...' : checkCapabilityLabel(cap)}
                           {alreadyDone && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
                           {isFree && !alreadyDone && <Badge variant="outline" className="text-[10px] px-1 py-0">free</Badge>}
                           {isPaid && !alreadyDone && <span className="text-amber-600 font-bold text-xs">$</span>}
                         </Button>
+                        <span className="text-xs text-muted-foreground px-1 max-w-56">
+                          {checkCapabilityDescription(cap)}
+                        </span>
                         {isPaid && !alreadyDone && (
                           <span className="text-xs text-amber-600 dark:text-amber-400 px-1">requires credits</span>
                         )}
@@ -985,7 +1093,7 @@ export default function CaseDetailPage() {
                       <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Shield className="h-4 w-4 text-primary shrink-0" />
-                          <span className="font-semibold uppercase text-sm">{ch.capability}</span>
+                          <span className="font-semibold text-sm">{checkCapabilityLabel(ch.capability)}</span>
                           <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium capitalize', CHECK_STATUS_BADGE[ch.status] ?? CHECK_STATUS_BADGE['queued'])}>
                             {ch.status.replace('_', ' ')}
                           </span>
@@ -1028,7 +1136,7 @@ export default function CaseDetailPage() {
 
                         <div className="text-xs text-muted-foreground">
                           Created {new Date(ch.createdAt).toLocaleString('en-AU')}
-                          {ch.providerRequestId && ` · ID: ${ch.providerRequestId.slice(0, 20)}...`}
+                          {ch.providerRequestId && ` - ID: ${ch.providerRequestId.slice(0, 20)}...`}
                         </div>
                       </div>
 
@@ -1058,11 +1166,11 @@ export default function CaseDetailPage() {
           </div>
         </TabsContent>
 
-        {/* ── Tasks tab ──────────────────────────────────────────────────── */}
+        {/* -- Tasks tab ---------------------------------------------------- */}
         <TabsContent value="tasks" className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              {openTasks.length} open · {completeTasks.length} complete
+              {openTasks.length} open - {completeTasks.length} complete
             </div>
             <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowAddTask(true)}>
               <Plus className="h-4 w-4" />Add Task
@@ -1158,7 +1266,7 @@ export default function CaseDetailPage() {
           </div>
         </TabsContent>
 
-        {/* ── Escalation tab ─────────────────────────────────────────────── */}
+        {/* -- Escalation tab ----------------------------------------------- */}
         <TabsContent value="escalation" className="mt-4 space-y-4">
           {escalation ? (
             <Card>
@@ -1188,7 +1296,7 @@ export default function CaseDetailPage() {
                   </div>
                 </div>
                 <Link href={`/escalations/${escalation.id}`} className="text-sm text-primary underline">
-                  Open escalation →
+                  Open escalation
                 </Link>
               </CardContent>
             </Card>
@@ -1282,7 +1390,7 @@ export default function CaseDetailPage() {
           )}
         </TabsContent>
 
-        {/* ── Audit tab ──────────────────────────────────────────────────── */}
+        {/* -- Audit tab ---------------------------------------------------- */}
         <TabsContent value="audit" className="mt-4">
           {audit.length === 0 && (
             <div className="text-center text-muted-foreground py-10 text-sm">No audit events yet.</div>

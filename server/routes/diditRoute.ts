@@ -1,11 +1,11 @@
 /**
- * server/routes/diditRoute.ts — Milestone 1 Didit integration endpoints.
+ * server/routes/diditRoute.ts - Milestone 1 Didit integration endpoints.
  *
- * POST /api/providers/didit/session      — create Didit verification session (mock-safe)
- * POST /api/providers/didit/webhook      — receive & process Didit webhook events
- * GET  /api/providers/didit/sessions     — list Didit sessions for workspace
- * GET  /api/providers/didit/sessions/:id — get single session + results
- * POST /api/providers/didit/mock-complete/:id — simulate webhook (dev/mock only)
+ * POST /api/providers/didit/session      - create Didit verification session (mock-safe)
+ * POST /api/providers/didit/webhook      - receive & process Didit webhook events
+ * GET  /api/providers/didit/sessions     - list Didit sessions for workspace
+ * GET  /api/providers/didit/sessions/:id - get single session + results
+ * POST /api/providers/didit/mock-complete/:id - simulate webhook (dev/mock only)
  *
  * Integration bridge:
  * - When a session is created for a case with a linked customer, a checkRequests row
@@ -41,7 +41,7 @@ import { addMinutes } from 'date-fns';
 
 export const diditRouter = Router();
 
-// ─── Schemas ────────────────────────────────────────────────────────────────
+// --- Schemas ----------------------------------------------------------------
 
 const CreateSessionSchema = z.object({
   caseId:     z.string().min(1),
@@ -54,7 +54,7 @@ const CreateSessionSchema = z.object({
   reason: z.string().min(10, 'Reason must be at least 10 characters'),
 });
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// --- Helpers ----------------------------------------------------------------
 
 function idempotencyKey(workspaceId: string, caseId: string, capability: string, subjectId?: string): string {
   return crypto
@@ -172,7 +172,13 @@ async function processWebhookPayload(payload: unknown): Promise<{
     .set({ status: normalized.status, updatedAt: new Date() })
     .where(eq(diditSessions.id, session.id));
 
-  // ── Bridge: create checkResults row if session has a linked checkRequest ──
+  if (['passed', 'failed', 'review_required'].includes(normalized.status)) {
+    await db.update(cases)
+      .set({ status: 'AWAITING_REVIEW', updatedAt: new Date() })
+      .where(eq(cases.id, session.caseId));
+  }
+
+  // -- Bridge: create checkResults row if session has a linked checkRequest --
   if (session.checkRequestId && ['passed', 'failed', 'review_required'].includes(normalized.status)) {
     const outcome = decisionToOutcome(normalized.decision);
     const checkStatus = diditStatusToCheckStatus(normalized.status);
@@ -215,7 +221,7 @@ async function processWebhookPayload(payload: unknown): Promise<{
   return { stored: true, duplicate: false, normalized };
 }
 
-// ─── Routes ─────────────────────────────────────────────────────────────────
+// --- Routes -----------------------------------------------------------------
 
 // GET /api/providers/didit/config-status
 diditRouter.get('/api/providers/didit/config-status', requireWorkspace, async (_req: Request, res: Response) => {
@@ -267,7 +273,7 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       ))
       .limit(1);
 
-    // Already succeeded — return cached result
+    // Already succeeded - return cached result
     if (existing.length > 0 && existing[0].providerRequestId) {
       return void res.json({
         ok:   true,
@@ -344,7 +350,7 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
       sessionRow = newSession;
     }
 
-    // Call Didit API (mock or live) — clean up records on failure instead of 500
+    // Call Didit API (mock or live) - clean up records on failure instead of 500
     let diditResult: DiditSessionResult;
     try {
       diditResult = await createDiditSession({
@@ -367,8 +373,10 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
           .where(eq(checkRequests.id, checkRequestId));
       }
       const raw = (apiErr as Error).message ?? '';
-      const userMsg = raw.includes('credits')
-        ? 'Didit account has no verification credits. Top up at https://business.didit.me, or set DIDIT_MODE=mock for local testing.'
+      const userMsg = raw.includes('DIDIT_NO_CREDITS')
+        ? raw.replace(/^DIDIT_NO_CREDITS:\s*/, '')
+        : raw.includes('credits')
+          ? 'This Didit check requires paid credits. KYC identity verification can still be tested with a KYC-only workflow.'
         : raw.includes('DIDIT_API_KEY')
           ? 'DIDIT_API_KEY is not configured. Add it to Replit Secrets or set DIDIT_MODE=mock.'
           : raw.includes('DIDIT_WORKFLOW_ID')
@@ -434,7 +442,7 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
   } catch (err) { next(err); }
 });
 
-// POST /api/providers/didit/webhook (no auth — Didit calls this directly)
+// POST /api/providers/didit/webhook (no auth - Didit calls this directly)
 diditRouter.post('/api/providers/didit/webhook', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const payload      = req.body as unknown;
