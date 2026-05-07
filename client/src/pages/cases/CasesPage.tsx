@@ -96,7 +96,13 @@ export default function CasesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (body: typeof form) => {
-      const created = await casesApi.create(body) as Case;
+      const payload = {
+        caseType: body.caseType,
+        title:    body.title,
+        ...(body.designatedService ? { designatedService: body.designatedService } : {}),
+        ...(body.partyType         ? { partyType: body.partyType }                 : {}),
+      };
+      const created = await casesApi.create(payload) as Case;
 
       try {
         const run = await wizardApi.start({

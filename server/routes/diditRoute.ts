@@ -359,7 +359,12 @@ diditRouter.post('/api/providers/didit/session', requireWorkspace, async (req: R
         workspaceId,
         caseId:         body.caseId,
         checkRequestId,
-        callbackUrl:    `${env.APP_URL}/verification-complete?case_id=${encodeURIComponent(body.caseId)}`,
+        callbackUrl:    (() => {
+          const proto = req.get('x-forwarded-proto') ?? 'https';
+          const host  = req.get('x-forwarded-host') ?? req.get('host') ?? '';
+          const base  = host ? `${proto}://${host}` : env.APP_URL;
+          return `${base}/verification-complete?case_id=${encodeURIComponent(body.caseId)}&verificationSessionId=${encodeURIComponent(sessionRow.id)}`;
+        })(),
         contactDetails: body.contactDetails,
       });
     } catch (apiErr) {

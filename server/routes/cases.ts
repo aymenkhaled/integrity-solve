@@ -33,8 +33,8 @@ export const casesRouter = Router();
 const CreateCaseSchema = z.object({
   caseType:          z.enum(['PROGRAM_SETUP', 'TRANSACTION_CDD']),
   title:             z.string().min(2).max(200),
-  designatedService: z.enum(DESIGNATED_SERVICES).optional(),
-  partyType:         z.enum(CASE_PARTY_TYPES).optional(),
+  designatedService: z.union([z.enum(DESIGNATED_SERVICES), z.literal('')]).optional().transform(v => v || undefined),
+  partyType:         z.union([z.enum(CASE_PARTY_TYPES), z.literal('')]).optional().transform(v => v || undefined),
   customerId:        z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.caseType === 'TRANSACTION_CDD') {
