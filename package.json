@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "npx concurrently \"tsx watch server/index.ts\" \"vite\"",
+    "dev": "concurrently \"tsx watch server/index.ts\" \"vite\"",
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "NODE_ENV=production node dist/server/server/index.js",
     "db:push": "drizzle-kit push",
