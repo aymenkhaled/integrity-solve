@@ -100,9 +100,7 @@ export default function App() {
         <ProtectedRoute><VerifyEmailPage /></ProtectedRoute>
       </Route>
       <Route path="/verification-complete">
-        <ProtectedRoute>
-          <AppLayout><VerificationCompletePage /></AppLayout>
-        </ProtectedRoute>
+        <VerificationCompletePage />
       </Route>
 
       {/* Protected app routes */}

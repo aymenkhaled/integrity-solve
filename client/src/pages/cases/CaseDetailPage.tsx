@@ -699,16 +699,24 @@ export default function CaseDetailPage() {
 
                 {/* Linked program form from wizard */}
                 {programForm && (
-                  <div className="border rounded-lg p-3 space-y-1 bg-muted/30">
-                    <div className="text-xs text-muted-foreground">Linked AML Program</div>
-                    <div className="font-medium text-sm">{programForm.title}</div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <Badge variant="outline">{programForm.status}</Badge>
-                      {programForm.pathway && <span className="text-muted-foreground">{programForm.pathway}</span>}
-                      <Link href={`/programs/${programForm.id}/wizard`} className="text-primary underline">
+                  <div className="border rounded-lg p-4 space-y-3 bg-primary/5 border-primary/20">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="space-y-0.5">
+                        <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Linked AML Program</div>
+                        <div className="font-semibold text-sm">{programForm.title}</div>
+                        <div className="flex items-center gap-2 text-xs mt-1">
+                          <Badge variant="outline">{programForm.status}</Badge>
+                          {programForm.pathway && <span className="text-muted-foreground">{programForm.pathway}</span>}
+                          <span className="text-muted-foreground">Step {programForm.currentStep + 1} of 13</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button asChild className="w-full gap-2" size="sm">
+                      <Link href={`/programs/${programForm.id}/wizard`}>
+                        <Play className="h-4 w-4" />
                         Continue Full AML Program Wizard
                       </Link>
-                    </div>
+                    </Button>
                   </div>
                 )}
 

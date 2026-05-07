@@ -1,0 +1,91 @@
+Fix Didit verification completion flow AND Program Setup case connection.
+
+Context:
+The app is now creating real Didit sandbox sessions correctly. Didit redirects users back to:
+  /verification-complete?case_id=...&verificationSessionId=...&status=Approved
+
+But the page is empty because /verification-complete is protected by portal authentication. The verifying customer may not be logged into the portal, so this page must be public.
+
+Also, Program Setup cases are still not properly connected. When creating a case with Program Setup / Start Program, the app throws an error or does not continue into the existing full AML Program wizard correctly. This must be fixed so Program Setup cases connect to the existing 13-step AML Program flow.
+
+Tasks:
+
+1. Fix /verification-complete public route
+- In client/src/App.tsx, make /verification-complete a public route.
+- Do not wrap it in ProtectedRoute.
+- Prefer not to wrap it in AppLayout unless AppLayout works without auth.
+- The page must work in incognito / logged-out browser.
+
+2. Improve VerificationCompletePage
+- Read query params:
+  - case_id or caseId
+  - verificationSessionId
+  - status
+- Display a simple standalone page:
+  - “Verification submitted”
+  - Status received from Didit
+  - Verification session ID
+  - “You may close this page.”
+  - “The final result will appear in the compliance case after Didit sends the webhook.”
+- If the portal user is logged in and case_id exists, show “Back to Case”.
+- If not logged in, do not redirect to login and do not show protected app navigation.
+
+3. Verify webhook behavior separately
+- Confirm Didit webhook URL is:
+  https://YOUR-REPLIT-URL/api/providers/didit/webhook
+- After completing Didit, Replit logs should show:
+  POST /api/providers/didit/webhook
+- If webhook arrives, update didit_sessions, didit_results, check_requests, check_results, case summary, and audit log.
+- If webhook does not arrive, do not fake success. The completion page should only say submitted, not passed.
+
+4. Fix Program Setup case connection
+- Creating a Program Setup case must not dead-end or throw an error.
+- Program Setup case should start the 5-step case-level Program Setup wizard first.
+- When the 5-step case wizard is completed:
+  - create or link a valid program_forms row
+  - currentStep must be valid between 0 and 12
+  - store the 5-step intake answers in formData.case_intake
+  - link programFormId back to the case
+- Case Detail must show a clear button:
+  “Continue Full AML Program Wizard”
+- This button must route to:
+  /programs/:programFormId/wizard
+- Do not route to /programs/:id unless that page is the actual wizard.
+- Do not replace or break the existing 13-step AML Program wizard.
+- The existing full AML Program wizard must remain usable for normal program records too.
+
+5. Program Setup case expected flow
+- User creates Program Setup case.
+- User completes case-level Program Setup wizard.
+- Case stores obligation/routing summary.
+- App creates/links program form.
+- User clicks “Continue Full AML Program Wizard”.
+- User lands in existing 13-step program wizard with the linked program form.
+- The program wizard can continue from currentStep 0 or existing saved step.
+
+6. Add/extend tests
+Run and pass:
+  npm run typecheck
+  npm run build
+  node scripts/test-api.mjs
+  node scripts/test-milestone1.mjs
+
+Add/confirm tests for:
+- /verification-complete loads without auth.
+- /verification-complete displays status and verificationSessionId.
+- /verification-complete does not redirect to login when logged out.
+- Program Setup case creation works.
+- Program Setup case wizard completion creates/links program_forms.
+- program_forms.currentStep is between 0 and 12.
+- program_forms.formData.case_intake exists.
+- Case Detail “Continue Full AML Program Wizard” points to /programs/:programFormId/wizard.
+- Existing 13-step AML Program wizard still works.
+
+7. Final report
+Include:
+- exact files changed
+- exact commands run
+- test results
+- whether webhook was received in logs
+- whether Program Setup case now links to full AML Program wizard
+- any remaining limitations
